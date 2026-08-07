@@ -79,20 +79,46 @@
         h('span.hero-k', 'مؤجَّر'), h('span.hero-v.count-up', String(rented))]),
       h('div.hero-item.hero-bad', { onclick: () => go('#units', { st: 'notEarning', b: F.b }) }, [
         h('span.hero-k', 'شاغرة'), h('span.hero-v.count-up', String(us.length - rented))]),
-      h('div.hero-item', [
+      h('div.hero-item', { onclick: () => go('#matrix', { b: F.b }) }, [
         h('span.hero-k', 'المطلوب تحصيله — ' + Store.periodLabel(m)),
         h('span.hero-v.count-up', money(mt.due + mt.unknownDue, { bare: true }))]),
-      h('div.hero-item', [
+      h('div.hero-item', { onclick: () => go('#matrix', { b: F.b }) }, [
         h('span.hero-k', 'ما تم تحصيله'),
         h('span.hero-v.count-up' + (mt.rate != null && mt.rate < 0.7 ? '.val-critical' : ''), money(mt.collected, { bare: true }))]),
-      h('div.hero-item.hero-score', [
+      h('div.hero-item.hero-score', { onclick: () => openHealthDrawer(health) }, [
         h('span.hero-k', 'التقييم العام'),
         h('span.hero-gauge', [
           h('span.hero-v.count-up', String(health.score)),
           h('span.hero-max', '/100'),
         ]),
+        h('span.hero-hint', 'اضغط للتفاصيل'),
       ]),
     ]);
+
+    /* شرح التقييم العام بأرقامه الفعلية — الرقم لازم يفسّر نفسه */
+    function openHealthDrawer(hh) {
+      const rows = [
+        ['نسبة التحصيل الشهرية', hh.parts.collectScore, 40, 'كلما حصَّلت أكثر من المستحق ارتفعت النقاط'],
+        ['نسبة الإشغال', hh.parts.occScore, 25, 'الوحدات المؤجَّرة من إجمالي الوحدات'],
+        ['اكتمال التأكيد', 15 - hh.parts.unknownPenalty, 15, 'تنخفض كلما زادت المبالغ التي لم يُحسم أمرها (سداد أم تأخير؟)'],
+        ['حداثة المتأخرات', 10 - hh.parts.agingPenalty, 10, 'تنخفض كلما تقادمت المتأخرات فوق 90 يومًا'],
+        ['أمان العقود', 10 - hh.parts.expiringPenalty, 10, 'تنخفض مع كثرة العقود المنتهية أو القريبة من الانتهاء دون تجديد'],
+      ];
+      openDrawer('التقييم العام — كيف يُحسب؟', [
+        h('p.step-hint', 'رقم واحد من 100 يلخِّص وضع مشاريعك، مجموع خمسة مكوّنات محسوبة من بياناتك الفعلية:'),
+        h('table.table.table-mini', [
+          h('thead', h('tr', [h('th', 'المكوِّن'), h('th', 'نقاطك'), h('th', 'من'), h('th', 'المعنى')])),
+          h('tbody', rows.map(r => h('tr', [
+            h('td', h('b', r[0])),
+            h('td', h('b' + (r[1] < r[2] * 0.6 ? '.val-critical' : '.val-good'), String(Math.max(0, Math.round(r[1]))))),
+            h('td', String(r[2])),
+            h('td', r[3]),
+          ]))),
+        ]),
+        h('p.unpaid-total', ['الإجمالي: ', h('b', hh.score + ' / 100')]),
+        h('p.step-hint', 'كل تحصيل تسجِّله، أو تأكيد تحسمه، أو عقد تجدِّده — يرفع الرقم فورًا.'),
+      ], [h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إغلاق')]);
+    }
     hero.querySelectorAll('.hero-item[onclick], .hero-item').forEach(el => { if (el.onclick) keyClickable(el); });
 
     /* ---------- 1) المشاريع: البطاقة الأم لكل مشروع ---------- */
@@ -172,12 +198,34 @@
         onclick: () => go('#units', { st: 'notEarning', b: F.b }),
       }),
       tile({
-        label: 'سداد يحتاج تأكيد',
+        label: 'سداد قديم يحتاج تأكيدًا',
         value: money(ar.undocumentedTotal, { bare: true }),
         ic: 'question', tone: 'warning',
         valueClass: ar.undocumentedTotal > 0 ? 'val-warning' : '',
-        sub: ar.undocumented.length ? `${ar.undocumented.length} شهرًا من الورقة يحتاج تأكيدًا: سداد أم تأخير؟` : 'لا شيء بانتظار التأكيد',
-        onclick: () => go('#quality', {}),
+        sub: ar.undocumented.length
+          ? `${ar.undocumented.length} أشهر مذكورة في الورقة بلا علامة — اسأل المالك: سُدِّدت أم متأخرة؟`
+          : 'لا شيء بانتظار التأكيد',
+        onclick: () => {
+          if (!ar.undocumented.length) { go('#quality', {}); return; }
+          openDrawer('سداد قديم يحتاج تأكيدًا — من بالضبط؟', [
+            h('p.step-hint', 'هذه الأشهر داخل مدة العقد لكن الورقة القديمة لم تضع عليها ✓ ولا ✗ — لا تُعتبر سدادًا ولا متأخرات قبل سؤال المالك. اضغط أي سطر لفتح خلية الشهر وتسجيل الحقيقة.'),
+            h('ul.unpaid-list', ar.undocumented.map(r => {
+              const u = Store.unit(r.unitId);
+              const cs = Store.unitContracts(u.id);
+              const tid = cs.length ? cs[cs.length - 1].tenantId : null;
+              return keyClickable(h('li.unpaid-row', {
+                onclick: () => { closeDrawer(); Views.openCellDrawer(u, r.period, asOf); },
+              }, [
+                h('div.unpaid-who', [h('b', tid ? tName(tid) : '—'), h('span.unpaid-unit', ` — ${u.name} (${bName(u.buildingId)})`)]),
+                h('div.unpaid-side', [
+                  h('span.unpaid-amt', money(r.amount, { bare: true })),
+                  h('span.chip.chip-unknown', Store.periodLabel(r.period, true)),
+                ]),
+              ]));
+            })),
+            h('p.unpaid-total', ['الإجمالي غير المحسوم: ', h('b.val-warning', money(ar.undocumentedTotal))]),
+          ], [h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إغلاق')]);
+        },
       }),
       tile({
         label: 'تأمينات عند المالك',
@@ -207,7 +255,24 @@
         sub: comp.perTenant.length
           ? `${comp.sometimesLate} يتأخر أحيانًا · ${comp.delinquent} متعثر — بالنقاط من سجل السداد الفعلي`
           : 'يُحسب من الدفعات المسجَّلة بتاريخ — يظهر بعد أول أشهر التشغيل',
-        onclick: () => go('#insights', { b: F.b }),
+        onclick: () => {
+          if (!comp.perTenant.length) { go('#insights', { b: F.b }); return; }
+          openDrawer('التزام المستأجرين — بالأسماء والنقاط', [
+            h('p.step-hint', 'النقاط = نسبة الدفعات التي وصلت في ميعادها (يوم الاستحقاق + أيام السماح) من سجل السداد الفعلي المُوثَّق.'),
+            h('table.table.table-mini', [
+              h('thead', h('tr', [h('th', 'المستأجر'), h('th', 'دفعات'), h('th', 'في الميعاد'), h('th', 'النقاط'), h('th', 'التقييم')])),
+              h('tbody', comp.perTenant.map(x => h('tr', [
+                h('td', x.tenant.name),
+                h('td', String(x.n)),
+                h('td', String(x.onTime)),
+                h('td', h('b', x.points + '/100')),
+                h('td', x.points >= 90 ? statusChip('good', 'ملتزم')
+                  : x.points >= 60 ? statusChip('warning', 'يتأخر أحيانًا')
+                  : statusChip('critical', 'متعثر')),
+              ]))),
+            ]),
+          ], [h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إغلاق')]);
+        },
       }),
     ]);
 
@@ -216,17 +281,17 @@
     const io = Store.inOutForecast(cur, 12, uset);
     const ioNotes = io.filter(x => x.starts.length || x.ends.length);
     const ioStrip = ioNotes.length
-      ? h('div.io-strip', ioNotes.map(x => {
-          const bad = x.ends.length > x.starts.length;
-          const el = h('span.io-badge' + (bad ? '.io-bad' : '.io-good'), {
-            onclick: () => openIoDrawer(io),
-          }, [
-            h('b', Store.periodLabel(x.period)),
-            h('span', ` ${x.starts.length ? '+' + x.starts.length + ' داخلة' : ''}${x.starts.length && x.ends.length ? ' · ' : ''}${x.ends.length ? '−' + x.ends.length + ' خارجة' : ''}`),
-            x.deltaPct != null && x.deltaPct !== 0 ? h('span.io-delta', ` → الدخل ${x.deltaPct > 0 ? '+' : ''}${x.deltaPct}%`) : null,
-          ]);
-          return keyClickable(el);
-        }))
+      ? h('div.mini-scroll', h('table.table.table-mini.io-table', [
+          h('thead', h('tr', [h('th', 'الشهر'), h('th', 'وحدات داخلة'), h('th', 'وحدات خارجة'), h('th', 'دخل الشهر'), h('th', 'الأثر')])),
+          h('tbody', ioNotes.slice(0, 6).map(x => keyClickable(h('tr.row-click', { onclick: () => openIoDrawer(io) }, [
+            h('td', h('b', Store.periodLabel(x.period, true))),
+            h('td', x.starts.length ? h('span.val-good', '+' + x.starts.length) : '—'),
+            h('td', x.ends.length ? h('span.val-critical', '−' + x.ends.length) : '—'),
+            h('td', money(x.income, { bare: true })),
+            h('td', x.deltaPct == null || x.deltaPct === 0 ? '—'
+              : h('span' + (x.deltaPct < 0 ? '.val-critical' : '.val-good'), (x.deltaPct > 0 ? '▲ +' : '▼ ') + x.deltaPct + '%')),
+          ])))),
+        ]))
       : h('p.note-line', 'لا حركة دخول أو خروج متوقعة خلال الاثني عشر شهرًا القادمة.');
 
     function openIoDrawer(list) {
@@ -411,6 +476,11 @@
     [/^خسارة الشواغر\/شهر$/, () => 'Vacancy loss/mo'],
     [/^المحصَّل$/, () => 'Collected'],
     [/^(\d+) ملتزم$/, m2 => `${m2[1]} punctual`],
+    [/^(\d+) أشهر مذكورة في الورقة بلا علامة — اسأل المالك: سُدِّدت أم متأخرة؟$/,
+      m2 => `${m2[1]} paper months carry no mark — ask the owner: paid or late?`],
+    [/^معروض أهم (\d+) وحدات من (\d+) — الباقي ساري ومستقر، اعرضه بالزر أعلاه\.$/,
+      m2 => `Showing the top ${m2[1]} of ${m2[2]} units — the rest are stable; use the button above to see them.`],
+    [/^عرض كل الوحدات \((\d+)\)$/, m2 => `Show all units (${m2[1]})`],
     [/^مؤجَّرة (\d+)$/, m2 => `Rented ${m2[1]}`],
     [/^شاغرة (\d+)$/, m2 => `Vacant ${m2[1]}`],
     [/^(\d+) وحدة$/, m2 => `${m2[1]} units`],
@@ -495,6 +565,38 @@
       'High dependency — losing them dents the income. Diversify upcoming leases or secure their renewal early.',
     'رد تجريبي من المالك': 'Sample owner answer',
     'إنشاء الحساب وإضافة المشاريع': 'Workspace created and projects added',
+    /* دفعة الشاشات الأخيرة */
+    'مرتَّب بالأولوية: ما يحتاج قرارًا أولًا — القيمة داخل الشريط إيجار شهري':
+      'Sorted by priority: decisions first — the value inside each bar is monthly rent',
+    'عرض المختصر (الأهم فقط)': 'Show summary (top items)',
+    'سداد قديم يحتاج تأكيدًا': 'Old payments needing confirmation',
+    'سداد قديم يحتاج تأكيدًا — من بالضبط؟': 'Old payments needing confirmation — who exactly?',
+    'هذه الأشهر داخل مدة العقد لكن الورقة القديمة لم تضع عليها ✓ ولا ✗ — لا تُعتبر سدادًا ولا متأخرات قبل سؤال المالك. اضغط أي سطر لفتح خلية الشهر وتسجيل الحقيقة.':
+      'These months fall inside the contract term but the old paper carries neither ✓ nor ✗ — they count as neither payment nor arrears until the owner answers. Click any row to open that month’s cell and record the truth.',
+    'الإجمالي غير المحسوم: ': 'Total unresolved: ',
+    'التزام المستأجرين — بالأسماء والنقاط': 'Tenant punctuality — names and points',
+    'النقاط = نسبة الدفعات التي وصلت في ميعادها (يوم الاستحقاق + أيام السماح) من سجل السداد الفعلي المُوثَّق.':
+      'Points = the share of documented payments that arrived on time (due day + grace days).',
+    'دفعات': 'Payments', 'النقاط': 'Points', 'يتأخر أحيانًا': 'Sometimes late',
+    'التقييم العام — كيف يُحسب؟': 'Overall score — how is it computed?',
+    'رقم واحد من 100 يلخِّص وضع مشاريعك، مجموع خمسة مكوّنات محسوبة من بياناتك الفعلية:':
+      'One number out of 100 summarising your projects — the sum of five components computed from your actual data:',
+    'المكوِّن': 'Component', 'نقاطك': 'Your points', 'المعنى': 'Meaning',
+    'نسبة التحصيل الشهرية': 'Monthly collection rate',
+    'كلما حصَّلت أكثر من المستحق ارتفعت النقاط': 'The more of the dues you collect, the higher the points',
+    'نسبة الإشغال': 'Occupancy rate', 'الوحدات المؤجَّرة من إجمالي الوحدات': 'Rented units out of all units',
+    'اكتمال التأكيد': 'Confirmation completeness',
+    'تنخفض كلما زادت المبالغ التي لم يُحسم أمرها (سداد أم تأخير؟)': 'Drops as more amounts remain unresolved (paid or late?)',
+    'حداثة المتأخرات': 'Arrears freshness',
+    'تنخفض كلما تقادمت المتأخرات فوق 90 يومًا': 'Drops as arrears age past 90 days',
+    'أمان العقود': 'Contract safety',
+    'تنخفض مع كثرة العقود المنتهية أو القريبة من الانتهاء دون تجديد': 'Drops with more contracts ended or ending soon without renewal',
+    'الإجمالي: ': 'Total: ',
+    'كل تحصيل تسجِّله، أو تأكيد تحسمه، أو عقد تجدِّده — يرفع الرقم فورًا.':
+      'Every payment you record, confirmation you resolve, or contract you renew lifts the number instantly.',
+    'اضغط للتفاصيل': 'Click for details',
+    '«إضافة مشروع جديد»': '“Add New Project”',
+    'وحدات داخلة': 'Moving in', 'وحدات خارجة': 'Moving out', 'دخل الشهر': 'Month income', 'الأثر': 'Impact',
     'الكشف يذكر تأمينًا واحدًا (35,000 للوحدة 41). قيم تأمين باقي العقود غير معروفة رغم أنها التزام مالي يجب أن يظهر.':
       'The paper records a single deposit (35,000 for unit 41). Deposits of the remaining contracts are unknown although they are a financial liability that must be visible in the figures.',
   });
