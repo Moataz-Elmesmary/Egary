@@ -441,7 +441,7 @@
       ]))));
 
     function collectionTable() {
-      return h('table.table.table-mini', [
+      return h('div.mini-scroll', h('table.table.table-mini', [
         h('thead', h('tr', [h('th', 'الشهر'), h('th', 'المستحق'), h('th', 'المحصَّل'), h('th', 'النسبة'), h('th', 'غير موثَّق')])),
         h('tbody', collSeries.map(x => h('tr', [
           h('td', Store.periodLabel(x.period, true)),
@@ -450,7 +450,7 @@
           h('td', x.rate == null ? '—' : pct(x.rate)),
           h('td', x.unknownDue ? money(x.unknownDue, { bare: true }) : '—'),
         ]))),
-      ]);
+      ]));
     }
     const collectionToggle = h('button.btn.btn-ghost', {
       onclick: () => { VS.collectionAsTable = !VS.collectionAsTable; App.render(); },
@@ -1252,9 +1252,11 @@
       const unitsNames = unitIds.map(unitLabel).join(' · ') || '—';
       const balance = ar.rows.filter(r => unitIds.includes(r.unitId)).reduce((s, r) => s + r.amount, 0);
       const unknown = ar.unknowns.filter(r => unitIds.includes(r.unitId)).length;
+      const initials = t.name.split(/\s+/).slice(0, 2).map(w => w[0]).join('');
+      const avTone = ['av-a', 'av-b', 'av-c', 'av-d', 'av-e'][[...t.name].reduce((s, ch) => s + ch.charCodeAt(0), 0) % 5];
       return keyClickable(h('tr.row-click', { onclick: () => openTenantDrawer(t) }, [
-        h('td', t.name),
-        h('td', t.kind || '—'),
+        h('td', h('span.tenant-cell', [h('span.avatar.' + avTone, initials), h('span', t.name)])),
+        h('td', t.kind === 'شركة' ? statusChip('neutral', 'شركة') : t.kind === 'فرد' ? statusChip('neutral', 'فرد') : '—'),
         h('td', unitsNames),
         h('td', t.phone || h('span.val-warning', 'غير مسجّل')),
         h('td', balance > 0 ? h('span.val-critical', money(balance)) : unknown ? h('span.val-critical', pluralMonths(unknown) + ' بقيمة مجهولة') : 'لا شيء'),
@@ -1322,11 +1324,12 @@
       }),
     ]);
 
+    const CAT_TONE = { 'سباكة': 'chip-neutral', 'كهرباء': 'chip-warning', 'تشطيبات': 'chip-neutral', 'تسريب': 'chip-serious', 'تكييف': 'chip-neutral', 'مصاعد ومرافق': 'chip-serious', 'أخرى': 'chip-neutral' };
     const rows = ks.map(k => h('tr', [
       h('td', shortDate(k.openedAt)),
       h('td', k.unitId ? bLabel(Store.unit(k.unitId).buildingId) : '—'),
       h('td', k.unitId ? unitLabel(k.unitId) : '—'),
-      h('td', k.category),
+      h('td', h('span.chip.' + (CAT_TONE[k.category] || 'chip-neutral'), k.category)),
       h('td', k.desc || '—'),
       h('td', k.cost ? money(k.cost, { bare: true }) : '—'),
       h('td', k.borneBy),
@@ -1403,7 +1406,7 @@
       const refName = q.refType === 'unit' ? 'الوحدة: ' + unitLabel(q.refId)
         : q.refType === 'contract' ? 'العقد: ' + (Store.contract(q.refId) ? unitLabel(Store.contract(q.refId).unitId) + ' — ' + tenantLabel(Store.contract(q.refId).tenantId) : q.refId)
         : 'عام';
-      return h('div.card.issue-card' + (q.status === 'resolved' ? '.issue-done' : ''), [
+      return h('div.card.issue-card.sev-' + q.severity + (q.status === 'resolved' ? '.issue-done' : ''), [
         h('div.issue-head', [severityChip(q.severity), h('span.issue-ref', refName),
           q.status === 'resolved' ? statusChip('good', 'محسومة') : null]),
         h('h3.issue-title', q.title),
@@ -1785,7 +1788,7 @@
           : emptyState('لا دفعات موثَّقة بعد')),
       ]),
       sectionCard('التزام السداد بالمستأجر (من الدفعات الموثَّقة فقط)', compliance.length
-        ? h('table.table.table-mini', [
+        ? h('div.mini-scroll', h('table.table.table-mini', [
             h('thead', h('tr', [h('th', 'المستأجر'), h('th', 'دفعات موثَّقة'), h('th', 'في الميعاد'), h('th', 'التقييم')])),
             h('tbody', compliance.slice(0, 10).map(x => h('tr', [
               h('td', x.t.name),
@@ -1795,7 +1798,7 @@
                 : x.rate >= 0.6 ? statusChip('warning', 'متذبذب')
                 : statusChip('critical', 'متعثر')),
             ]))),
-          ])
+          ]))
         : emptyState('يُحسب من الدفعات الموثَّقة فقط', 'كشف سكرية كله علامات ✓ بلا تواريخ — أول شهر توثيق حقيقي سيُظهر هذا الجدول')),
     ]);
   }
@@ -1941,6 +1944,9 @@
         : h('p.step-hint', [icon('warn'), ' العلامات بتتعلّم على صفوف الورقة — أضف الصفوف في الخطوة 2 الأول وبعدها الزر هيظهر هنا.']));
     }
 
+    [step1, step2, step3].forEach((s2, i) => {
+      if (s2) { s2.classList.add('step-card'); s2.dataset.step = String(i + 1); }
+    });
     return h('div.view', [
       pageHead('إدخال كشف جديد', 'ثلاث خطوات تحوّل أي ورقة تصلك إلى كشف حي بمؤشراته — من غير Excel في النص.'),
       step1, step2, step3,

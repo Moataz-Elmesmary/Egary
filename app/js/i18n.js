@@ -22,6 +22,7 @@
     'إدخال كشف جديد': 'New Statement Intake', 'الوحدات': 'Units', 'العقود': 'Contracts',
     'المستأجرون': 'Tenants', 'الشكاوى': 'Complaints', 'جودة البيانات': 'Data Quality',
     'الإعدادات': 'Settings', 'إدخال': 'Add', 'دليل الشرح': 'User Guide',
+    'دليل الاستخدام الكامل': 'Full documentation',
     'نسخة عرض · كشف سكرية الفعلي + كشفان توضيحيان':
       'Demo build · Sokareya (real) + 2 sample statements',
     // السلايسرز
@@ -178,7 +179,7 @@
     [/^توزيع استحقاق (.+) حسب النوع$/, m => tt(m[1]) + ' dues by unit type'],
     [/^(\d+) وحدة$/, m => m[1] + ' units'],
     [/^(\d+) من (\d+)$/, m => `${m[1]} of ${m[2]}`],
-    [/^عقد منتهٍ بلا تجديد (\d+) · بلا عقد\/شاغرة (\d+)$/, m => `Ended no-renewal ${m[1]} · no contract/vacant ${m[2]}`],
+    [/^عقد منتهٍ بلا تجديد (\d+) · بلا عقد\/شاغرة (\d+)$/, m => `Ended without renewal: ${m[1]} · No contract / vacant: ${m[2]}`],
     [/^منها (\d+) انتهت فعلًا بلا تجديد$/, m => `${m[1]} already ended without renewal`],
     [/^مسجَّلة لعقد (\d+) من (\d+)$/, m => `Recorded on ${m[1]} of ${m[2]} contracts`],
     [/^(\d[\d,]*) شهر×وحدة/, m => m[0].replace(/^(\d[\d,]*) شهر×وحدة/, '$1 unit-months')],
@@ -225,6 +226,13 @@
     [/(يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر) (\d{4})/g,
       (mm, mo, yr) => MONTHS[mo] + ' ' + yr],
   ];
+
+  /* دمج محتوى الترجمة الموسّع (i18n-content.js): قاموس + أنماط + رموز أسماء */
+  if (window.I18N_EXTRA) Object.assign(D, window.I18N_EXTRA);
+  if (Array.isArray(window.I18N_PATTERNS))
+    for (const [re, fn] of window.I18N_PATTERNS) P.unshift([re, fn]);
+  if (Array.isArray(window.I18N_TOKENS))
+    for (const t of window.I18N_TOKENS) TOKENS.push(t);
 
   function tt(str) {
     if (lang === 'ar') return str;
@@ -276,4 +284,10 @@
     setLang, apply, tt, translateNode,
   };
   apply();
+
+  /* نوافذ التأكيد النظامية تتترجم هي كمان */
+  const _confirm = window.confirm.bind(window);
+  const _prompt = window.prompt.bind(window);
+  window.confirm = msg => _confirm(tt(String(msg)));
+  window.prompt = (msg, def) => _prompt(tt(String(msg)), def);
 })();

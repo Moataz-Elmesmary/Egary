@@ -80,6 +80,10 @@
         h('span.nav-label', n.label),
         n.id === 'quality' && openIssues ? h('span.nav-badge', String(openIssues)) : null,
       ])))),
+      h('a.nav-docs', { href: '../docs/index.html', target: '_blank', rel: 'noopener' }, [
+        h('span.nav-ic', { html: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3.2C6.8 2.2 5 2 3 2.3v10.4c2-.3 3.8-.1 5 .9 1.2-1 3-1.2 5-.9V2.3c-2-.3-3.8-.1-5 .9zM8 3.2v10.4"/></svg>' }),
+        h('span', 'دليل الاستخدام الكامل'),
+      ]),
       h('div.sidebar-foot', 'نسخة عرض · كشف سكرية الفعلي + كشفان توضيحيان'),
     ]);
 

@@ -1,45 +1,78 @@
-# إيجاري · Egary
+# Egary — Rental Data Management Suite
 
-**منظومة إدارة بيانات الإيجارات** — تحوّل كشوف الإيجار الورقية إلى محفظة رقمية حيّة: تحصيل، متأخرات بأعمارها، عقود وتجديدات، شكاوى، وجودة بيانات — بلا أي تبعيات خارجية.
+Turn paper rent statements into a live digital portfolio: collections, aged arrears, contracts & renewals, complaints, and a built-in data-quality workflow — in a single static web app with **zero dependencies**.
 
-**Rental Data Management Suite** — turns paper rent statements into a live digital portfolio: collections, aged arrears, contracts & renewals, complaints, and a data-quality workflow. Zero dependencies, runs from a static host or by opening the file directly.
+<p align="center">
+  <img src="docs/screens/dashboard.png" alt="Egary dashboard" width="900">
+</p>
 
-## التشغيل / Run
+## Why
 
-افتح [`app/index.html`](app/index.html) مباشرة في المتصفح — لا خادم ولا إنترنت.
-Open [`app/index.html`](app/index.html) directly in a browser — no server needed.
+Property offices receive handwritten rent statements: a grid of tenants × months with ✓/✗ marks, contract dates, and yearly rent values. The paper says *"a payment happened"* — never **how much, when, or what remains**, and it can't tell *"late"* from *"forgot to write it down."*
 
-- عربي RTL افتراضيًا + نسخة إنجليزية كاملة (زر `EN`) · وضع ليلي (زر 🌙)
-- Arabic RTL by default + full English version (`EN` button) · dark mode (🌙)
-- للعروض: `?lang=en` · `?theme=dark`
+Egary ingests each paper as an independent **statement**, keeps every ambiguity as an explicit open question, and computes every figure live from contracts and payments — nothing is ever typed into a KPI.
 
-## الدليل الكامل / Full guide
+## Features
 
-**[docs/index.html](docs/index.html)** — دليل استخدام مصوَّر يشرح كل شاشة وكل كارد: ما هو، مصدره، طريقة حسابه، واستخدامه. مكتوب كوثيقة تسليم.
+- **Dashboard** — collection rate with month-over-month delta, confirmed arrears with 30/60/90+ aging, occupancy, upcoming renewals, deposits held, a per-building floor map colored by payment state, and a direct *"Who has not paid?"* list.
+- **Collection Matrix** — the paper grid, alive. Two modes: *record payments* (click a cell → full payment with amount, date, method, receipt) and *transcribe paper* (click cycles ✓ → ✗ → blank). Bulk-collect an entire month in one dialog.
+- **Statement Intake** — a 3-step wizard that turns any incoming paper into a working statement: owner → rows (unit + tenant + contract with auto-generated year schedule) → month marks.
+- **Insights** — auto-written findings (arrears concentration, revenue cliff, vacancy loss estimate, best/worst statement), 12-month collection trend, top debtors, tenant punctuality scores, rent averages by unit type.
+- **Contracts timeline** — a priority-sorted Gantt: ended-without-renewal first, "X days left" badges, renewal chains, monthly rent inside each bar.
+- **Data Quality** — every contradiction in the source paper becomes a tracked question with the literal source text, the interpretation taken, and a recorded owner resolution.
+- **Complaints log** with category, cost, and who bears it.
+- **Fully bilingual** — Arabic RTL and complete English LTR, switchable live (`EN` button or `?lang=en`).
+- **Dark mode** — full theme including the charts (`🌙` button or `?theme=dark`).
+- **Mobile responsive**, keyboard accessible, Arabic-normalized search (hamza/ta-marbuta/Hindi digits) across tenants, units, owners, phones, and receipt numbers.
+- **CSV exports** (arrears, matrix, contracts, payments) that open cleanly in Excel.
 
-Screenshot-based handover documentation covering every screen and card: what it is, where it comes from, how it's computed, and how to use it.
+<p align="center">
+  <img src="docs/screens/english.png" alt="English version" width="440">
+  <img src="docs/screens/dark.png" alt="Dark mode" width="440">
+</p>
 
-## البنية / Structure
+## Quick start
+
+No build, no server, no dependencies:
+
+```
+open app/index.html        # or just double-click it
+```
+
+Works from `file://` or any static host. To share with a non-technical person, send them the single self-contained `Egary.html`.
+
+### Deploy
+
+The repo ships with `vercel.json` — import it on [Vercel](https://vercel.com/new) (or any static host; GitHub Pages works too). The root URL serves the app; `/docs` serves the user guide.
+
+## Documentation
+
+**[docs/index.html](docs/index.html)** — a full screenshot-based user guide (Arabic): every screen and every card explained — what it is, where its number comes from, how it's computed, and how to use it. Written as a handover document.
+
+## Architecture
 
 ```
 app/
 ├── index.html
-├── css/app.css        نظام التصميم (فاتح/داكن، RTL/LTR)
+├── css/app.css        design system: light/dark themes, RTL/LTR
 └── js/
-    ├── seed.js        بذرة الكشف الفعلي + كشفان توضيحيان + سجل الجودة
-    ├── store.js       محرك الاستحقاق وحسابات BI + الحفظ المحلي
-    ├── i18n.js        النسخة الإنجليزية الكاملة
-    ├── ui.js          مكوّنات الواجهة + البحث العربي المطبَّع
-    ├── charts.js      رسوم SVG يدوية (ثيم-أوير)
-    ├── views.js       الشاشات
-    └── app.js         التوجيه والهيكل
-docs/                  دليل الاستخدام المصوَّر
+    ├── seed.js        real statement data + 2 sample statements + quality log
+    ├── store.js       dues engine & BI aggregations, localStorage persistence
+    ├── i18n-content.js + i18n.js   complete English layer (zero-Arabic verified)
+    ├── ui.js          DOM helpers, drawers, normalized Arabic search
+    ├── charts.js      hand-rolled theme-aware SVG charts
+    ├── views.js       all screens
+    └── app.js         shell & routing
+docs/                  screenshot-based user guide
+Egary.html             single-file build for easy sharing
 ```
 
-## المبادئ الحاكمة / Principles
+Plain ES5+ JavaScript, no frameworks, no external requests. State persists in `localStorage` (demo build); a production deployment swaps the storage layer for a server with auth and an audit trail — the UI stays the same.
 
-1. **الحالة محسوبة لا مكتوبة** — "متأخر" نتيجة مقارنة، ليست خانة تُملأ.
-2. **متأخر مؤكَّد ≠ غير موثَّق** — الورق لا يفرّق بينهما؛ المنظومة تفرّق.
-3. **قيمة الإيجار مربوطة بسنة العقد** — الشهر المقطوع يُحسب باليوم.
-4. **التجديد عقد جديد** مربوط بسابقه — التاريخ لا يُمحى.
-5. **كل افتراض مُعلَن** وكل غموض في المصدر بند جودة بسؤال محدد وقرار حسم مسجَّل.
+## Design principles
+
+1. **State is computed, never typed** — "late" is the result of comparing dues to payments after the due day + grace, not a field someone fills.
+2. **Confirmed-late ≠ undocumented** — paper can't tell them apart; the system refuses to guess.
+3. **Rent follows the contract year**, not the calendar year — split months are prorated by day.
+4. **A renewal is a new contract** linked to its predecessor — history is never edited away.
+5. **Every assumption is declared** and every source ambiguity is a tracked question with a recorded resolution.
