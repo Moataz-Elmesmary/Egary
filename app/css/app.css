@@ -883,22 +883,56 @@ button { font-family: inherit; }
 .alarm-months { color: var(--critical-text); font-weight: 700; font-size: 12.5px; }
 .alarm-amt { font-weight: 800; font-variant-numeric: tabular-nums; }
 
+/* ---------- شريط الترشيح النشط: ما تتوهش وسط أرقام مُرشَّحة ---------- */
+.fchips {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: var(--accent-weak);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius); padding: 8px 12px; margin-bottom: 14px;
+}
+.fchips-label { color: var(--accent-ink); font-size: 12.5px; font-weight: 700; }
+.fchip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface); border: 1px solid var(--accent);
+  border-radius: 99px; padding: 3px 11px; font-size: 12.5px; font-weight: 600;
+  color: var(--accent-ink); cursor: pointer; font-family: inherit;
+}
+.fchip:hover { background: var(--accent); color: #fff; }
+.fchip-x { font-weight: 800; }
+.fchips-clear { margin-inline-start: auto; font-weight: 700; }
+
+/* ---------- ضبط الكروت والمساحات (نقد: فراغات + المالي تحت) ---------- */
+@media (min-width: 1100px) {
+  .tiles { grid-template-columns: repeat(3, 1fr); }
+  .proj-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.tile-value { font-size: 29px; font-weight: 800; }
+.hero-item { padding: 12px 16px; min-width: 118px; }
+.hero-v { font-size: 25px; }
+.card-title {
+  position: relative; padding-inline-start: 12px;
+}
+.card-title::before {
+  content: ''; position: absolute; inset-inline-start: 0; top: 3px; bottom: 3px;
+  width: 4px; border-radius: 99px; background: var(--brand-grad);
+}
+.btn-primary { background: var(--brand-grad); border: none; }
+.btn-primary:hover { filter: brightness(1.08); }
+:root[data-theme="dark"] .btn-primary { background: var(--brand-grad); border: none; }
+.proj-card { min-height: 0; }
+.tile { min-height: 118px; }
+
 /* =========================================================
    حركة وحياة — مع احترام تفضيل تقليل الحركة
    ========================================================= */
-@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-@keyframes popIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
-.view > * { animation: rise 0.4s both; }
-.view > *:nth-child(1) { animation-delay: 0.02s; }
-.view > *:nth-child(2) { animation-delay: 0.06s; }
-.view > *:nth-child(3) { animation-delay: 0.10s; }
-.view > *:nth-child(4) { animation-delay: 0.14s; }
-.view > *:nth-child(5) { animation-delay: 0.18s; }
-.view > *:nth-child(6) { animation-delay: 0.22s; }
-.view > *:nth-child(7) { animation-delay: 0.26s; }
-.view > *:nth-child(n+8) { animation-delay: 0.3s; }
-.proj-card, .tile, .insight { animation: popIn 0.35s both; }
-.donut { animation: popIn 0.5s both; }
+/* دخول ناعم بلا تأخيرات — المحتوى لا يُحجب أبدًا انتظارًا لأنيميشن */
+@keyframes rise { from { opacity: 0.2; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes popIn { from { opacity: 0.3; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+.view > * { animation: rise 0.3s ease; }
+.proj-card, .tile, .insight { animation: popIn 0.25s ease; }
+.donut { animation: popIn 0.4s ease; }
+/* ?shot=1 يوقف الحركة لالتقاط لقطات التوثيق */
+html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animation: none !important; transition: none !important; }
 .drawer { transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.25, 1), opacity 0.22s; }
 .btn, .nav-link, .chip, .evc, .mcell { transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s; }
 .btn:active { transform: scale(0.97); }

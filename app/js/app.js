@@ -5,7 +5,7 @@
   'use strict';
   const { h, icon } = UI;
 
-  const BRAND = { name: 'تحصيل', sub: 'ذكاء محفظة الإيجارات' };
+  const BRAND = { name: 'إيجاري', sub: 'نظام إدارة الإيجارات' };
 
   const NAV = [
     { id: 'dashboard',  label: 'لوحة المؤشرات',   path: 'M2.5 2.5h4.5v6H2.5zM9 2.5h4.5v3.5H9zM9 8h4.5v5.5H9zM2.5 10.5h4.5v3H2.5z' },
@@ -32,7 +32,7 @@
     return NAV.some(n => n.id === id) ? id : 'dashboard';
   }
 
-  /* المرشِّحات العامة (السلايسرز) — تسري على كل شاشات المحفظة */
+  /* المرشِّحات العامة (السلايسرز) — تسري على كل شاشات مشاريعك */
   const SLICER_VIEWS = ['dashboard', 'insights', 'matrix', 'units', 'contracts', 'tenants', 'complaints'];
 
   /* قائمة الإدخال السريع — مكان إدخال البيانات واضح من أي شاشة */
@@ -76,6 +76,34 @@
       slicerEl = wantSlicer ? Views.slicerBar() : null;
     }
 
+    /* شريط «الترشيح النشط» — ظاهر بوضوح حتى لا تُفهم الأرقام المُرشَّحة خطأً */
+    let chipsEl = null;
+    const F = App.filters;
+    if (wantSlicer && (F.b || F.ty || F.tn || F.st || (F.q || '').trim())) {
+      const ST_LBL = {
+        occupied: 'مؤجَّرة', ending: 'تنتهي قريبًا', ended: 'عقد منتهٍ بلا تجديد',
+        noContract: 'بلا عقد مسجّل', vacant: 'شاغرة', arrears: 'عليها متأخرات',
+        notEarning: 'شاغرة (لا إيراد منها)',
+      };
+      const chip = (label, key) => h('button.fchip', {
+        onclick: () => { App.filters[key] = ''; render(); },
+        title: 'إزالة هذا الترشيح',
+      }, [h('span', label), h('span.fchip-x', '×')]);
+      const items = [];
+      if (F.b) items.push(chip('المشروع: ' + ((Store.building(F.b) || {}).name || ''), 'b'));
+      if (F.ty) items.push(chip('النوع: ' + F.ty, 'ty'));
+      if (F.tn) items.push(chip('المستأجر: ' + ((Store.tenant(F.tn) || {}).name || ''), 'tn'));
+      if (F.st) items.push(chip('الحالة: ' + (ST_LBL[F.st] || F.st), 'st'));
+      if ((F.q || '').trim()) items.push(chip('بحث: ' + F.q.trim(), 'q'));
+      chipsEl = h('div.fchips', [
+        h('span.fchips-label', 'الأرقام المعروضة مُرشَّحة على:'),
+        ...items,
+        h('button.btn.btn-ghost.fchips-clear', {
+          onclick: () => { App.filters = { b: '', ty: '', tn: '', st: '', q: '' }; render(); },
+        }, 'عرض الكل'),
+      ]);
+    }
+
     const sidebar = h('nav.sidebar', [
       h('div.brand', [
         h('span.brand-logo', {
@@ -98,7 +126,7 @@
         h('span.nav-ic', { html: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3.2C6.8 2.2 5 2 3 2.3v10.4c2-.3 3.8-.1 5 .9 1.2-1 3-1.2 5-.9V2.3c-2-.3-3.8-.1-5 .9zM8 3.2v10.4"/></svg>' }),
         h('span', 'دليل الاستخدام الكامل'),
       ]),
-      h('div.sidebar-foot', 'نسخة عرض · كشف سكرية الفعلي + كشفان توضيحيان'),
+      h('div.sidebar-foot', 'نسخة عرض — مشروع سكرية الفعلي ومشروعان تجريبيان'),
     ]);
 
     const t = Store.today();
@@ -133,6 +161,7 @@
     const main = h('main.main', [
       header,
       slicerEl,
+      chipsEl,
       Views[cur](),
     ]);
 
@@ -150,6 +179,7 @@
 
   /* أرقام بتعدّ لفوق — حياة من غير دوشة، وبتحترم تقليل الحركة */
   function animateCounts(root) {
+    if (document.documentElement.dataset.shot) return;
     if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     root.querySelectorAll('.count-up').forEach(el => {
       const raw = el.textContent.trim();
@@ -184,6 +214,7 @@
       const usp = new URLSearchParams(location.search);
       if (usp.get('theme')) document.documentElement.dataset.theme = usp.get('theme');
       if (usp.get('lang')) I18N.setLang(usp.get('lang'));
+      if (usp.get('shot')) document.documentElement.dataset.shot = '1';
     } catch (e) {}
     Store.load();
     Store.subscribe(render);

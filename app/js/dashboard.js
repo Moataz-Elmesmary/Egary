@@ -1,6 +1,6 @@
 /* =========================================================
    dashboard.js — اللوحة v3: من فوق لتحت زي ما المدير بيفكر
-   1) المحفظة كلها  2) المشاريع  3) الفلوس والمخاطر  4) الأكشن
+   1) كل المشاريع  2) المشاريع  3) الفلوس والمخاطر  4) الأكشن
    كل كارد يودّيك للشاشة المفلترة على اللي ضغطت عليه بالظبط.
    ========================================================= */
 (function () {
@@ -69,7 +69,7 @@
     const projects = Store.state.buildings.filter(b => !F.b || b.id === F.b);
     const pstats = projects.map(b => Store.projectStats(b.id, m, asOf));
 
-    /* ---------- 0) سطر المحفظة: الصورة من فوق ---------- */
+    /* ---------- 0) سطر مشاريعك: الصورة من فوق ---------- */
     const hero = h('div.hero-strip', [
       h('div.hero-item', { onclick: () => go('#dashboard', {}) }, [
         h('span.hero-k', 'المشاريع'), h('span.hero-v.count-up', String(Store.state.buildings.length))]),
@@ -78,15 +78,15 @@
       h('div.hero-item.hero-good', { onclick: () => go('#units', { st: 'occupied', b: F.b }) }, [
         h('span.hero-k', 'مؤجَّر'), h('span.hero-v.count-up', String(rented))]),
       h('div.hero-item.hero-bad', { onclick: () => go('#units', { st: 'notEarning', b: F.b }) }, [
-        h('span.hero-k', 'فاضي'), h('span.hero-v.count-up', String(us.length - rented))]),
+        h('span.hero-k', 'شاغرة'), h('span.hero-v.count-up', String(us.length - rented))]),
       h('div.hero-item', [
         h('span.hero-k', 'المطلوب تحصيله — ' + Store.periodLabel(m)),
         h('span.hero-v.count-up', money(mt.due + mt.unknownDue, { bare: true }))]),
       h('div.hero-item', [
-        h('span.hero-k', 'اللي اتحصّل فعلًا'),
+        h('span.hero-k', 'ما تم تحصيله'),
         h('span.hero-v.count-up' + (mt.rate != null && mt.rate < 0.7 ? '.val-critical' : ''), money(mt.collected, { bare: true }))]),
       h('div.hero-item.hero-score', [
-        h('span.hero-k', 'صحة المحفظة'),
+        h('span.hero-k', 'التقييم العام'),
         h('span.hero-gauge', [
           h('span.hero-v.count-up', String(health.score)),
           h('span.hero-max', '/100'),
@@ -114,29 +114,29 @@
             h('span.proj-bar-rented', { style: { width: (rPct * 100) + '%' } }),
           ]),
           h('div.proj-bar-legend', [
-            h('span.pb-good', `مؤجَّر ${ps.rented}`),
+            h('span.pb-good', `مؤجَّرة ${ps.rented}`),
             h('span.pb-mid', `${ps.unitsTotal} وحدة`),
-            h('span.pb-bad', `فاضي ${ps.vacant}`),
+            h('span.pb-bad', `شاغرة ${ps.vacant}`),
           ]),
         ]),
         h('div.proj-nums', [
           h('div.pn', [h('span.pn-k', 'إيجارات ' + Store.periodLabel(m)), h('span.pn-v', money(ps.monthDue, { bare: true }))]),
-          h('div.pn', [h('span.pn-k', 'اتحصّل'), h('span.pn-v' + (ps.rate != null && ps.rate < 0.7 ? '.val-critical' : '.val-good'), ps.rate == null ? '—' : pct(ps.rate))]),
+          h('div.pn', [h('span.pn-k', 'المحصَّل'), h('span.pn-v' + (ps.rate != null && ps.rate < 0.7 ? '.val-critical' : '.val-good'), ps.rate == null ? '—' : pct(ps.rate))]),
           h('div.pn', [h('span.pn-k', 'متأخرات'), h('span.pn-v' + (ps.arrears ? '.val-critical' : ''), money(ps.arrears, { bare: true }))]),
-          h('div.pn', [h('span.pn-k', 'خسارة الفاضي/شهر'), h('span.pn-v' + (ps.vacancyLossMonthly ? '.val-warning' : ''), ps.vacancyLossMonthly ? '≈' + money(ps.vacancyLossMonthly, { bare: true }) : '—')]),
+          h('div.pn', [h('span.pn-k', 'خسارة الشواغر/شهر'), h('span.pn-v' + (ps.vacancyLossMonthly ? '.val-warning' : ''), ps.vacancyLossMonthly ? '≈' + money(ps.vacancyLossMonthly, { bare: true }) : '—')]),
         ]),
         (ps.expiringSoon || ps.unknownArrears) ? h('div.proj-flags', [
-          ps.expiringSoon ? h('span.chip.chip-serious', `${ps.expiringSoon} عقد بيخلص قريب`) : null,
-          ps.unknownArrears ? h('span.chip.chip-critical', 'متأخرات قيمتها مش معروفة') : null,
+          ps.expiringSoon ? h('span.chip.chip-serious', `${ps.expiringSoon} عقد ينتهي قريبًا`) : null,
+          ps.unknownArrears ? h('span.chip.chip-critical', 'متأخرات قيمتها غير معروفة') : null,
         ]) : null,
       ]);
       bindTip(card, () =>
         `<b>${b.name}</b><br>` +
-        `مؤجَّر: ${ps.rented} · فاضي: ${ps.vacant} من ${ps.unitsTotal}<br>` +
+        `مؤجَّر: ${ps.rented} · شاغرة: ${ps.vacant} من ${ps.unitsTotal}<br>` +
         `إيجارات ${Store.periodLabel(m, true)}: ${money(ps.monthDue)}<br>` +
-        `اتحصّل: ${money(ps.monthCollected)} (${ps.rate == null ? '—' : pct(ps.rate)})<br>` +
+        `المحصَّل: ${money(ps.monthCollected)} (${ps.rate == null ? '—' : pct(ps.rate)})<br>` +
         `تأمينات عند المالك: ${money(ps.deposits)}<br>` +
-        '<i>اضغط لتركيز كل الشاشات على المشروع ده</i>');
+        '<i>اضغط لتركيز جميع الشاشات على هذا المشروع</i>');
       return keyClickable(card);
     });
 
@@ -158,17 +158,17 @@
         value: money(ar.total, { bare: true }),
         ic: 'trendDown', tone: 'critical',
         valueClass: ar.total > 0 ? 'val-critical' : '',
-        sub: `${ar.rows.length} شهر متأخر` + (ar.unknowns.length ? ` + ${ar.unknowns.length} أشهر قيمتها مش معروفة` : ''),
+        sub: `${ar.rows.length} شهر متأخر` + (ar.unknowns.length ? ` + ${ar.unknowns.length} أشهر قيمتها غير معروفة` : ''),
         onclick: () => go('#matrix', { st: 'arrears', b: F.b }),
       }),
       tile({
-        label: 'خسارة الوحدات الفاضية',
+        label: 'خسائر الوحدات الشاغرة',
         value: vac.totalMonthly ? '≈' + money(vac.totalMonthly, { bare: true }) : '0',
         ic: 'bolt', tone: 'serious',
         valueClass: vac.totalMonthly ? 'val-warning' : '',
         sub: vac.count
-          ? `${vac.count} وحدة فاضية · متوسط الشغور ${vac.avgMonths != null ? vac.avgMonths + ' شهر' : '—'} · ضاع منك ≈${money(vac.totalAccum, { bare: true })}`
-          : 'مفيش وحدات فاضية',
+          ? `${vac.count} وحدة شاغرة · متوسط مدة الشغور ${vac.avgMonths != null ? vac.avgMonths + ' شهر' : '—'} · إجمالي الفاقد ≈${money(vac.totalAccum, { bare: true })}`
+          : 'لا توجد وحدات شاغرة',
         onclick: () => go('#units', { st: 'notEarning', b: F.b }),
       }),
       tile({
@@ -176,14 +176,14 @@
         value: money(ar.undocumentedTotal, { bare: true }),
         ic: 'question', tone: 'warning',
         valueClass: ar.undocumentedTotal > 0 ? 'val-warning' : '',
-        sub: ar.undocumented.length ? `${ar.undocumented.length} شهر من الورقة مش معروف اتدفع ولا لأ` : 'كله متأكد منه',
+        sub: ar.undocumented.length ? `${ar.undocumented.length} شهرًا من الورقة يحتاج تأكيدًا: سداد أم تأخير؟` : 'لا شيء بانتظار التأكيد',
         onclick: () => go('#quality', {}),
       }),
       tile({
         label: 'تأمينات عند المالك',
         value: money(deps, { bare: true }),
         ic: 'shield', tone: 'violet',
-        sub: 'دي مش دخل — التزام بيترد آخر العقد (محسوبة خارج الإيرادات)',
+        sub: 'ليست دخلًا — التزام يُرَدُّ عند نهاية العقد (خارج الإيرادات)',
         onclick: () => {
           const rows = Store.depositsHeld(uset);
           openDrawer('التأمينات عند المالك', [
@@ -205,8 +205,8 @@
         value: comp.perTenant.length ? `${comp.punctual} ملتزم` : '—',
         ic: 'check', tone: 'good',
         sub: comp.perTenant.length
-          ? `${comp.sometimesLate} بيتأخر أحيانًا · ${comp.delinquent} متعثر — بالنقاط من سجل الدفع الفعلي`
-          : 'بيتحسب من الدفعات المسجّلة بتاريخ — هيظهر مع أول شهور التشغيل',
+          ? `${comp.sometimesLate} يتأخر أحيانًا · ${comp.delinquent} متعثر — بالنقاط من سجل السداد الفعلي`
+          : 'يُحسب من الدفعات المسجَّلة بتاريخ — يظهر بعد أول أشهر التشغيل',
         onclick: () => go('#insights', { b: F.b }),
       }),
     ]);
@@ -227,11 +227,11 @@
           ]);
           return keyClickable(el);
         }))
-      : h('p.note-line', 'مفيش دخول أو خروج متوقع في الـ12 شهر الجايين.');
+      : h('p.note-line', 'لا حركة دخول أو خروج متوقعة خلال الاثني عشر شهرًا القادمة.');
 
     function openIoDrawer(list) {
       openDrawer('حركة الوحدات: داخل / خارج', [
-        h('p.step-hint', 'كل شهر: عقود بتبدأ (داخلة) وعقود بتنتهي من غير تجديد (خارجة) وأثرها على دخل الشهر.'),
+        h('p.step-hint', 'لكل شهر: عقود تبدأ (داخلة) وعقود تنتهي دون تجديد (خارجة) وأثر ذلك على دخل الشهر.'),
         h('table.table.table-mini', [
           h('thead', h('tr', [h('th', 'الشهر'), h('th', 'داخلة'), h('th', 'خارجة'), h('th', 'الدخل المتوقع'), h('th', 'التغير')])),
           h('tbody', list.map(x => h('tr', [
@@ -245,7 +245,7 @@
       ], [h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إغلاق')]);
     }
 
-    /* ---------- 4) عقود بتخلص خلال 90 يوم (أعلن / اتصرف) ---------- */
+    /* ---------- 4) عقود تنتهي خلال 90 يومًا (أعلن / اتصرف) ---------- */
     const expiring = [...ren.overdue.map(r => ({ c: r.contract, days: -r.daysAgo })),
                       ...ren.soon.map(r => ({ c: r.contract, days: r.daysLeft }))];
     const expiringList = expiring.length
@@ -256,30 +256,30 @@
             h('span.exp-tenant', tName(x.c.tenantId)),
             h('span.exp-date', shortDate(x.c.end)),
             x.days < 0
-              ? statusChip('critical', `خلص من ${Math.abs(x.days)} يوم`)
-              : statusChip('serious', `باقي ${x.days} يوم`),
+              ? statusChip('critical', `انتهى منذ ${Math.abs(x.days)} يوم`)
+              : statusChip('serious', `متبقّي ${x.days} يوم`),
           ]);
           return keyClickable(row);
         }))
-      : emptyState('مفيش عقود بتخلص خلال 90 يوم');
+      : emptyState('لا عقود تنتهي خلال 90 يومًا');
 
     /* ---------- 5) الألارم: شهرين ورا بعض من غير سداد ---------- */
     const alarmCard = alarms.length ? h('section.card.alarm-card', [
-      h('div.card-head', [h('h3.card-title', [icon('warn'), ' 🚨 متأخرين شهرين ورا بعض — اتصرف']),
+      h('div.card-head', [h('h3.card-title', [icon('warn'), ' 🚨 متأخرون شهرين متتاليين — يلزم إجراء']),
         h('span.chip.chip-critical', alarms.length + ' حالة')]),
       h('ul.alarm-list', alarms.map(a => {
         const row = h('li.alarm-row', {
           onclick: () => Views.openCellDrawer(a.unit, a.periods[a.periods.length - 1], asOf),
         }, [
           h('span.alarm-who', [h('b', a.tenant ? a.tenant.name : '—'), h('span.exp-proj', ` — ${a.unit.name} (${bName(a.unit.buildingId)})`)]),
-          h('span.alarm-months', `${a.months} شهور ورا بعض`),
-          h('span.alarm-amt.val-critical', a.unknownAmt ? 'القيمة مش معروفة' : money(a.amount)),
+          h('span.alarm-months', `${a.months} أشهر متتالية`),
+          h('span.alarm-amt.val-critical', a.unknownAmt ? 'القيمة غير معروفة' : money(a.amount)),
         ]);
         return keyClickable(row);
       })),
     ]) : null;
 
-    /* ---------- 6) مين ما دفعش الشهر ده ---------- */
+    /* ---------- 6) من لم يسدِّد الشهر ده ---------- */
     function unpaidCard() {
       const rows = [];
       for (const u of us) {
@@ -295,11 +295,11 @@
       rows.sort((a, b) => (b.amount || 0) - (a.amount || 0));
       const total = rows.reduce((s, r) => s + (r.amount || 0), 0);
       const chipOf = ci =>
-        ci.status === 'late' ? statusChip('critical', ci.unknownAmount ? 'متأخر — قيمته مش معروفة' : 'متأخر')
-        : ci.status === 'partial' ? statusChip('warning', 'دفع جزء')
+        ci.status === 'late' ? statusChip('critical', ci.unknownAmount ? 'متأخر — قيمته غير معروفة' : 'متأخر')
+        : ci.status === 'partial' ? statusChip('warning', 'سداد جزئي')
         : ci.status === 'unknown' ? statusChip('unknown', 'يحتاج تأكيد')
-        : statusChip('neutral', 'لسه في المهلة');
-      return sectionCard(`مين ما دفعش ${Store.periodLabel(m, true)}؟`,
+        : statusChip('neutral', 'ضمن المهلة');
+      return sectionCard(`من لم يسدِّد ${Store.periodLabel(m, true)}؟`,
         rows.length
           ? h('div', [
               h('ul.unpaid-list', rows.slice(0, 8).map(r =>
@@ -310,10 +310,10 @@
                     chipOf(r.ci),
                   ]),
                 ])))),
-              h('p.unpaid-total', ['الإجمالي اللي برة: ', h('b.val-critical', money(total)),
-                rows.some(r => r.amount == null) ? ' + مبالغ مش معروفة' : '']),
+              h('p.unpaid-total', ['الإجمالي غير المحصَّل: ', h('b.val-critical', money(total)),
+                rows.some(r => r.amount == null) ? ' + مبالغ غير معروفة' : '']),
             ])
-          : emptyState('الكل دفع الشهر ده ✓'));
+          : emptyState('الجميع سدَّد هذا الشهر ✓'));
     }
 
     /* ---------- تجميع الصفحة ---------- */
@@ -331,27 +331,27 @@
       hero,
       filterRow,
       alarmCard,
-      sectionCard('المشاريع — اضغط على مشروع تركّز عليه كل الأرقام',
-        h('div.proj-grid', projCards),
-        F.b ? h('button.btn.btn-ghost', { onclick: () => go('#dashboard', {}) }, 'رجّع كل المشاريع') : null),
       tiles,
+      sectionCard('المشاريع — اختر مشروعًا لتركيز جميع الأرقام عليه',
+        h('div.proj-grid', projCards),
+        F.b ? h('button.btn.btn-ghost', { onclick: () => go('#dashboard', {}) }, 'عرض كل المشاريع') : null),
       h('div.grid-2', [
-        sectionCard('الدخل المتوقع 12 شهر (من العقود — التأمينات مش محسوبة)', h('div', [
+        sectionCard('الدخل المتوقع 12 شهر (من العقود — التأمينات غير محسوبة)', h('div', [
           h('p.hero-line', [h('span.hero-num.count-up', money(rev.total, { bare: true })), h('span.hero-unit', ' ج.م'),
             rev.anyEstimated ? statusChip('unknown', 'فيه قيم تقديرية') : null]),
           Charts.revenueChart(rev.series),
-          h('div.io-wrap', [h('h4.io-title', 'حركة داخل/خارج وأثرها'), ioStrip]),
+          h('div.io-wrap', [h('h4.io-title', 'حركة الوحدات (دخول/خروج) وأثرها'), ioStrip]),
         ])),
-        sectionCard('عقود بتخلص خلال 90 يوم — أعلن أو جدد', expiringList),
+        sectionCard('عقود تنتهي خلال 90 يومًا — للإعلان أو التجديد', expiringList),
       ]),
       h('div.grid-2', [
-        sectionCard('التحصيل شهر بشهر', Charts.collectionChart(Store.collectionSeries(m, 12, asOf, uset))),
+        sectionCard('التحصيل شهرًا بشهر', Charts.collectionChart(Store.collectionSeries(m, 12, asOf, uset))),
         unpaidCard(),
       ]),
       h('div.grid-2', [
         sectionCard('أعمار المتأخرات', h('div', [
           Charts.agingChart(ar.buckets),
-          ar.unknowns.length ? h('p.note-line', [icon('warn'), ` مش محسوب: ${ar.unknowns.length} أشهر قيمتها مش معروفة (مفيش عقد مسجّل).`]) : null,
+          ar.unknowns.length ? h('p.note-line', [icon('warn'), ` غير مشمول: ${ar.unknowns.length} أشهر قيمتها غير معروفة (لا يوجد عقد مسجّل).`]) : null,
         ])),
         sectionCard('آخر الحركات', Store.state.log.length
           ? h('ul.acts', Store.state.log.slice(0, 8).map(x => h('li.act', [h('span.act-t', x.at), h('span', x.txt)])))
@@ -362,63 +362,63 @@
 
   /* ترجمات اللوحة الجديدة */
   I18N.extend({
-    'المشاريع': 'Projects', 'الوحدات': 'Units', 'مؤجَّر': 'Rented', 'فاضي': 'Vacant',
-    'اللي اتحصّل فعلًا': 'Actually collected', 'صحة المحفظة': 'Portfolio health',
-    'المشاريع — اضغط على مشروع تركّز عليه كل الأرقام': 'Projects — click one to focus every figure on it',
-    'رجّع كل المشاريع': 'Back to all projects', 'بيانات تجريبية': 'sample data',
+    'المشاريع': 'Projects', 'الوحدات': 'Units', 'مؤجَّر': 'Rented', 'شاغرة': 'Vacant',
+    'ما تم تحصيله': 'Actually collected', 'التقييم العام': 'Portfolio health',
+    'المشاريع — اختر مشروعًا لتركيز جميع الأرقام عليه': 'Projects — click one to focus every figure on it',
+    'عرض كل المشاريع': 'Back to all projects', 'بيانات تجريبية': 'sample data',
     'تجريبي': 'Sample', 'فعلي': 'Real', 'وحدة': 'units',
     'المتأخرات': 'Arrears', 'شهر متأخر': 'late months',
-    'خسارة الوحدات الفاضية': 'Vacancy loss', 'مفيش وحدات فاضية': 'No vacant units',
-    'سداد يحتاج تأكيد': 'Payments needing confirmation', 'كله متأكد منه': 'All confirmed',
+    'خسائر الوحدات الشاغرة': 'Vacancy loss', 'لا توجد وحدات شاغرة': 'No vacant units',
+    'سداد يحتاج تأكيد': 'Payments needing confirmation', 'لا شيء بانتظار التأكيد': 'All confirmed',
     'تأمينات عند المالك': 'Deposits held by owner',
-    'دي مش دخل — التزام بيترد آخر العقد (محسوبة خارج الإيرادات)': 'Not income — a liability returned at contract end (kept out of revenue)',
+    'ليست دخلًا — التزام يُرَدُّ عند نهاية العقد (خارج الإيرادات)': 'Not income — a liability returned at contract end (kept out of revenue)',
     'التزام المستأجرين': 'Tenant punctuality',
-    'الدخل المتوقع 12 شهر (من العقود — التأمينات مش محسوبة)': 'Expected income, 12 months (from contracts — deposits excluded)',
-    'حركة داخل/خارج وأثرها': 'Move-ins / move-outs and their impact',
+    'الدخل المتوقع 12 شهر (من العقود — التأمينات غير محسوبة)': 'Expected income, 12 months (from contracts — deposits excluded)',
+    'حركة الوحدات (دخول/خروج) وأثرها': 'Move-ins / move-outs and their impact',
     'حركة الوحدات: داخل / خارج': 'Unit movement: in / out',
-    'عقود بتخلص خلال 90 يوم — أعلن أو جدد': 'Contracts ending within 90 days — advertise or renew',
-    'مفيش عقود بتخلص خلال 90 يوم': 'No contracts ending within 90 days',
-    '🚨 متأخرين شهرين ورا بعض — اتصرف': '🚨 Two consecutive unpaid months — act now',
-    'حالة': 'cases', 'شهور ورا بعض': 'consecutive months', 'القيمة مش معروفة': 'amount unknown',
-    'التحصيل شهر بشهر': 'Collection month by month',
+    'عقود تنتهي خلال 90 يومًا — للإعلان أو التجديد': 'Contracts ending within 90 days — advertise or renew',
+    'لا عقود تنتهي خلال 90 يومًا': 'No contracts ending within 90 days',
+    '🚨 متأخرون شهرين متتاليين — يلزم إجراء': '🚨 Two consecutive unpaid months — act now',
+    'حالة': 'cases', 'أشهر متتالية': 'consecutive months', 'القيمة غير معروفة': 'amount unknown',
+    'التحصيل شهرًا بشهر': 'Collection month by month',
     'أعمار المتأخرات': 'Arrears aging', 'المطلوب تحصيله — ': 'To collect — ',
-    'الكل دفع الشهر ده ✓': 'Everyone paid this month ✓',
-    'الإجمالي اللي برة: ': 'Total outstanding: ', ' + مبالغ مش معروفة': ' + unknown amounts',
-    'متأخر — قيمته مش معروفة': 'Late — amount unknown', 'دفع جزء': 'Partial',
-    'يحتاج تأكيد': 'Needs confirmation', 'لسه في المهلة': 'Still in grace',
+    'الجميع سدَّد هذا الشهر ✓': 'Everyone paid this month ✓',
+    'الإجمالي غير المحصَّل: ': 'Total outstanding: ', ' + مبالغ غير معروفة': ' + unknown amounts',
+    'متأخر — قيمته غير معروفة': 'Late — amount unknown', 'سداد جزئي': 'Partial',
+    'يحتاج تأكيد': 'Needs confirmation', 'ضمن المهلة': 'Still in grace',
     'داخلة': 'in', 'خارجة': 'out', 'الدخل المتوقع': 'Expected income', 'التغير': 'Change',
-    'مفيش دخول أو خروج متوقع في الـ12 شهر الجايين.': 'No move-ins or move-outs expected in the next 12 months.',
-    'كل شهر: عقود بتبدأ (داخلة) وعقود بتنتهي من غير تجديد (خارجة) وأثرها على دخل الشهر.':
+    'لا حركة دخول أو خروج متوقعة خلال الاثني عشر شهرًا القادمة.': 'No move-ins or move-outs expected in the next 12 months.',
+    'لكل شهر: عقود تبدأ (داخلة) وعقود تنتهي دون تجديد (خارجة) وأثر ذلك على دخل الشهر.':
       'Each month: contracts starting (in), contracts ending without renewal (out), and the impact on that month’s income.',
     'التأمين ≈ شهر إيجار (البند الخامس) — بيترد بالكامل عند التسليم أو بيتخصم منه الإصلاحات. مش بيدخل في حسابات الدخل.':
       'Deposit ≈ one month’s rent (clause 5) — returned in full on handover or reduced by repairs. Never counted as income.',
   });
   I18N.addPatterns([
-    [/^مين ما دفعش (.+)؟$/, m2 => 'Who has not paid — ' + I18N.tt(m2[1]) + '?'],
+    [/^من لم يسدِّد (.+)؟$/, m2 => 'Who has not paid — ' + I18N.tt(m2[1]) + '?'],
     [/^تحصيل (.+)$/, m2 => 'Collection — ' + I18N.tt(m2[1])],
     [/^إيجارات (.+)$/, m2 => I18N.tt(m2[1]) + ' rents'],
-    [/^خلص من (\d+) يوم$/, m2 => `Ended ${m2[1]}d ago`],
-    [/^باقي (\d+) يوم$/, m2 => `${m2[1]}d left`],
-    [/^(\d+) عقد بيخلص قريب$/, m2 => `${m2[1]} contracts ending soon`],
-    [/^متأخرات قيمتها مش معروفة$/, () => 'Arrears of unknown amount'],
-    [/^(\d+) وحدة فاضية · متوسط الشغور (.+) · ضاع منك ≈([\d,]+)$/,
+    [/^انتهى منذ (\d+) يوم$/, m2 => `Ended ${m2[1]}d ago`],
+    [/^متبقّي (\d+) يوم$/, m2 => `${m2[1]}d left`],
+    [/^(\d+) عقد ينتهي قريبًا$/, m2 => `${m2[1]} contracts ending soon`],
+    [/^متأخرات قيمتها غير معروفة$/, () => 'Arrears of unknown amount'],
+    [/^(\d+) وحدة شاغرة · متوسط مدة الشغور (.+) · إجمالي الفاقد ≈([\d,]+)$/,
       m2 => `${m2[1]} vacant units · avg vacancy ${I18N.tt(m2[2])} · lost so far ≈${m2[3]}`],
-    [/^(\d+) شهر من الورقة مش معروف اتدفع ولا لأ$/, m2 => `${m2[1]} paper months unconfirmed — paid or late?`],
-    [/^(\d+) بيتأخر أحيانًا · (\d+) متعثر — بالنقاط من سجل الدفع الفعلي$/,
+    [/^(\d+) شهرًا من الورقة يحتاج تأكيدًا: سداد أم تأخير؟$/, m2 => `${m2[1]} paper months unconfirmed — paid or late?`],
+    [/^(\d+) يتأخر أحيانًا · (\d+) متعثر — بالنقاط من سجل السداد الفعلي$/,
       m2 => `${m2[1]} sometimes late · ${m2[2]} delinquent — scored from actual payment history`],
-    [/^بيتحسب من الدفعات المسجّلة بتاريخ — هيظهر مع أول شهور التشغيل$/,
+    [/^يُحسب من الدفعات المسجَّلة بتاريخ — يظهر بعد أول أشهر التشغيل$/,
       () => 'Scored from dated payments — appears after the first operating months'],
-    [/^خسارة الفاضي\/شهر$/, () => 'Vacancy loss/mo'],
-    [/^اتحصّل$/, () => 'Collected'],
+    [/^خسارة الشواغر\/شهر$/, () => 'Vacancy loss/mo'],
+    [/^المحصَّل$/, () => 'Collected'],
     [/^(\d+) ملتزم$/, m2 => `${m2[1]} punctual`],
-    [/^مؤجَّر (\d+)$/, m2 => `Rented ${m2[1]}`],
-    [/^فاضي (\d+)$/, m2 => `Vacant ${m2[1]}`],
+    [/^مؤجَّرة (\d+)$/, m2 => `Rented ${m2[1]}`],
+    [/^شاغرة (\d+)$/, m2 => `Vacant ${m2[1]}`],
     [/^(\d+) وحدة$/, m2 => `${m2[1]} units`],
-    [/^(\d+) شهور ورا بعض$/, m2 => `${m2[1]} months in a row`],
+    [/^(\d+) أشهر متتالية$/, m2 => `${m2[1]} months in a row`],
     [/^المالك: (.+)$/, m2 => 'Owner: ' + I18N.tt(m2[1])],
     /* شظايا مركّبة رصدها السكانر */
     [/^المطلوب تحصيله — (.+)$/, m2 => 'To collect — ' + I18N.tt(m2[1])],
-    [/^(\d+) شهر متأخر \+ (\d+) أشهر قيمتها مش معروفة$/, m2 => `${m2[1]} late months + ${m2[2]} months of unknown amount`],
+    [/^(\d+) شهر متأخر \+ (\d+) أشهر قيمتها غير معروفة$/, m2 => `${m2[1]} late months + ${m2[2]} months of unknown amount`],
     [/^(\d+) شهر متأخر$/, m2 => `${m2[1]} late months`],
     [/^(\d+) حالة$/, m2 => `${m2[1]} cases`],
     [/^\+(\d+) داخلة · −(\d+) خارجة$/, m2 => `+${m2[1]} in · −${m2[2]} out`],
@@ -432,29 +432,71 @@
     [/^من دخل الشهر معتمد على مستأجر واحد: (.+)$/, m2 => "of this month's income depends on a single tenant: " + I18N.tt(m2[1])],
     [/^(\d+) vacant units · avg vacancy ([\d.]+) شهر · lost so far ≈([\d,]+)$/,
       m2 => `${m2[1]} vacant units · avg vacancy ${m2[2]} mo · lost so far ≈${m2[3]}`],
-    [/^مش محسوب: (\d+) أشهر قيمتها مش معروفة \(مفيش عقد مسجّل\)\.$/,
+    [/^غير مشمول: (\d+) أشهر قيمتها غير معروفة \(لا يوجد عقد مسجّل\)\.$/,
       m2 => `Excluded: ${m2[1]} months of unknown amount (no contract on file).`],
   ]);
   I18N.addTokens([
     [/،/g, ','],
     [/([\d.]+) شهر/g, '$1 mo'],
   ]);
+  /* شريط الترشيح النشط */
   I18N.extend({
-    'كل ورقة بتوصلك = مشروع مستقل باسم صاحبه. اكتب اسم المالك زي ما هو مكتوب على الورقة.':
+    'الأرقام المعروضة مُرشَّحة على:': 'Figures below are filtered by:',
+    'عرض الكل': 'Show all', 'إزالة هذا الترشيح': 'Remove this filter',
+    'شاغرة (لا إيراد منها)': 'Vacant (no income)', 'تنتهي قريبًا': 'Ending soon',
+    'عقد منتهٍ بلا تجديد': 'Ended, no renewal',
+  });
+  I18N.addPatterns([
+    [/^المشروع: (.+)$/, m2 => 'Project: ' + I18N.tt(m2[1])],
+    [/^النوع: (.+)$/, m2 => 'Type: ' + I18N.tt(m2[1])],
+    [/^المستأجر: (.+)$/, m2 => 'Tenant: ' + I18N.tt(m2[1])],
+    [/^الحالة: (.+)$/, m2 => 'State: ' + I18N.tt(m2[1])],
+    [/^بحث: (.+)$/, m2 => 'Search: ' + m2[1]],
+  ]);
+  /* جدول أنواع الإدخال */
+  I18N.extend({
+    'أنواع الإدخال في النظام — ماذا تُدخل ومن أين': 'Entry types — what you enter and where',
+    'ماذا تريد أن تُدخل؟': 'What do you want to enter?', 'من أين': 'Where', 'الخطوات باختصار': 'Steps in short',
+    'مشروع جديد (ورقة كاملة)': 'New project (a full paper)', 'هذه الشاشة': 'This screen',
+    'اسم المالك ← صفوف الورقة ← نقل علامات ✓/✗': 'Owner name → paper rows → transfer ✓/✗ marks',
+    'دفعة شهر واحد': 'A single month payment', 'جدول التحصيل': 'Collection Sheet',
+    'اضغط خلية الشهر ← المبلغ مُعبَّأ بالمتبقي ← احفظ': 'Click the month cell → amount pre-filled with the remainder → save',
+    'سداد شهر كامل (دفعة واحدة للجميع)': 'Collect a whole month (one action for everyone)',
+    'جدول التحصيل ← «سداد جماعي»': 'Collection Sheet → “Bulk collect”',
+    'حدِّد من سدَّدوا ← تاريخ وطريقة موحَّدان ← حفظ': 'Tick who paid → one date & method → save',
+    'عقد جديد أو تجديد': 'New contract or renewal',
+    'العقود ← «عقد جديد» أو زر «+ إدخال»': 'Contracts → “New contract” or the “+ Add” button',
+    'وحدة + مستأجر + بداية وقيمة سنة أولى — الجدول يتولَّد': 'Unit + tenant + start & year-1 rent — the schedule generates itself',
+    'وحدة داخل مشروع قائم': 'A unit inside an existing project', 'الوحدات ← «وحدة جديدة»': 'Units → “New unit”',
+    'اختر المشروع ← الاسم والنوع': 'Pick the project → name & type',
+    'مستأجر أو تعديل بياناته': 'A tenant, or editing one', 'المستأجرون': 'Tenants',
+    'اضغط الصف للتعديل أو «مستأجر جديد»': 'Click a row to edit, or “New tenant”',
+    'شكوى صيانة': 'A maintenance complaint', 'الشكاوى ← «شكوى جديدة»': 'Complaints → “New complaint”',
+    'الوحدة ← التصنيف والتكلفة ومن يتحمَّلها': 'Unit → category, cost and who bears it',
+    'رد المالك على سؤال مراجعة': 'Owner’s answer to a review question', 'مراجعات مطلوبة': 'Reviews Needed',
+    '«سجّل رد المالك» ← اكتب الإجابة — يُغلق البند': '“Record owner’s answer” → type it — the item closes',
+    'ثلاث خطوات تحوِّل أي ورقة تصلك إلى مشروع حي بمؤشراته — دون Excel وسيط.':
+      'Three steps turn any incoming paper into a live project with its own KPIs — no Excel in between.',
+  });
+  I18N.extend({
+    'كل ورقة تصلك = مشروع مستقل باسم مالكها. اكتب اسم المالك كما هو مدوَّن على الورقة.':
       'Every incoming paper = an independent project named after its owner. Type the owner name exactly as written on it.',
-    'الدخل السنوي المتوقع لكل مشروع (التأمينات مفصولة — مش دخل)': 'Expected annual income per project (deposits separated — not income)',
-    'التأمينات التزام هيترد — اعرف سيولتك الحقيقية من غيرها.': 'Deposits are a returnable liability — know your real liquidity without them.',
+    'الدخل السنوي المتوقع لكل مشروع (التأمينات مفصولة — ليست دخلًا)': 'Expected annual income per project (deposits separated — not income)',
+    'التأمينات التزام يُرَد — اعرف سيولتك الحقيقية بدونها.': 'Deposits are a returnable liability — know your real liquidity without them.',
     'توزيع صحي للدخل على المستأجرين.': 'Healthy income spread across tenants.',
     'مراجعات مطلوبة — أسئلة للمالك': 'Reviews needed — questions for the owner',
-    'تركيز المخاطر وصحة المحفظة': 'Risk concentration & portfolio health',
-    'صحة المحفظة — مؤشر مجمَّع': 'Portfolio health — composite index',
+    'تركيز المخاطر والتقييم العام': 'Risk concentration & portfolio health',
+    'التقييم العام — مؤشر مجمَّع': 'Portfolio health — composite index',
     'التأمينات عند المالك': 'Deposits held by owner',
-    'الإجمالي اللي برة:': 'Total outstanding:',
-    'ضاع منك حتى الآن': 'Lost so far', 'بتخسّرك شهريًا': 'Costing you monthly', 'فاضية من': 'Vacant for',
+    'الإجمالي غير المحصَّل:': 'Total outstanding:',
+    'إجمالي الفاقد حتى الآن': 'Lost so far', 'خسارة شهرية تقديرية': 'Costing you monthly', 'شاغرة منذ': 'Vacant for',
     'فيه قيم تقديرية': 'Includes estimates', 'المشروع': 'Project', 'جودة البيانات': 'Data quality',
-    'اعتماد عالي — خروجه يضرب الدخل. وزّع العقود الجاية أو أمّن تجديده بدري.':
+    'اعتماد مرتفع — خروجه يؤثر بشدة على الدخل. نوِّع العقود القادمة أو أمِّن تجديده مبكرًا.':
       'High dependency — losing them dents the income. Diversify upcoming leases or secure their renewal early.',
     'رد تجريبي من المالك': 'Sample owner answer',
+    'إنشاء الحساب وإضافة المشاريع': 'Workspace created and projects added',
+    'الكشف يذكر تأمينًا واحدًا (35,000 للوحدة 41). قيم تأمين باقي العقود غير معروفة رغم أنها التزام مالي يجب أن يظهر.':
+      'The paper records a single deposit (35,000 for unit 41). Deposits of the remaining contracts are unknown although they are a financial liability that must be visible in the figures.',
   });
 
   /* اللوحة الجديدة هي الافتراضية */

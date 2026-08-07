@@ -1,6 +1,6 @@
-# Tahseel (تحصيل) — Rental Portfolio Intelligence
+# Egary (إيجاري) — Rental Management System
 
-> Repository name *Egary* is historical; the product brand is **Tahseel**.
+> Simple, clear, and zero-dependency.
 
 Turn paper rent statements into a live digital portfolio: collections, aged arrears, contracts & renewals, complaints, and a built-in data-quality workflow — in a single static web app with **zero dependencies**.
 

@@ -17,14 +17,14 @@
   /* ---------- القاموس: مطابقة تامة ---------- */
   const D = {
     // الهوية والتنقل
-    'تحصيل': 'Tahseel', 'ذكاء محفظة الإيجارات': 'Rental Portfolio Intelligence',
+    'تحصيل': 'Tahseel', 'نظام إدارة الإيجارات': 'Rental Management System',
     'إيجاري': 'Egary', 'منظومة إدارة بيانات الإيجارات': 'Rental Data Management Suite',
     'لوحة المؤشرات': 'Dashboard', 'التحليلات': 'Insights', 'جدول التحصيل': 'Collection Sheet',
     'إضافة مشروع جديد': 'Add New Project', 'الوحدات': 'Units', 'العقود': 'Contracts',
     'المستأجرون': 'Tenants', 'الشكاوى': 'Complaints', 'مراجعات مطلوبة': 'Reviews Needed',
     'الإعدادات': 'Settings', 'إدخال': 'Add', 'دليل الشرح': 'User Guide',
     'دليل الاستخدام الكامل': 'Full documentation',
-    'نسخة عرض · كشف سكرية الفعلي + كشفان توضيحيان':
+    'نسخة عرض — مشروع سكرية الفعلي ومشروعان تجريبيان':
       'Demo build · Sokareya (real) + 2 sample statements',
     // السلايسرز
     'ابحث عن وحدة أو مستأجر…': 'Search unit, tenant, phone, receipt…',
@@ -64,25 +64,25 @@
     'محصَّل': 'Collected', 'متعثر': 'Delinquent', 'بلا عقد نشط': 'No active contract',
     'مستحق الشهر': 'Month due', 'جزئي/متأخر السداد': 'Partial / paid late',
     'متأخر': 'Late', 'بلا استحقاق/شاغرة': 'No dues / vacant',
-    'الكل سدَّد هذا الشهر ✓': 'Everyone paid this month ✓',
+    'الجميع سدَّد هذا الشهر ✓': 'Everyone paid this month ✓',
     'في السماح': 'In grace', 'متأخر — قيمة مجهولة': 'Late — unknown amount',
     // المصفوفة
     'نفس جدول الورقة — وضعان: تسجيل دفعات موثَّقة، أو تفريغ سريع لعلامات ورقة.':
       'Same grid as the paper — two modes: record documented payments, or fast-transcribe paper marks.',
     'وضع العمل': 'Mode', 'تسجيل دفعات — اضغط الخلية تفتح دفعة كاملة': 'Record payments — click a cell to log a full payment',
-    'نقل ورقة قديمة — الضغطة تقلّب ✓ ← ✗ ← فاضي': 'Transfer old paper — click cycles ✓ → ✗ → blank',
+    'نقل ورقة قديمة — الضغطة تقلّب ✓ ← ✗ ← فارغ': 'Transfer old paper — click cycles ✓ → ✗ → blank',
     'سداد جماعي لشهر كامل': 'Bulk collect a whole month',
     'الوحدة / المستأجر': 'Unit / Tenant', 'متأخرات': 'Arrears',
     'الإجمالي (محصَّل / مستحق)': 'Total (collected / due)',
     'مدفوع (موثَّق)': 'Paid (documented)', 'مدفوع متأخرًا عن ميعاده': 'Paid late',
     'مدفوع (من الورقة) — من غير مبلغ/تاريخ': 'Paid (per old paper) — no amount/date',
     'سداد جزئي': 'Partial payment', 'مستحق الآن (في السماح)': 'Due now (in grace)',
-    'يحتاج تأكيد — اتدفع ولا اتأخر؟': 'Needs confirmation — paid or late?',
+    'يحتاج تأكيد — سداد أم تأخير؟': 'Needs confirmation — paid or late?',
     'لم يستحق بعد': 'Not yet due', 'قبل تغطية الكشف': 'Before statement range',
     'سداد بلا عقد مسجّل': 'Paid, no contract on file', 'خارج مدة العقد': 'Outside contract term',
     'قيمة تقديرية (+10٪) غير مدوَّنة': 'Estimated value (+10%), not on paper',
     'وضع نقل الورقة شغّال: ': 'Paper-transfer mode is ON: ',
-    'كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فاضي. الخانة اللي الورقة ساكتة عنها سيبها فاضية. ارجع لوضع «تسجيل دفعات» للدفعات الموثَّقة.':
+    'كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فارغ. اترك ما سكتت عنه الورقة فارغًا، وعُد لوضع «تسجيل دفعات» للدفعات الموثَّقة.':
       'Each click cycles the cell ✓ → ✗ → blank. Leave blank whatever the paper is silent about. Switch back to “Record payments” for documented entries.',
     'تسجيل دفعة': 'Record payment', 'توثيق دفعة الكشف (مبلغ وتاريخ فعليان)': 'Document the paper payment (real amount & date)',
     'المبلغ (ج.م)': 'Amount (EGP)', 'تاريخ السداد': 'Payment date', 'طريقة السداد': 'Payment method',
@@ -143,7 +143,7 @@
       'Three steps turn any incoming paper into a live statement with its own KPIs — no Excel in between.',
     'الخطوة 1 — بيانات المشروع (الورقة)': 'Step 1 — Project (paper) details',
     'إنشاء المشروع': 'Create project', 'أضف الصف': 'Add row', 'الصفوف المُدخلة': 'Entered rows',
-    'مين لم يسدِّد': 'Who has not paid',
+    'من لم يسدِّد': 'Who has not paid',
     'كل ورقة تصلك = كشف مستقل باسم مالكها. اكتب اسم المالك كما هو على الورقة.':
       'Every incoming paper = an independent statement named after its owner. Type the owner name exactly as written.',
     'الخطوة 3 — علامات الشهور ✓/✗': 'Step 3 — Month marks ✓/✗',
@@ -173,7 +173,7 @@
   /* ---------- أنماط جُمل بمتغيرات (مُرتَّبة: الأخص أولًا) ---------- */
   const P = [
     [/^تحصيل (.+)$/, m => 'Collection — ' + tt(m[1])],
-    [/^مين لم يسدِّد (.+)؟$/, m => 'Who has not paid — ' + tt(m[1]) + '?'],
+    [/^من لم يسدِّد (.+)؟$/, m => 'Who has not paid — ' + tt(m[1]) + '?'],
     [/^محفظة من (\d+) مبانٍ و(\d+) وحدة — كل رقم محسوب لحظيًا من العقود والدفعات\.$/,
       m => `A portfolio of ${m[1]} buildings and ${m[2]} units — every figure computed live from contracts & payments.`],
     [/^حالة المباني — (.+)$/, m => 'Buildings status — ' + tt(m[1])],
@@ -189,7 +189,7 @@
     [/^منتهٍ بلا تجديد (\d+)$/, m => 'Ended, no renewal: ' + m[1]],
     [/^ينتهي خلال (.+)$/, m => 'Ends in ' + tt(m[1])],
     [/^انتهى منذ (.+)$/, m => 'Ended ' + tt(m[1]) + ' ago'],
-    [/^باقي (\d+) يوم$/, m => m[1] + 'd left'],
+    [/^متبقّي (\d+) يوم$/, m => m[1] + 'd left'],
     [/^سنة (\d+)$/, m => 'Year ' + m[1]],
     [/^(\d+) سنة$/, m => m[1] === '1' ? '1 year' : m[1] + ' years'],
     [/^(\d+) سنوات$/, m => m[1] + ' years'],
@@ -272,7 +272,7 @@
   function apply() {
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
-    document.title = lang === 'ar' ? 'تحصيل — ذكاء محفظة الإيجارات' : 'Tahseel — Rental Portfolio Intelligence';
+    document.title = lang === 'ar' ? 'إيجاري — نظام إدارة الإيجارات' : 'Egary — Rental Management System';
   }
   function setLang(l) {
     lang = l === 'en' ? 'en' : 'ar';

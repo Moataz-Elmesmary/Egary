@@ -338,7 +338,7 @@
         // شارة الأيام المتبقية للعقود القريبة من الانتهاء
         if (b.status === 'soon') {
           const left = Math.max(0, Math.round((Store.d(b.end) - today) / 86400000));
-          svg.appendChild(txt(xe - 5, by + 14, 'باقي ' + left + ' يوم', {
+          svg.appendChild(txt(xe - 5, by + 14, 'متبقّي ' + left + ' يوم', {
             'text-anchor': 'end', fill: C.serious, 'font-size': 10, 'font-weight': 700,
           }));
         }

@@ -204,7 +204,7 @@
     'الحسم: هل جُدِّد العقد؟ إن لم يُجدَّد فالوحدة شاغرة ويجب استرداد أو تسوية التأمين إن وُجد.':
       'Resolve: was the contract renewed? If not, the unit is vacant and the deposit (if any) must be refunded or settled.',
     'التأمينات مسجَّلة لعقد واحد فقط من 12 (الكشف الحقيقي)': 'Deposits are recorded for only 1 of 12 contracts (the real statement)',
-    'الكشف يذكر تأمينًا واحدًا (35,000 للوحدة 41). قيم تأمين باقي العقود غير معروفة رغم أنها التزام مالي يجب أن يظهر.':
+    'الكشف يذكر تأمينًا واحدًا (35,000 للوحدة 41). قيم تأمين متبقّي العقود غير معروفة رغم أنها التزام مالي يجب أن يظهر.':
       'The statement mentions one deposit (35,000 for unit 41). The other contracts’ deposit values are unknown even though they are a financial liability that must be visible in the figures.',
     'حصر تأمينات كل العقود القائمة وإدخالها.': 'Inventory the deposits of all active contracts and enter them.',
     'الصيانة الشهرية غير مسجَّلة رغم نصّ البند الرابع': 'Monthly maintenance is unrecorded despite Clause 4',
@@ -238,7 +238,7 @@
     'بيان عبدالمنعم سكرية — الكشف الورقي المفرّغ': 'Abdelmoneim Sokareya Statement — the transcribed paper statement',
     'استيراد كشف «بيان عبدالمنعم سكرية» (يناير–يونيو 2026) — 12 صفًا، 25 ملاحظة جودة':
       'Imported “Abdelmoneim Sokareya Statement” (Jan–Jun 2026) — 12 rows, 25 quality notes',
-    'إنشاء المحفظة وإضافة المباني': 'Portfolio created and buildings added',
+    'إنشاء مشاريعك وإضافة المباني': 'Portfolio created and buildings added',
     'تسريب في حمام الوحدة': 'Leak in the unit’s bathroom',
     'انقطاع في لوحة الكهرباء': 'Outage in the electrical panel',
     'باب لا يغلق بإحكام': 'Door does not close tightly',
@@ -255,13 +255,13 @@
     'التقارير والقرار': 'Reports & decisions',
     'بيان ورقي من مالك عقار (زي «بيان عبدالمنعم سكرية») + نموذج عقد. الورقة = كشف مستقل في المنظومة.':
       'A paper statement from a property owner (like the “Abdelmoneim Sokareya Statement”) + a contract form. Each paper = an independent statement in the suite.',
-    'شاشة «إدخال كشف جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من المصفوفة بوضع التفريغ. الخانة الفاضية تتسجّل «غير موثَّق» — الفراغ معلومة.':
+    'شاشة «إدخال كشف جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من المصفوفة بوضع نقل الورقة. الخانة الفارغة تُسجَّل «يحتاج تأكيد» — الفراغ معلومة.':
       'The “New Statement Intake” screen: owner details → the paper’s rows with its exact columns (client name / unit / from / values 1-2-3 / notes) → ✓/✗ marks from the matrix in Transcribe mode. Empty cells register as “Undocumented” — a blank is information.',
     'كل تناقض أو نقص يتسجّل تلقائيًا في «جودة البيانات» بنص المصدر الحرفي. تقعد مع المالك جلسة واحدة تقفل الأسئلة (تليفونات، تأمينات، قيم ناقصة، فراغات = سداد ولا تأخير؟).':
       'Every contradiction or gap is logged automatically in “Data Quality” with the source’s verbatim text. One sitting with the owner closes the questions (phones, deposits, missing values, blanks = paid or late?).',
     'التحصيل الجديد يتسجّل دفعة كاملة (مبلغ+تاريخ+طريقة+إيصال) من خلية المصفوفة أو بالسداد الجماعي. عقد جديد/تجديد من زر «+ إدخال». شكوى تتسجّل بتصنيفها وتكلفتها.':
       'New collections are logged as full payments (amount + date + method + receipt) from a matrix cell or via bulk collection. A new contract/renewal via the “+ Add” button. Complaints are logged with category and cost.',
-    'مش بتراجع 1000 وحدة — بتفتح «مين لم يسدِّد؟» والتنبيهات والتحليلات: بيوروك بس اللي محتاج قرار (متأخر، عقد بينتهي، فجوة توثيق).':
+    'مش بتراجع 1000 وحدة — بتفتح «من لم يسدِّد؟» والتنبيهات والتحليلات: بيوروك بس اللي محتاج قرار (متأخر، عقد بينتهي، فجوة توثيق).':
       'You don’t review 1,000 units — you open “Who has not paid?”, the alerts, and Insights: they show only what needs a decision (a late payer, an expiring contract, a documentation gap).',
     'تصدير CSV للمالك (متأخرات/مصفوفة/عقود/دفعات) + التحليلات للقرارات: مين نطارده، إمتى نجدد، فين الفاقد.':
       'CSV exports for the owner (arrears / matrix / contracts / payments) + Insights for decisions: whom to chase, when to renew, where the loss is.',
@@ -276,11 +276,11 @@
       'The “from/to/1/2/3” columns on the paper — and Clause 3 of the contract states the value is “monthly”',
     'استحقاق الشهر = قيمة سنة العقد الجارية (+ الصيانة إن وُجدت + الضريبة للخاضعين). الشهر المقطوع بين سنتين يتحسب باليوم':
       'Month due = the current contract-year value (+ maintenance if any + VAT where applicable). A month split across two years is prorated per day',
-    'الحقيقة 2: علامة الشهر (✓ / ✗ / فاضي)': 'Fact 2: the month mark (✓ / ✗ / blank)',
-    '✓ = حصل سداد (بلا تفاصيل) · ✗ = متأخر مؤكد · الفاضي = لا نعرف':
+    'الحقيقة 2: علامة الشهر (✓ / ✗ / شاغرة)': 'Fact 2: the month mark (✓ / ✗ / blank)',
+    '✓ = حصل سداد (بلا تفاصيل) · ✗ = متأخر مؤكد · الشاغرة = لا نعرف':
       '✓ = a payment happened (no details) · ✗ = confirmed late · blank = we don’t know',
-    'شبكة الشهور في الورقة، بتتفرّغ كما هي بوضع التفريغ': 'The paper’s month grid, transcribed as-is in Transcribe mode',
-    '✓ تُحسب سدادًا كاملًا بقيمة الاستحقاق (افتراض مُعلَن لحد ما تتوثّق) · ✗ يدخل المتأخرات · الفاضي يتعلّم «غير موثَّق» ولا يدخل أي إجمالي إلا بقيمته المحتملة منفصلة':
+    'شبكة الشهور في الورقة، بتتفرّغ كما هي بوضع نقل الورقة': 'The paper’s month grid, transcribed as-is in Transcribe mode',
+    '✓ تُحسب سدادًا كاملًا بقيمة الاستحقاق (افتراض مُعلَن لحد ما تتوثّق) · ✗ يدخل المتأخرات · الشاغرة يتعلّم «غير موثَّق» ولا يدخل أي إجمالي إلا بقيمته المحتملة منفصلة':
       '✓ counts as full payment at the due amount (a declared assumption until documented) · ✗ enters the arrears · blank is flagged “Undocumented” and enters no total except as a separate potential value',
     'الحقيقة 3: التاريخ الجاري (النهارده)': 'Fact 3: the current date (today)',
     'بيحوّل الجدول لحالات: مدفوع/مستحق/متأخر/لم يستحق': 'Turns the schedule into states: paid / due / late / not yet due',
@@ -288,7 +288,7 @@
       'The device clock + the contract’s due day (the 1st, per the contract clauses) + grace days from Settings',
     'شهر مستحق بلا سداد وتجاوز (يوم الاستحقاق + السماح) ⇒ متأخر، وعمره = عدد الأيام منذ الاستحقاق ⇒ شرائح 30/60/90':
       'A due month with no payment past (due day + grace) ⇒ late; its age = days since due ⇒ 30/60/90 buckets',
-    'كل الباقي تجميعات': 'Everything else is aggregation',
+    'كل المتبقّي تجميعات': 'Everything else is aggregation',
     'أي كارد أو رسم في المنظومة هو مجموع/نسبة/ترتيب للحالات دي — مفيش رقم بيتكتب يدويًا':
       'Every card or chart in the suite is a sum / ratio / ranking of these states — no figure is ever typed by hand',
     'محرك الحالات أعلاه': 'The state engine above',
@@ -313,7 +313,7 @@
     'دفعة بتاريخ بعد اليوم 1+5 سماح تتعلّم «مدفوع متأخرًا»': 'A payment dated after day 1 + 5 grace is flagged “paid late”',
     'البند الرابع: صيانة شهرية تُسدَّد مع الإيجار': 'Clause 4: monthly maintenance paid with the rent',
     'بند مستقل في الاستحقاق مش مضموم للإيجار': 'A separate dues line, not folded into the rent',
-    'نص البند (القيمة فاضية في العينة!)': 'The clause text (the amount is blank in the sample!)',
+    'نص البند (القيمة فارغة في العينة!)': 'The clause text (the amount is blank in the sample!)',
     'خانة صيانة بكل عقد تدخل استحقاق الشهر وتظهر منفصلة في التلميح والدرج':
       'A maintenance field on every contract feeds the month’s dues and shows separately in the tooltip and drawer',
     'محل 1 (برج النيل): 41,800 إيجار + 1,200 صيانة + ض.ق.م': 'Shop 1 (Nile Tower): 41,800 rent + 1,200 maintenance + VAT',
@@ -353,10 +353,10 @@
     '✗ الورقة + الشهور المتجاوزة للسماح بلا سداد': 'Paper ✗ marks + months past grace with no payment',
     'Σ (مستحق − مسدَّد) لكل شهر×وحدة متأخر — والمجهول القيمة (سكرية) يُعد منفصلًا ولا يُخلَط':
       'Σ (due − paid) for every late unit-month — unknown-value items (Sokareya) are counted separately, never mixed in',
-    'خانات فاضية داخل تغطية الورقة — سداد ولا تأخير؟ محدش يعرف':
+    'خانات فارغة داخل تغطية الورقة — سداد أم تأخير؟ غير معروف':
       'Blank cells inside the paper’s range — paid or late? Nobody knows',
     'الفراغات في شبكة شهور الورقة': 'The blanks in the paper’s month grid',
-    'Σ استحقاق الشهور الفاضية داخل التغطية — يُعرض كنطاق عدم يقين مش كمتأخرات':
+    'Σ استحقاق الشهور الفارغة داخل التغطية — يُعرض كنطاق عدم يقين مش كمتأخرات':
       'Σ dues of the blank months inside the range — shown as an uncertainty band, not as arrears',
     'الإشغال / التجديدات / التأمينات': 'Occupancy / renewals / deposits',
     'وحدات بعقد نشط اليوم · عقود تنتهي ≤90 يوم بلا لاحق · مجموع التأمينات المحتجزة':
@@ -372,7 +372,7 @@
     'نفس ألوان المصفوفة: أخضر محصَّل، كهرماني جزئي/متأخر السداد، أحمر متأخر، مقلّم غير موثَّق':
       'Same matrix colors: green collected, amber partial/paid-late, red late, striped undocumented',
     'صف سكرية أحمر كامل — 6 أشهر ✗': 'The Sokareya row is solid red — 6 months of ✗',
-    'مين لم يسدِّد؟': 'Who has not paid?',
+    'من لم يسدِّد؟': 'Who has not paid?',
     'الإجابة المباشرة لسؤالك: أسماء ومبالغ الشهر المختار، مرتّبة بالأكبر':
       'The direct answer to your question: names and amounts for the chosen month, largest first',
     'حالات الشهر المختار': 'The chosen month’s states',
@@ -405,7 +405,7 @@
     '«≈» جنب الرمز = القيمة تقديرية (+10٪ غير مدوَّنة في الورقة)':
       '“≈” next to the symbol = an estimated value (+10%, not written on the paper)',
     'وضعا العمل': 'The two modes',
-    '«تسجيل دفعات»: الضغطة تفتح دفعة كاملة · «تفريغ ورقة»: الضغطة تقلّب ✓/✗/فاضي':
+    '«تسجيل دفعات»: الضغطة تفتح دفعة كاملة · «تفريغ ورقة»: الضغطة تقلّب ✓/✗/فارغ':
       '“Record payments”: a click opens a full payment · “Transcribe paper”: a click cycles ✓/✗/blank',
     'التفريغ للتاريخ القديم من الورق، والدفعات للتشغيل اليومي':
       'Transcription is for paper history; payments are for daily operations',
@@ -418,7 +418,7 @@
     'رصيد الوحدة المتأخر الكلي عبر كل الشهور': 'The unit’s total late balance across all months',
     'تجميع صف الوحدة': 'The unit row’s aggregate',
     'Σ متبقي الشهور المتأخرة + «؟×n» للمجهول': 'Σ remaining of the late months + “?×n” for the unknown',
-    'باقي الشاشات — باختصار': 'The other screens — in brief',
+    'متبقّي الشاشات — باختصار': 'The other screens — in brief',
     'الإنسايتس المكتوبة + تحليل العقود + الالتزام + التوزيعات': 'Written insights + contract analysis + punctuality + distributions',
     'كل ما سبق': 'All of the above',
     'كل بطاقة إنسايت جملة محسوبة بشرطها (مثلًا: منحدر الإيراد يظهر فقط لو النصف الثاني أقل 15٪+) وتنقلك لمكان الإجراء':
@@ -443,7 +443,7 @@
     '1,519,345 ج.م + 6 أشهر مجهولة': '1,519,345 EGP + 6 unknown months',
     '198,000 ج.م (تقوى: يناير–مارس)': '198,000 EGP (Taqwa: Jan–Mar)',
     'أقدم شريحة حاليًا: 80,200 ج.م فوق 90 يومًا': 'Oldest bucket currently: 80,200 EGP past 90 days',
-    'تقوى عبدالمنعم: يناير–مارس فاضية في الورقة = 198,000 ج.م «غير موثَّق» — مش متأخرات ومش تحصيل':
+    'تقوى عبدالمنعم: يناير–مارس فارغة في الورقة = 198,000 ج.م «غير موثَّق» — ليست متأخرات وليست تحصيلًا':
       'Taqwa Abdelmoneim: January–March blank on the paper = 198,000 EGP “Undocumented” — neither arrears nor collection',
     'يوليو 2026 كله بلا أي علامة في الورقة ⇒ 453,254 ج.م متأخرات مؤكدة عمرها 31–60 يومًا':
       'July 2026 has no marks at all on the paper ⇒ 453,254 EGP confirmed arrears aged 31–60 days',
@@ -487,7 +487,7 @@
     'وسّع الترشيح من السلايسرز فوق، أو امسح البحث.': 'Widen the filter from the slicers above, or clear the search.',
     /* ---------- الأدراج ---------- */
     'سداد جماعي — شهر كامل': 'Bulk collection — a whole month',
-    'علّم اللي دفعوا بالكامل واحفظ مرة واحدة — بدل ما تفتح 1000 خلية. الجزئي والاستثناءات سجّلهم من خلاياهم.':
+    'حدِّد من سدَّدوا بالكامل واحفظ مرة واحدة — بدلًا من فتح كل خلية. الجزئي والاستثناءات تُسجَّل من خلاياها.':
       'Check everyone who paid in full and save once — instead of opening 1,000 cells. Record partials and exceptions from their own cells.',
     'المستحق عليهم (المحدَّد = سيُسجَّل مدفوعًا بالكامل)': 'Units with outstanding dues (checked = will be recorded as paid in full)',
     'حفظ الدفعات المحددة': 'Save checked payments',
@@ -564,7 +564,7 @@
     'اسم المبنى / الكشف': 'Building / statement name',
     'المنطقة — اختياري': 'District — optional',
     'أدخل اسم المبنى': 'Enter the building name',
-    'أُضيف المبنى — أضف وحداته من شاشة الوحدات ثم عقوده، أو فرّغ كشفه من المصفوفة بوضع التفريغ':
+    'أُضيف المبنى — أضف وحداته من شاشة الوحدات ثم عقوده، أو فرّغ كشفه من المصفوفة بوضع نقل الورقة':
       'Building added — add its units from the Units screen then its contracts, or transcribe its statement from the matrix in Transcribe mode',
     'عند بدء الاستخدام الفعلي:': 'When real operations begin:',
     'حذف المبنيين التوضيحيين وكل بياناتهما نهائيًا؟': 'Permanently delete the two sample buildings and all their data?',
@@ -604,23 +604,23 @@
     'أدخل قيمة السنة 1 أولًا': 'Enter the year-1 value first',
     'الصفوف المُدخلة (مطابقة لأعمدة الورقة)': 'Entered rows (matching the paper’s columns)',
     'لم تُضف صفوف بعد.': 'No rows added yet.',
-    'نفس أعمدة الورقة بالظبط: اسم العميل · الوحدة · من · قيم السنوات 1/2/3 (شهري — بنص البند الثالث في العقد) · ملاحظات. اللي مش مكتوب في الورقة سيبه فاضي — الفراغ معلومة، مش غلطة.':
+    'نفس أعمدة الورقة بالظبط: اسم العميل · الوحدة · من · قيم السنوات 1/2/3 (شهري — بنص البند الثالث في العقد) · ملاحظات. ما لم يُدوَّن في الورقة اتركه فارغًا — الفراغ معلومة لا خطأ.':
       'The paper’s exact columns: client name · unit · from · year values 1/2/3 (monthly — per Clause 3 of the contract) · notes. Leave blank whatever the paper does not write — a blank is information, not a mistake.',
-    'نفس أعمدة الورقة بالظبط: اسم العميل · الوحدة · من · قيم السنوات 1/2/3 (سنوي — بنص البند الثالث في العقد) · ملاحظات. اللي مش مكتوب في الورقة سيبه فاضي — الفراغ معلومة، مش غلطة.':
+    'نفس أعمدة الورقة بالظبط: اسم العميل · الوحدة · من · قيم السنوات 1/2/3 (سنوي — بنص البند الثالث في العقد) · ملاحظات. ما لم يُدوَّن في الورقة اتركه فارغًا — الفراغ معلومة لا خطأ.':
       'The paper’s exact columns: client name · unit · from · year values 1/2/3 (annual — per Clause 3 of the contract) · notes. Leave blank whatever the paper does not write — a blank is information, not a mistake.',
-    'اكتب الوحدة أو اسم العميل على الأقل — زي ما الورقة نفسها أحيانًا بتسيب واحد منهم':
+    'اكتب الوحدة أو اسم العميل على الأقل — كما تترك الورقة نفسها أحدهما أحيانًا':
       'Type at least the unit or the client name — just as the paper itself sometimes leaves one out',
-    'أُضيف الصف ناقصًا — هيظهر «بلا عقد مسجّل» زي صف جراج الهدم، ويتكمّل لما تعرف بياناته':
+    'أُضيف الصف ناقصًا — سيظهر «بلا عقد مسجّل» حتى تُستكمل بياناته':
       'Row added incomplete — it will show “No contract on file” like the Demolition Garage row, to be completed once its data is known',
     'بلا عقد': 'No contract',
-    'افتح المصفوفة بوضع التفريغ: كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فاضي — بسرعة الورقة نفسها. الخانة اللي الورقة ساكتة عنها سيبها فاضية وسيعلّمها النظام «غير موثَّق».':
+    'افتح المصفوفة بوضع نقل الورقة: كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فارغ — بسرعة الورقة نفسها. الخانة اللي الورقة ساكتة عنها سيبها فارغة وسيعلّمها النظام «غير موثَّق».':
       'Open the matrix in Transcribe mode: each click cycles a cell ✓ → ✗ → blank — as fast as the paper itself. Leave blank whatever the paper is silent about; the system flags it “Undocumented”.',
     'العلامات بتتعلّم على صفوف الورقة — أضف الصفوف في الخطوة 2 الأول وبعدها الزر هيظهر هنا.':
       'Marks attach to the paper’s rows — add the rows in Step 2 first, and the button will appear here.',
     /* ---------- التحليلات ---------- */
     'الإيراد المتعاقد عليه ينخفض في النصف الثاني من السنة القادمة':
       'Contracted revenue drops in the second half of the coming year',
-    'أكبر فجوة معرفية في المحفظة — كل بند له سؤال محدد في شاشة جودة البيانات، وإجابته تدخل النظام وتقفل البند.':
+    'أكبر فجوة معرفية في البيانات — كل بند له سؤال محدد في شاشة جودة البيانات، وإجابته تدخل النظام وتقفل البند.':
       'The portfolio’s biggest knowledge gap — every item has a specific question on the Data Quality screen; each answer enters the system and closes its item.',
     'محسوب من متوسط إيجار النوع المماثل — كل شهر تأخير في التأجير أو التجديد يكلّف هذا الرقم.':
       'Computed from the average rent of the same type — every month of leasing or renewal delay costs this figure.',
