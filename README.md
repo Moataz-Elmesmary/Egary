@@ -1,4 +1,6 @@
-# Egary — Rental Data Management Suite
+# Tahseel (تحصيل) — Rental Portfolio Intelligence
+
+> Repository name *Egary* is historical; the product brand is **Tahseel**.
 
 Turn paper rent statements into a live digital portfolio: collections, aged arrears, contracts & renewals, complaints, and a built-in data-quality workflow — in a single static web app with **zero dependencies**.
 
@@ -14,7 +16,7 @@ Egary ingests each paper as an independent **statement**, keeps every ambiguity 
 
 ## Features
 
-- **Dashboard** — collection rate with month-over-month delta, confirmed arrears with 30/60/90+ aging, occupancy, upcoming renewals, deposits held, a per-building floor map colored by payment state, and a direct *"Who has not paid?"* list.
+- **Top-down Dashboard** — portfolio strip (projects / units / rented / vacant / to-collect / collected / a 0-100 **health score**), per-project cards with rented-vs-vacant bars and vacancy loss, a red **two-consecutive-unpaid-months alarm**, move-in/move-out forecast with income impact %, contracts-ending-in-90-days action list, aged arrears, and a direct *"Who has not paid?"* list. Every card clicks through to the exact filtered view.
 - **Collection Matrix** — the paper grid, alive. Two modes: *record payments* (click a cell → full payment with amount, date, method, receipt) and *transcribe paper* (click cycles ✓ → ✗ → blank). Bulk-collect an entire month in one dialog.
 - **Statement Intake** — a 3-step wizard that turns any incoming paper into a working statement: owner → rows (unit + tenant + contract with auto-generated year schedule) → month marks.
 - **Insights** — auto-written findings (arrears concentration, revenue cliff, vacancy loss estimate, best/worst statement), 12-month collection trend, top debtors, tenant punctuality scores, rent averages by unit type.

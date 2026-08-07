@@ -356,6 +356,231 @@
       .sort((a, b) => b.amount - a.amount);
   }
 
+  /* =====================================================
+     تحليلات المدير: من فوق لتحت — المشروع أولًا ثم التفاصيل
+     ===================================================== */
+
+  /* وحدة «شغّالة» تجاريًا: عقد نشط، أو بتدفع فعليًا ولو بلا عقد مسجّل (كجراج الهدم) */
+  function unitIsEarning(u, period, asOf) {
+    if (activeContractOn(u.id, asOf)) return true;
+    const ci = cellInfo(u.id, period, asOf);
+    return ci.status === 'orphan_paid';
+  }
+
+  /* إحصاءات مشروع (كشف/مبنى) كاملة لشهر */
+  function projectStats(bid, period, asOf) {
+    asOf = asOf || today();
+    const us = STATE.units.filter(u => u.buildingId === bid);
+    const uset = new Set(us.map(u => u.id));
+    const rented = us.filter(u => unitIsEarning(u, period, asOf));
+    const mt = monthTotals(period, asOf, uset);
+    const ar = arrears(asOf, uset);
+    const ren = renewals(90, asOf, uset);
+    const vac = vacancyInfo(asOf, uset);
+    return {
+      building: building(bid), uset,
+      unitsTotal: us.length,
+      rented: rented.length,
+      vacant: us.length - rented.length,
+      monthDue: mt.due + mt.unknownDue,
+      monthCollected: mt.collected,
+      rate: mt.rate,
+      arrears: ar.total,
+      unknownArrears: ar.unknowns.length,
+      needsConfirm: ar.undocumentedTotal,
+      expiringSoon: ren.soon.length + ren.overdue.length,
+      overdueRenewals: ren.overdue.length,
+      vacancyLossMonthly: vac.totalMonthly,
+      deposits: depositsHeld(uset).reduce((s, x) => s + x.amount, 0),
+    };
+  }
+  function allProjectsStats(period, asOf) {
+    return STATE.buildings.map(b => projectStats(b.id, period, asOf));
+  }
+
+  /* الشواغر: من إمتى فاضية + الخسارة الشهرية التقديرية (آخر إيجار أو متوسط النوع) */
+  function typeAvgRent(asOf) {
+    const by = {};
+    for (const u of STATE.units) {
+      const c = activeContractOn(u.id, asOf);
+      if (!c) continue;
+      const y = c.years.find(yy => d(yy.from) <= asOf && asOf <= d(yy.to));
+      if (!y) continue;
+      (by[u.type] = by[u.type] || []).push(monthlyRate(y.rent));
+    }
+    const out = {};
+    for (const t in by) out[t] = by[t].reduce((s, v) => s + v, 0) / by[t].length;
+    return out;
+  }
+  function vacancyInfo(asOf, uset) {
+    asOf = asOf || today();
+    const period = periodOf(asOf);
+    const avg = typeAvgRent(asOf);
+    const rows = [];
+    for (const u of unitsIn(uset)) {
+      if (unitIsEarning(u, period, asOf)) continue;
+      const cs = unitContracts(u.id);
+      const last = cs.length ? cs[cs.length - 1] : null;
+      let since = null, months = null, est = null, src = null;
+      if (last) {
+        since = last.end;
+        months = Math.max(0, Math.round(daysBetween(d(last.end), asOf) / 30.44 * 10) / 10);
+        const y = last.years[last.years.length - 1];
+        est = Math.round(monthlyRate(y.rent));
+        src = 'آخر إيجار للوحدة';
+      } else if (avg[u.type]) {
+        est = Math.round(avg[u.type]);
+        src = 'متوسط النوع المماثل';
+      }
+      rows.push({
+        unit: u, since, months, estMonthly: est, src,
+        accumLoss: est != null && months != null ? Math.round(est * Math.min(months, 12)) : null,
+      });
+    }
+    rows.sort((a, b) => (b.estMonthly || 0) - (a.estMonthly || 0));
+    const withEst = rows.filter(r => r.estMonthly != null);
+    return {
+      rows,
+      count: rows.length,
+      totalMonthly: withEst.reduce((s, r) => s + r.estMonthly, 0),
+      totalAccum: rows.filter(r => r.accumLoss != null).reduce((s, r) => s + r.accumLoss, 0),
+      avgMonths: (function () {
+        const m = rows.filter(r => r.months != null).map(r => r.months);
+        return m.length ? Math.round(m.reduce((s, v) => s + v, 0) / m.length * 10) / 10 : null;
+      })(),
+    };
+  }
+
+  /* داخل / خارج: عقود بتبدأ وبتنتهي كل شهر قادم + أثرها على الدخل */
+  function inOutForecast(fromPeriod, n, uset) {
+    const out = [];
+    let prevIncome = null;
+    for (let i = 0; i < n; i++) {
+      const p = addMonths(fromPeriod, i);
+      const starts = [], ends = [];
+      for (const c of STATE.contracts) {
+        if (uset && !uset.has(c.unitId)) continue;
+        if (periodOf(d(c.start)) === p) starts.push(c);
+        if (periodOf(d(c.end)) === p && !nextContract(c)) ends.push(c);
+      }
+      const income = contractedRevenue(p, 1, uset).total;
+      const deltaPct = prevIncome != null && prevIncome > 0
+        ? Math.round((income - prevIncome) / prevIncome * 100) : null;
+      out.push({ period: p, starts, ends, income, deltaPct });
+      prevIncome = income;
+    }
+    return out;
+  }
+
+  /* الألارم: شهران متتاليان أو أكثر غير مسدَّدين حتى الشهر السابق */
+  function consecutiveLateAlarms(asOf, uset) {
+    asOf = asOf || today();
+    const lastFull = addMonths(periodOf(asOf), -1);
+    const from = STATE.meta.importCoverage.from;
+    const alarms = [];
+    for (const u of unitsIn(uset)) {
+      let streak = 0, amount = 0, unknownAmt = false, periods = [];
+      for (let p = from; cmpPeriod(p, lastFull) <= 0; p = addMonths(p, 1)) {
+        const ci = cellInfo(u.id, p, asOf);
+        if (ci.status === 'late' || ci.status === 'partial') {
+          streak++;
+          periods.push(p);
+          if (ci.unknownAmount || !ci.due) unknownAmt = true;
+          else amount += Math.max(0, ci.due.amount - ci.paid);
+        } else if (ci.status === 'unknown' || ci.status === 'history') {
+          // لا يقطع السلسلة ولا يزيدها — معلومة ناقصة
+        } else {
+          streak = 0; amount = 0; unknownAmt = false; periods = [];
+        }
+      }
+      if (streak >= 2) {
+        const cs = unitContracts(u.id);
+        const tid = cs.length ? cs[cs.length - 1].tenantId : null;
+        alarms.push({
+          unit: u, building: building(u.buildingId),
+          tenant: tid ? tenant(tid) : null,
+          months: streak, periods, amount, unknownAmt,
+        });
+      }
+    }
+    alarms.sort((a, b) => b.months - a.months || b.amount - a.amount);
+    return alarms;
+  }
+
+  /* التزام المستأجرين من الدفعات الموثَّقة: نقاط = نسبة السداد في الميعاد */
+  function complianceBuckets(uset) {
+    const grace = STATE.settings.graceDays;
+    const perTenant = [];
+    for (const t of STATE.tenants) {
+      const pays = STATE.payments.filter(p => {
+        if (!p.date || (uset && !uset.has(p.unitId))) return false;
+        const c = contract(p.contractId);
+        return c && c.tenantId === t.id;
+      });
+      if (pays.length < 3) continue;
+      let onTime = 0;
+      for (const p of pays) {
+        const c = contract(p.contractId);
+        if (daysBetween(dueDateOf(c, p.period), d(p.date)) <= grace) onTime++;
+      }
+      perTenant.push({ tenant: t, n: pays.length, onTime, lateN: pays.length - onTime, points: Math.round(onTime / pays.length * 100) });
+    }
+    perTenant.sort((a, b) => b.points - a.points);
+    return {
+      perTenant,
+      punctual: perTenant.filter(x => x.points >= 90).length,
+      sometimesLate: perTenant.filter(x => x.points >= 60 && x.points < 90).length,
+      delinquent: perTenant.filter(x => x.points < 60).length,
+    };
+  }
+
+  /* صحة المحفظة 0–100: تحصيل + إشغال − فجوات − تركّز انتهاءات − تعمّر متأخرات */
+  function healthScore(asOf, uset) {
+    asOf = asOf || today();
+    const m = addMonths(periodOf(asOf), -1);
+    const mt = monthTotals(m, asOf, uset);
+    const occ = occupancy(asOf, uset);
+    const ar = arrears(asOf, uset);
+    const ren = renewals(90, asOf, uset);
+    const income12 = contractedRevenue(periodOf(asOf), 12, uset).total || 1;
+    const collectScore = (mt.rate == null ? 0.5 : mt.rate) * 40;
+    const occScore = (occ.total ? occ.occupied.length / occ.total : 0) * 25;
+    const unknownPenalty = Math.min(15, ((mt.unknownDue + ar.undocumentedTotal) / Math.max(1, mt.due + mt.unknownDue)) * 15);
+    const agingPenalty = Math.min(10, (ar.buckets.b90p / Math.max(1, ar.total || 1)) * 10);
+    const expiringShare = ren.overdue.length * 2 + ren.soon.length;
+    const expiringPenalty = Math.min(10, expiringShare * 2.5);
+    const score = Math.round(Math.max(0, Math.min(100,
+      collectScore + occScore + (15 - unknownPenalty) + (10 - agingPenalty) + (10 - expiringPenalty))));
+    return { score, parts: { collectScore: Math.round(collectScore), occScore: Math.round(occScore), unknownPenalty: Math.round(unknownPenalty), agingPenalty: Math.round(agingPenalty), expiringPenalty: Math.round(expiringPenalty) }, income12 };
+  }
+
+  /* تركّز المخاطر: أكبر مستأجر كنسبة من دخل الشهر */
+  function topTenantShare(period, uset) {
+    const by = {};
+    for (const u of unitsIn(uset)) {
+      const c = contractsOverlappingMonth(u.id, period)[0];
+      if (!c) continue;
+      const due = dueForMonth(c, period);
+      if (due) by[c.tenantId] = (by[c.tenantId] || 0) + due.amount;
+    }
+    const total = Object.values(by).reduce((s, v) => s + v, 0);
+    const top = Object.entries(by).sort((a, b) => b[1] - a[1])[0];
+    if (!top || !total) return null;
+    return { tenant: tenant(top[0]), amount: Math.round(top[1]), share: Math.round(top[1] / total * 100) };
+  }
+
+  /* الدخل السنوي المتوقع لكل مشروع (التأمينات التزام منفصل — ليست دخلًا) */
+  function annualByProject(fromPeriod) {
+    return STATE.buildings.map(b => {
+      const uset = new Set(STATE.units.filter(u => u.buildingId === b.id).map(u => u.id));
+      return {
+        building: b,
+        annual: contractedRevenue(fromPeriod, 12, uset).total,
+        deposits: depositsHeld(uset).reduce((s, x) => s + x.amount, 0),
+      };
+    }).sort((a, b) => b.annual - a.annual);
+  }
+
   /* ---------- عمليات الإدخال ---------- */
   let idSeq = 1000;
   function genId(prefix) { return prefix + (idSeq++) + '-' + Math.random().toString(36).slice(2, 6); }
@@ -523,6 +748,9 @@
     // BI
     arrears, monthTotals, collectionSeries, occupancy, renewals,
     depositsHeld, contractedRevenue, revenueByType,
+    projectStats, allProjectsStats, vacancyInfo, inOutForecast,
+    consecutiveLateAlarms, complianceBuckets, healthScore,
+    topTenantShare, annualByProject, unitIsEarning,
     // إدخال
     addPayment, addPaymentsBulk, deletePayment, setMark, addContract, addTenant, updateTenant,
     addUnit, addBuilding, removeDemoData, addComplaint, closeComplaint,

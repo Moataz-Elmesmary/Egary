@@ -4,24 +4,25 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
-  <title>إيجاري — منظومة إدارة بيانات الإيجارات</title>
+  <title>تحصيل | Tahseel — ذكاء محفظة الإيجارات</title>
   <style>
 /* =========================================================
    نظام إدارة الإيجارات — نظام التصميم (وضع فاتح، RTL)
    ألوان الرسوم من لوحة dataviz المرجعية المتحقَّق منها
    ========================================================= */
 :root {
-  --page: #f9f9f7;
-  --surface: #fcfcfb;
-  --ink: #0b0b0b;
-  --ink-sec: #52514e;
-  --muted: #75736e; /* أُغمق عن #898781 ليتجاوز تباين AA للنص الصغير */
-  --grid: #e1e0d9;
-  --baseline: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.10);
-  --accent: #2a78d6;
-  --accent-weak: #cde2fb;
-  --accent-ink: #1c5cab;
+  --page: #f6f5fb;
+  --surface: #ffffff;
+  --ink: #16141f;
+  --ink-sec: #4b4760;
+  --muted: #6f6b85;
+  --grid: #e7e5f0;
+  --baseline: #c6c2d8;
+  --border: rgba(31, 27, 54, 0.10);
+  --accent: #7c3aed;
+  --accent-weak: #ede9fe;
+  --accent-ink: #6023c9;
+  --brand-grad: linear-gradient(135deg, #a78bfa 0%, #7c3aed 45%, #4c1d95 100%);
   /* حالات — لا تُستخدم أبدًا كألوان سلاسل بيانات */
   --good: #0ca30c;
   --good-text: #006300;
@@ -36,26 +37,27 @@
   --critical-text: #a32c2c;
   --critical-wash: #fae3e3;
   --unknown-wash: #f0efec;
-  --viz-series: #2a78d6;
-  --viz-track: #cde2fb;
-  --radius: 10px;
+  --viz-series: #4a3aa7;
+  --viz-track: #e4e0f8;
+  --radius: 12px;
   --shadow: 0 1px 2px rgba(11, 11, 11, 0.05), 0 4px 16px rgba(11, 11, 11, 0.05);
   --font: "Segoe UI", "Segoe UI Arabic", Tahoma, system-ui, sans-serif;
 }
 
 /* ---------- الوضع الليلي: درجات مختارة على السطح الداكن (لوحة dataviz المرجعية) ---------- */
 :root[data-theme="dark"] {
-  --page: #0d0d0d;
-  --surface: #1a1a19;
-  --ink: #f4f3ef;
-  --ink-sec: #c3c2b7;
-  --muted: #98968f;
-  --grid: #2c2c2a;
-  --baseline: #45443f;
+  --page: #0d0b14;
+  --surface: #17141f;
+  --ink: #f2f0f7;
+  --ink-sec: #c4c0d4;
+  --muted: #97929f;
+  --grid: #2a2638;
+  --baseline: #453f5c;
   --border: rgba(255, 255, 255, 0.10);
-  --accent: #3987e5;
-  --accent-weak: #16324f;
-  --accent-ink: #8ab9f0;
+  --accent: #a78bfa;
+  --accent-weak: #2e2454;
+  --accent-ink: #c4b5fd;
+  --brand-grad: linear-gradient(135deg, #a78bfa 0%, #7c3aed 55%, #3b0f80 100%);
   --good: #2fb52f;
   --good-text: #8ad98a;
   --good-wash: #142e14;
@@ -69,12 +71,12 @@
   --critical-text: #f09090;
   --critical-wash: #3a1818;
   --unknown-wash: #242422;
-  --viz-series: #3987e5;
-  --viz-track: #16324f;
+  --viz-series: #9085e9;
+  --viz-track: #2c2560;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.35);
 }
-:root[data-theme="dark"] .btn-primary { background: #2a78d6; border-color: #2a78d6; color: #fff; }
-:root[data-theme="dark"] .btn-primary:hover { background: #3987e5; border-color: #3987e5; }
+:root[data-theme="dark"] .btn-primary { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+:root[data-theme="dark"] .btn-primary:hover { background: #8b5cf6; border-color: #8b5cf6; }
 :root[data-theme="dark"] .c-paid-imp { background: #14251a; }
 :root[data-theme="dark"] .c-unknown,
 :root[data-theme="dark"] .ev-unk {
@@ -84,8 +86,8 @@
 :root[data-theme="dark"] .ev-warn { border-color: #514012; }
 :root[data-theme="dark"] .ev-bad { border-color: #5c2424; }
 :root[data-theme="dark"] .tone-violet { background: #241f45; color: #b3a8f5; }
-:root[data-theme="dark"] .brand-logo { box-shadow: 0 3px 10px rgba(57, 135, 229, 0.45); }
-:root[data-theme="dark"] .qa-btn { box-shadow: 0 3px 8px rgba(57, 135, 229, 0.35); }
+:root[data-theme="dark"] .brand-logo { box-shadow: 0 3px 12px rgba(167, 139, 250, 0.45); }
+:root[data-theme="dark"] .qa-btn { box-shadow: 0 3px 10px rgba(167, 139, 250, 0.35); }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 /* الاتجاه تحكمه سمة dir على <html> (rtl افتراضيًا، وltr للإنجليزية) — لا نفرضه هنا */
@@ -110,11 +112,13 @@ button { font-family: inherit; }
 }
 .brand { padding: 18px 16px 14px; border-bottom: 1px solid var(--grid); display: flex; align-items: center; gap: 10px; }
 .brand-logo {
-  width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px;
+  width: 42px; height: 42px; flex-shrink: 0; border-radius: 13px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: linear-gradient(140deg, #4aa3f7 0%, #2a78d6 45%, #164a89 100%);
-  box-shadow: 0 4px 10px rgba(42, 120, 214, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  background: var(--brand-grad);
+  box-shadow: 0 5px 14px rgba(124, 58, 237, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform 0.2s;
 }
+.brand:hover .brand-logo { transform: rotate(-4deg) scale(1.05); }
 .brand-logo svg { width: 24px; height: 24px; }
 
 /* أزرار التبديل (لغة/ثيم) في الشريط العلوي */
@@ -164,7 +168,7 @@ button { font-family: inherit; }
 
 /* قائمة الإدخال السريع */
 .qa-wrap { position: relative; }
-.qa-btn { box-shadow: 0 3px 8px rgba(42, 120, 214, 0.3); font-weight: 700; }
+.qa-btn { background: var(--brand-grad); border: none; box-shadow: 0 3px 10px rgba(124, 58, 237, 0.35); font-weight: 700; }
 .qa-menu {
   display: none; position: absolute; top: calc(100% + 6px); inset-inline-end: 0;
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
@@ -804,6 +808,111 @@ button { font-family: inherit; }
 
 /* جداول داخل البطاقات تلفّ بسكرول خاص بها بدل كسر العرض */
 .mini-scroll { overflow-x: auto; max-width: 100%; }
+
+/* =========================================================
+   لوحة v3: سطر المحفظة + بطاقات المشاريع + داخل/خارج + الألارم
+   ========================================================= */
+.hero-strip {
+  display: flex; flex-wrap: wrap; gap: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  margin-bottom: 14px; overflow: hidden;
+}
+.hero-item {
+  flex: 1; min-width: 128px; padding: 14px 18px;
+  border-inline-end: 1px solid var(--grid);
+  display: flex; flex-direction: column; gap: 2px; cursor: default;
+  transition: background 0.15s;
+}
+.hero-item[role="button"], .hero-item[onclick] { cursor: pointer; }
+.hero-item:hover { background: var(--page); }
+.hero-item:last-child { border-inline-end: none; }
+.hero-k { color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.hero-v { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; }
+.hero-good .hero-v { color: var(--good-text); }
+.hero-bad .hero-v { color: var(--critical-text); }
+.hero-score { background: var(--brand-grad); }
+.hero-score .hero-k, .hero-score .hero-v, .hero-score .hero-max { color: #fff; }
+.hero-gauge { display: flex; align-items: baseline; gap: 2px; }
+.hero-max { font-size: 12px; opacity: 0.8; }
+
+.proj-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.proj-card {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); padding: 14px 16px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 10px;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+.proj-card:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(31, 27, 54, 0.12); border-color: var(--accent); }
+.proj-card.proj-on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-weak), var(--shadow); }
+.proj-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.proj-name { font-size: 15.5px; font-weight: 800; }
+.proj-owner { color: var(--muted); font-size: 12px; }
+.chip-good-soft { background: var(--good-wash); color: var(--good-text); }
+.proj-bar { position: relative; height: 10px; border-radius: 99px; background: var(--critical-wash); overflow: hidden; }
+.proj-bar-rented { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--good), #3fcf3f); border-radius: 99px; transition: width 0.6s ease; }
+.proj-bar-legend { display: flex; justify-content: space-between; font-size: 11.5px; margin-top: 5px; }
+.pb-good { color: var(--good-text); font-weight: 700; }
+.pb-bad { color: var(--critical-text); font-weight: 700; }
+.pb-mid { color: var(--muted); }
+.proj-nums { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+.pn { display: flex; justify-content: space-between; font-size: 12.5px; }
+.pn-k { color: var(--muted); }
+.pn-v { font-weight: 700; font-variant-numeric: tabular-nums; }
+.val-good { color: var(--good-text); }
+.proj-flags { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.io-wrap { margin-top: 12px; border-top: 1px solid var(--grid); padding-top: 10px; }
+.io-title { font-size: 12.5px; font-weight: 700; color: var(--ink-sec); margin-bottom: 8px; }
+.io-strip { display: flex; flex-wrap: wrap; gap: 8px; }
+.io-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  border-radius: 99px; padding: 4px 12px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--border); transition: transform 0.12s;
+}
+.io-badge:hover { transform: translateY(-2px); }
+.io-good { background: var(--good-wash); color: var(--good-text); }
+.io-bad { background: var(--critical-wash); color: var(--critical-text); }
+.io-delta { font-weight: 800; }
+
+.exp-list, .alarm-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.exp-row, .alarm-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px;
+  cursor: pointer; background: var(--page); transition: border-color 0.12s;
+}
+.exp-row:hover, .alarm-row:hover { border-color: var(--accent); }
+.exp-unit { flex: 1; min-width: 140px; }
+.exp-proj { color: var(--muted); font-size: 12px; }
+.exp-tenant { color: var(--ink-sec); font-size: 12.5px; }
+.exp-date { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.alarm-card { border-inline-start: 4px solid var(--critical); }
+.alarm-who { flex: 1; min-width: 150px; }
+.alarm-months { color: var(--critical-text); font-weight: 700; font-size: 12.5px; }
+.alarm-amt { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* =========================================================
+   حركة وحياة — مع احترام تفضيل تقليل الحركة
+   ========================================================= */
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes popIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+.view > * { animation: rise 0.4s both; }
+.view > *:nth-child(1) { animation-delay: 0.02s; }
+.view > *:nth-child(2) { animation-delay: 0.06s; }
+.view > *:nth-child(3) { animation-delay: 0.10s; }
+.view > *:nth-child(4) { animation-delay: 0.14s; }
+.view > *:nth-child(5) { animation-delay: 0.18s; }
+.view > *:nth-child(6) { animation-delay: 0.22s; }
+.view > *:nth-child(7) { animation-delay: 0.26s; }
+.view > *:nth-child(n+8) { animation-delay: 0.3s; }
+.proj-card, .tile, .insight { animation: popIn 0.35s both; }
+.donut { animation: popIn 0.5s both; }
+.drawer { transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.25, 1), opacity 0.22s; }
+.btn, .nav-link, .chip, .evc, .mcell { transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s; }
+.btn:active { transform: scale(0.97); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
 
 /* أهداف لمس أكبر على الشاشات اللمسية */
 @media (pointer: coarse) {
@@ -1615,6 +1724,231 @@ button { font-family: inherit; }
       .sort((a, b) => b.amount - a.amount);
   }
 
+  /* =====================================================
+     تحليلات المدير: من فوق لتحت — المشروع أولًا ثم التفاصيل
+     ===================================================== */
+
+  /* وحدة «شغّالة» تجاريًا: عقد نشط، أو بتدفع فعليًا ولو بلا عقد مسجّل (كجراج الهدم) */
+  function unitIsEarning(u, period, asOf) {
+    if (activeContractOn(u.id, asOf)) return true;
+    const ci = cellInfo(u.id, period, asOf);
+    return ci.status === 'orphan_paid';
+  }
+
+  /* إحصاءات مشروع (كشف/مبنى) كاملة لشهر */
+  function projectStats(bid, period, asOf) {
+    asOf = asOf || today();
+    const us = STATE.units.filter(u => u.buildingId === bid);
+    const uset = new Set(us.map(u => u.id));
+    const rented = us.filter(u => unitIsEarning(u, period, asOf));
+    const mt = monthTotals(period, asOf, uset);
+    const ar = arrears(asOf, uset);
+    const ren = renewals(90, asOf, uset);
+    const vac = vacancyInfo(asOf, uset);
+    return {
+      building: building(bid), uset,
+      unitsTotal: us.length,
+      rented: rented.length,
+      vacant: us.length - rented.length,
+      monthDue: mt.due + mt.unknownDue,
+      monthCollected: mt.collected,
+      rate: mt.rate,
+      arrears: ar.total,
+      unknownArrears: ar.unknowns.length,
+      needsConfirm: ar.undocumentedTotal,
+      expiringSoon: ren.soon.length + ren.overdue.length,
+      overdueRenewals: ren.overdue.length,
+      vacancyLossMonthly: vac.totalMonthly,
+      deposits: depositsHeld(uset).reduce((s, x) => s + x.amount, 0),
+    };
+  }
+  function allProjectsStats(period, asOf) {
+    return STATE.buildings.map(b => projectStats(b.id, period, asOf));
+  }
+
+  /* الشواغر: من إمتى فاضية + الخسارة الشهرية التقديرية (آخر إيجار أو متوسط النوع) */
+  function typeAvgRent(asOf) {
+    const by = {};
+    for (const u of STATE.units) {
+      const c = activeContractOn(u.id, asOf);
+      if (!c) continue;
+      const y = c.years.find(yy => d(yy.from) <= asOf && asOf <= d(yy.to));
+      if (!y) continue;
+      (by[u.type] = by[u.type] || []).push(monthlyRate(y.rent));
+    }
+    const out = {};
+    for (const t in by) out[t] = by[t].reduce((s, v) => s + v, 0) / by[t].length;
+    return out;
+  }
+  function vacancyInfo(asOf, uset) {
+    asOf = asOf || today();
+    const period = periodOf(asOf);
+    const avg = typeAvgRent(asOf);
+    const rows = [];
+    for (const u of unitsIn(uset)) {
+      if (unitIsEarning(u, period, asOf)) continue;
+      const cs = unitContracts(u.id);
+      const last = cs.length ? cs[cs.length - 1] : null;
+      let since = null, months = null, est = null, src = null;
+      if (last) {
+        since = last.end;
+        months = Math.max(0, Math.round(daysBetween(d(last.end), asOf) / 30.44 * 10) / 10);
+        const y = last.years[last.years.length - 1];
+        est = Math.round(monthlyRate(y.rent));
+        src = 'آخر إيجار للوحدة';
+      } else if (avg[u.type]) {
+        est = Math.round(avg[u.type]);
+        src = 'متوسط النوع المماثل';
+      }
+      rows.push({
+        unit: u, since, months, estMonthly: est, src,
+        accumLoss: est != null && months != null ? Math.round(est * Math.min(months, 12)) : null,
+      });
+    }
+    rows.sort((a, b) => (b.estMonthly || 0) - (a.estMonthly || 0));
+    const withEst = rows.filter(r => r.estMonthly != null);
+    return {
+      rows,
+      count: rows.length,
+      totalMonthly: withEst.reduce((s, r) => s + r.estMonthly, 0),
+      totalAccum: rows.filter(r => r.accumLoss != null).reduce((s, r) => s + r.accumLoss, 0),
+      avgMonths: (function () {
+        const m = rows.filter(r => r.months != null).map(r => r.months);
+        return m.length ? Math.round(m.reduce((s, v) => s + v, 0) / m.length * 10) / 10 : null;
+      })(),
+    };
+  }
+
+  /* داخل / خارج: عقود بتبدأ وبتنتهي كل شهر قادم + أثرها على الدخل */
+  function inOutForecast(fromPeriod, n, uset) {
+    const out = [];
+    let prevIncome = null;
+    for (let i = 0; i < n; i++) {
+      const p = addMonths(fromPeriod, i);
+      const starts = [], ends = [];
+      for (const c of STATE.contracts) {
+        if (uset && !uset.has(c.unitId)) continue;
+        if (periodOf(d(c.start)) === p) starts.push(c);
+        if (periodOf(d(c.end)) === p && !nextContract(c)) ends.push(c);
+      }
+      const income = contractedRevenue(p, 1, uset).total;
+      const deltaPct = prevIncome != null && prevIncome > 0
+        ? Math.round((income - prevIncome) / prevIncome * 100) : null;
+      out.push({ period: p, starts, ends, income, deltaPct });
+      prevIncome = income;
+    }
+    return out;
+  }
+
+  /* الألارم: شهران متتاليان أو أكثر غير مسدَّدين حتى الشهر السابق */
+  function consecutiveLateAlarms(asOf, uset) {
+    asOf = asOf || today();
+    const lastFull = addMonths(periodOf(asOf), -1);
+    const from = STATE.meta.importCoverage.from;
+    const alarms = [];
+    for (const u of unitsIn(uset)) {
+      let streak = 0, amount = 0, unknownAmt = false, periods = [];
+      for (let p = from; cmpPeriod(p, lastFull) <= 0; p = addMonths(p, 1)) {
+        const ci = cellInfo(u.id, p, asOf);
+        if (ci.status === 'late' || ci.status === 'partial') {
+          streak++;
+          periods.push(p);
+          if (ci.unknownAmount || !ci.due) unknownAmt = true;
+          else amount += Math.max(0, ci.due.amount - ci.paid);
+        } else if (ci.status === 'unknown' || ci.status === 'history') {
+          // لا يقطع السلسلة ولا يزيدها — معلومة ناقصة
+        } else {
+          streak = 0; amount = 0; unknownAmt = false; periods = [];
+        }
+      }
+      if (streak >= 2) {
+        const cs = unitContracts(u.id);
+        const tid = cs.length ? cs[cs.length - 1].tenantId : null;
+        alarms.push({
+          unit: u, building: building(u.buildingId),
+          tenant: tid ? tenant(tid) : null,
+          months: streak, periods, amount, unknownAmt,
+        });
+      }
+    }
+    alarms.sort((a, b) => b.months - a.months || b.amount - a.amount);
+    return alarms;
+  }
+
+  /* التزام المستأجرين من الدفعات الموثَّقة: نقاط = نسبة السداد في الميعاد */
+  function complianceBuckets(uset) {
+    const grace = STATE.settings.graceDays;
+    const perTenant = [];
+    for (const t of STATE.tenants) {
+      const pays = STATE.payments.filter(p => {
+        if (!p.date || (uset && !uset.has(p.unitId))) return false;
+        const c = contract(p.contractId);
+        return c && c.tenantId === t.id;
+      });
+      if (pays.length < 3) continue;
+      let onTime = 0;
+      for (const p of pays) {
+        const c = contract(p.contractId);
+        if (daysBetween(dueDateOf(c, p.period), d(p.date)) <= grace) onTime++;
+      }
+      perTenant.push({ tenant: t, n: pays.length, onTime, lateN: pays.length - onTime, points: Math.round(onTime / pays.length * 100) });
+    }
+    perTenant.sort((a, b) => b.points - a.points);
+    return {
+      perTenant,
+      punctual: perTenant.filter(x => x.points >= 90).length,
+      sometimesLate: perTenant.filter(x => x.points >= 60 && x.points < 90).length,
+      delinquent: perTenant.filter(x => x.points < 60).length,
+    };
+  }
+
+  /* صحة المحفظة 0–100: تحصيل + إشغال − فجوات − تركّز انتهاءات − تعمّر متأخرات */
+  function healthScore(asOf, uset) {
+    asOf = asOf || today();
+    const m = addMonths(periodOf(asOf), -1);
+    const mt = monthTotals(m, asOf, uset);
+    const occ = occupancy(asOf, uset);
+    const ar = arrears(asOf, uset);
+    const ren = renewals(90, asOf, uset);
+    const income12 = contractedRevenue(periodOf(asOf), 12, uset).total || 1;
+    const collectScore = (mt.rate == null ? 0.5 : mt.rate) * 40;
+    const occScore = (occ.total ? occ.occupied.length / occ.total : 0) * 25;
+    const unknownPenalty = Math.min(15, ((mt.unknownDue + ar.undocumentedTotal) / Math.max(1, mt.due + mt.unknownDue)) * 15);
+    const agingPenalty = Math.min(10, (ar.buckets.b90p / Math.max(1, ar.total || 1)) * 10);
+    const expiringShare = ren.overdue.length * 2 + ren.soon.length;
+    const expiringPenalty = Math.min(10, expiringShare * 2.5);
+    const score = Math.round(Math.max(0, Math.min(100,
+      collectScore + occScore + (15 - unknownPenalty) + (10 - agingPenalty) + (10 - expiringPenalty))));
+    return { score, parts: { collectScore: Math.round(collectScore), occScore: Math.round(occScore), unknownPenalty: Math.round(unknownPenalty), agingPenalty: Math.round(agingPenalty), expiringPenalty: Math.round(expiringPenalty) }, income12 };
+  }
+
+  /* تركّز المخاطر: أكبر مستأجر كنسبة من دخل الشهر */
+  function topTenantShare(period, uset) {
+    const by = {};
+    for (const u of unitsIn(uset)) {
+      const c = contractsOverlappingMonth(u.id, period)[0];
+      if (!c) continue;
+      const due = dueForMonth(c, period);
+      if (due) by[c.tenantId] = (by[c.tenantId] || 0) + due.amount;
+    }
+    const total = Object.values(by).reduce((s, v) => s + v, 0);
+    const top = Object.entries(by).sort((a, b) => b[1] - a[1])[0];
+    if (!top || !total) return null;
+    return { tenant: tenant(top[0]), amount: Math.round(top[1]), share: Math.round(top[1] / total * 100) };
+  }
+
+  /* الدخل السنوي المتوقع لكل مشروع (التأمينات التزام منفصل — ليست دخلًا) */
+  function annualByProject(fromPeriod) {
+    return STATE.buildings.map(b => {
+      const uset = new Set(STATE.units.filter(u => u.buildingId === b.id).map(u => u.id));
+      return {
+        building: b,
+        annual: contractedRevenue(fromPeriod, 12, uset).total,
+        deposits: depositsHeld(uset).reduce((s, x) => s + x.amount, 0),
+      };
+    }).sort((a, b) => b.annual - a.annual);
+  }
+
   /* ---------- عمليات الإدخال ---------- */
   let idSeq = 1000;
   function genId(prefix) { return prefix + (idSeq++) + '-' + Math.random().toString(36).slice(2, 6); }
@@ -1782,6 +2116,9 @@ button { font-family: inherit; }
     // BI
     arrears, monthTotals, collectionSeries, occupancy, renewals,
     depositsHeld, contractedRevenue, revenueByType,
+    projectStats, allProjectsStats, vacancyInfo, inOutForecast,
+    consecutiveLateAlarms, complianceBuckets, healthScore,
+    topTenantShare, annualByProject, unitIsEarning,
     // إدخال
     addPayment, addPaymentsBulk, deletePayment, setMark, addContract, addTenant, updateTenant,
     addUnit, addBuilding, removeDemoData, addComplaint, closeComplaint,
@@ -2664,23 +3001,24 @@ button { font-family: inherit; }
   /* ---------- القاموس: مطابقة تامة ---------- */
   const D = {
     // الهوية والتنقل
+    'تحصيل': 'Tahseel', 'ذكاء محفظة الإيجارات': 'Rental Portfolio Intelligence',
     'إيجاري': 'Egary', 'منظومة إدارة بيانات الإيجارات': 'Rental Data Management Suite',
-    'لوحة المؤشرات': 'Dashboard', 'التحليلات': 'Insights', 'مصفوفة التحصيل': 'Collection Matrix',
-    'إدخال كشف جديد': 'New Statement Intake', 'الوحدات': 'Units', 'العقود': 'Contracts',
-    'المستأجرون': 'Tenants', 'الشكاوى': 'Complaints', 'جودة البيانات': 'Data Quality',
+    'لوحة المؤشرات': 'Dashboard', 'التحليلات': 'Insights', 'جدول التحصيل': 'Collection Sheet',
+    'إضافة مشروع جديد': 'Add New Project', 'الوحدات': 'Units', 'العقود': 'Contracts',
+    'المستأجرون': 'Tenants', 'الشكاوى': 'Complaints', 'مراجعات مطلوبة': 'Reviews Needed',
     'الإعدادات': 'Settings', 'إدخال': 'Add', 'دليل الشرح': 'User Guide',
     'دليل الاستخدام الكامل': 'Full documentation',
     'نسخة عرض · كشف سكرية الفعلي + كشفان توضيحيان':
       'Demo build · Sokareya (real) + 2 sample statements',
     // السلايسرز
     'ابحث عن وحدة أو مستأجر…': 'Search unit, tenant, phone, receipt…',
-    'كل الكشوف': 'All statements', 'كل الأنواع': 'All types', 'كل المستأجرين': 'All tenants',
+    'كل المشاريع': 'All projects', 'كل الأنواع': 'All types', 'كل المستأجرين': 'All tenants',
     'كل الحالات': 'All states', 'مسح': 'Clear', 'مؤجَّرة': 'Occupied',
     'تنتهي خلال 90 يوم': 'Ending within 90 days', 'عقد منتهٍ بلا تجديد': 'Ended, no renewal',
     'بلا عقد مسجّل': 'No contract on file', 'شاغرة': 'Vacant', 'عليها متأخرات': 'Has arrears',
     '· توضيحي': '· sample',
     // عام
-    'الكشف الفعلي': 'Real statement', 'توضيحي': 'Sample', 'المبنى': 'Building',
+    'مشروع فعلي': 'Real project', 'تجريبي': 'Sample', 'المبنى': 'Building',
     'الوحدة': 'Unit', 'المستأجر': 'Tenant', 'الشهر': 'Month', 'الحالة': 'State',
     'النوع': 'Type', 'ملاحظات': 'Notes', 'ملاحظة': 'Note', 'المنطقة': 'District',
     'محل': 'Shop', 'مكتب': 'Office', 'شقة': 'Apartment', 'جراج': 'Garage',
@@ -2695,13 +3033,13 @@ button { font-family: inherit; }
     'ساري': 'Active', 'ينتهي خلال 90 يوم': 'Ending in 90 days', 'ينتهي قريبًا': 'Ending soon',
     'حرج': 'Critical', 'مهم': 'Important', 'تنبيه': 'Notice',
     // لوحة المؤشرات
-    'متأخرات مؤكَّدة': 'Confirmed arrears', 'غير موثَّق (تغطية الكشف)': 'Undocumented (statement range)',
+    'المتأخرات': 'Arrears', 'سداد يحتاج تأكيد': 'Payments needing confirmation',
     'الإشغال': 'Occupancy', 'تجديدات خلال 90 يوم': 'Renewals within 90 days',
     'تأمينات محتجزة': 'Deposits held', 'جزء تقديري': 'Includes estimates',
     'بند مجهول القيمة': 'Unknown-value item', 'لا استحقاقات محسوبة لهذا الشهر': 'No dues computed for this month',
     'لا شيء معلَّق': 'Nothing pending',
     'التحصيل الشهري — المحصَّل من المستحق': 'Monthly collection — collected vs due',
-    'أعمار المتأخرات المؤكَّدة': 'Confirmed arrears aging',
+    'أعمار المتأخرات': 'Arrears aging',
     'الإيراد المتعاقد عليه — 12 شهرًا قادمة': 'Contracted revenue — next 12 months',
     'يتضمن قيمًا تقديرية': 'Includes estimated values',
     'يحتاج انتباهك': 'Needs your attention', 'آخر الحركات': 'Recent activity',
@@ -2716,18 +3054,18 @@ button { font-family: inherit; }
     'نفس جدول الورقة — وضعان: تسجيل دفعات موثَّقة، أو تفريغ سريع لعلامات ورقة.':
       'Same grid as the paper — two modes: record documented payments, or fast-transcribe paper marks.',
     'وضع العمل': 'Mode', 'تسجيل دفعات — اضغط الخلية تفتح دفعة كاملة': 'Record payments — click a cell to log a full payment',
-    'تفريغ ورقة — الضغطة تقلّب ✓ ← ✗ ← فاضي': 'Transcribe paper — click cycles ✓ → ✗ → blank',
+    'نقل ورقة قديمة — الضغطة تقلّب ✓ ← ✗ ← فاضي': 'Transfer old paper — click cycles ✓ → ✗ → blank',
     'سداد جماعي لشهر كامل': 'Bulk collect a whole month',
     'الوحدة / المستأجر': 'Unit / Tenant', 'متأخرات': 'Arrears',
     'الإجمالي (محصَّل / مستحق)': 'Total (collected / due)',
     'مدفوع (موثَّق)': 'Paid (documented)', 'مدفوع متأخرًا عن ميعاده': 'Paid late',
-    'مدفوع من الكشف — بلا مبلغ/تاريخ': 'Paid per paper — no amount/date',
+    'مدفوع (من الورقة) — من غير مبلغ/تاريخ': 'Paid (per old paper) — no amount/date',
     'سداد جزئي': 'Partial payment', 'مستحق الآن (في السماح)': 'Due now (in grace)',
-    'غير موثَّق — سداد أم تأخير؟': 'Undocumented — paid or late?',
+    'يحتاج تأكيد — اتدفع ولا اتأخر؟': 'Needs confirmation — paid or late?',
     'لم يستحق بعد': 'Not yet due', 'قبل تغطية الكشف': 'Before statement range',
     'سداد بلا عقد مسجّل': 'Paid, no contract on file', 'خارج مدة العقد': 'Outside contract term',
     'قيمة تقديرية (+10٪) غير مدوَّنة': 'Estimated value (+10%), not on paper',
-    'وضع التفريغ شغّال: ': 'Transcribe mode is ON: ',
+    'وضع نقل الورقة شغّال: ': 'Paper-transfer mode is ON: ',
     'كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فاضي. الخانة اللي الورقة ساكتة عنها سيبها فاضية. ارجع لوضع «تسجيل دفعات» للدفعات الموثَّقة.':
       'Each click cycles the cell ✓ → ✗ → blank. Leave blank whatever the paper is silent about. Switch back to “Record payments” for documented entries.',
     'تسجيل دفعة': 'Record payment', 'توثيق دفعة الكشف (مبلغ وتاريخ فعليان)': 'Document the paper payment (real amount & date)',
@@ -2774,8 +3112,8 @@ button { font-family: inherit; }
     // جودة البيانات
     'الخطورة': 'Severity', 'حرجة': 'Critical', 'عالية': 'High', 'متوسطة': 'Medium', 'منخفضة': 'Low',
     'الكل': 'All', 'محسومة': 'Resolved', 'مفتوحة': 'Open', 'عام': 'General',
-    'سجّل قرار الحسم': 'Record resolution', 'إعادة فتح': 'Reopen', 'المطلوب: ': 'Action needed: ',
-    'قرار الحسم: ': 'Resolution: ',
+    'سجّل رد المالك': 'Record owner’s answer', 'إعادة فتح': 'Reopen', 'المطلوب: ': 'Action needed: ',
+    'رد المالك: ': 'Owner’s answer: ',
     // الإعدادات
     'كل افتراض في النظام مُعلَن هنا وقابل للتغيير — ويُعاد الحساب فورًا.':
       'Every assumption is declared here and switchable — figures recompute instantly.',
@@ -2787,8 +3125,8 @@ button { font-family: inherit; }
     // الإدخال
     'ثلاث خطوات تحوّل أي ورقة تصلك إلى كشف حي بمؤشراته — من غير Excel في النص.':
       'Three steps turn any incoming paper into a live statement with its own KPIs — no Excel in between.',
-    'الخطوة 1 — بيانات الكشف (الورقة)': 'Step 1 — Statement (paper) details',
-    'إنشاء الكشف': 'Create statement', 'أضف الصف': 'Add row', 'الصفوف المُدخلة': 'Entered rows',
+    'الخطوة 1 — بيانات المشروع (الورقة)': 'Step 1 — Project (paper) details',
+    'إنشاء المشروع': 'Create project', 'أضف الصف': 'Add row', 'الصفوف المُدخلة': 'Entered rows',
     'مين لم يسدِّد': 'Who has not paid',
     'كل ورقة تصلك = كشف مستقل باسم مالكها. اكتب اسم المالك كما هو على الورقة.':
       'Every incoming paper = an independent statement named after its owner. Type the owner name exactly as written.',
@@ -2918,7 +3256,7 @@ button { font-family: inherit; }
   function apply() {
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
-    document.title = lang === 'ar' ? 'إيجاري — منظومة إدارة بيانات الإيجارات' : 'Egary — Rental Data Management Suite';
+    document.title = lang === 'ar' ? 'تحصيل — ذكاء محفظة الإيجارات' : 'Tahseel — Rental Portfolio Intelligence';
   }
   function setLang(l) {
     lang = l === 'en' ? 'en' : 'ar';
@@ -2929,6 +3267,10 @@ button { font-family: inherit; }
   window.I18N = {
     get lang() { return lang; },
     setLang, apply, tt, translateNode,
+    /* لإضافة ترجمات من ملفات لاحقة التحميل (dashboard.js وغيره) */
+    extend(dict) { Object.assign(D, dict); },
+    addPatterns(list) { for (const p of list) P.unshift(p); },
+    addTokens(list) { for (const t of list) TOKENS.push(t); },
   };
   apply();
 
@@ -3815,7 +4157,10 @@ button { font-family: inherit; }
         if (f.st === 'arrears') { if (!arrearsSet.has(u.id)) return false; }
         else {
           const k = unitStatusKey(u, asOf);
-          if (f.st === 'occupied' ? (k !== 'occupied' && k !== 'ending') : k !== f.st) return false;
+          if (f.st === 'notEarning') {
+            // «الفاضي» بمنطق البيزنس: مش داخلة فلوس منها الشهر ده
+            if (Store.unitIsEarning(u, Store.periodOf(asOf), asOf)) return false;
+          } else if (f.st === 'occupied' ? (k !== 'occupied' && k !== 'ending') : k !== f.st) return false;
         }
       }
       if (q) {
@@ -3845,10 +4190,10 @@ button { font-family: inherit; }
     const asOf = Store.today();
     const types = [...new Set(Store.state.units.map(u => u.type))];
     const bSel = UI.combo({
-      placeholder: 'كل الكشوف',
+      placeholder: 'كل المشاريع',
       items: [
-        { value: '', label: 'كل الكشوف' },
-        ...Store.state.buildings.map(b => ({ value: b.id, label: b.name + (b.demo ? ' · توضيحي' : '') })),
+        { value: '', label: 'كل المشاريع' },
+        ...Store.state.buildings.map(b => ({ value: b.id, label: b.name + (b.demo ? ' · تجريبي' : '') })),
       ],
       value: f.b,
       onPick: v => { f.b = v; App.render(); },
@@ -3884,6 +4229,12 @@ button { font-family: inherit; }
     let qT;
     qIn.addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(() => { f.q = qIn.value; App.render(); }, 250); });
     const n = filteredUnits(asOf).length;
+    function refreshSlicerCount(el) {
+      const c = el.querySelector('.slicer-count');
+      const k = filteredUnits(Store.today()).length;
+      if (c) c.textContent = I18N.lang === 'en' ? k + ' units' : k + ' وحدة';
+    }
+    Views.refreshSlicerCount = refreshSlicerCount;
     return h('div.slicers', [
       h('span.slicer-item.slicer-q', qIn),
       h('span.slicer-item', bSel),
@@ -3997,7 +4348,7 @@ button { font-family: inherit; }
       return h('div.bldg', [
         h('div.bldg-head', [
           h('b', b.name),
-          b.demo ? h('span.chip.chip-neutral', 'توضيحي') : h('span.chip.chip-unknown', 'الكشف الفعلي'),
+          b.demo ? h('span.chip.chip-neutral', 'تجريبي') : h('span.chip.chip-unknown', 'مشروع فعلي'),
           b.owner ? h('span.bldg-owner', 'المالك: ' + b.owner) : null,
           h('span.bldg-area', b.area),
         ]),
@@ -4085,7 +4436,7 @@ button { font-family: inherit; }
         chip: mt.estimatedPart ? statusChip('unknown', 'جزء تقديري') : null,
       }),
       statTile({
-        label: 'متأخرات مؤكَّدة',
+        label: 'المتأخرات',
         value: money(ar.total, { bare: true }),
         ic: 'trendDown', tone: 'critical',
         valueClass: ar.total > 0 ? 'val-critical' : '',
@@ -4094,7 +4445,7 @@ button { font-family: inherit; }
         onclick: () => { location.hash = '#matrix'; },
       }),
       statTile({
-        label: 'غير موثَّق (تغطية الكشف)',
+        label: 'سداد يحتاج تأكيد',
         value: money(ar.undocumentedTotal, { bare: true }),
         ic: 'question', tone: 'warning',
         valueClass: ar.undocumentedTotal > 0 ? 'val-warning' : '',
@@ -4209,7 +4560,7 @@ button { font-family: inherit; }
       const chipOf = ci =>
         ci.status === 'late' ? statusChip('critical', ci.unknownAmount ? 'متأخر — قيمة مجهولة' : 'متأخر')
         : ci.status === 'partial' ? statusChip('warning', 'جزئي')
-        : ci.status === 'unknown' ? statusChip('unknown', 'غير موثَّق')
+        : ci.status === 'unknown' ? statusChip('unknown', 'يحتاج تأكيد')
         : statusChip('neutral', 'في السماح');
       return sectionCard(`مين لم يسدِّد ${Store.periodLabel(m, true)}؟`,
         rows.length
@@ -4251,7 +4602,7 @@ button { font-family: inherit; }
         sectionCard('التحصيل الشهري — المحصَّل من المستحق',
           VS.collectionAsTable ? collectionTable() : Charts.collectionChart(collSeries),
           collectionToggle),
-        sectionCard('أعمار المتأخرات المؤكَّدة', h('div', [
+        sectionCard('أعمار المتأخرات', h('div', [
           Charts.agingChart(ar.buckets),
           ar.unknowns.length ? h('p.note-line', [icon('warn'), ` غير مشمول: ${ar.unknowns.length} أشهر بقيمة مجهولة (بلا عقد مسجّل).`]) : null,
         ])),
@@ -4277,11 +4628,11 @@ button { font-family: inherit; }
   const CELL_DEFS = {
     paid:          { cls: 'c-paid',      sym: '✓', label: 'مدفوع (موثَّق)' },
     paid_late:     { cls: 'c-plate',     sym: '✓', label: 'مدفوع متأخرًا عن ميعاده' },
-    paid_imported: { cls: 'c-paid-imp',  sym: '✓', label: 'مدفوع من الكشف — بلا مبلغ/تاريخ' },
+    paid_imported: { cls: 'c-paid-imp',  sym: '✓', label: 'مدفوع (من الورقة) — من غير مبلغ/تاريخ' },
     partial:       { cls: 'c-partial',   sym: '½', label: 'سداد جزئي' },
     late:          { cls: 'c-late',      sym: '✗', label: 'متأخر' },
     due:           { cls: 'c-due',       sym: '•', label: 'مستحق الآن (في السماح)' },
-    unknown:       { cls: 'c-unknown',   sym: '؟', label: 'غير موثَّق — سداد أم تأخير؟' },
+    unknown:       { cls: 'c-unknown',   sym: '؟', label: 'يحتاج تأكيد — اتدفع ولا اتأخر؟' },
     upcoming:      { cls: 'c-upcoming',  sym: '',  label: 'لم يستحق بعد' },
     history:       { cls: 'c-history',   sym: '·', label: 'قبل تغطية الكشف' },
     orphan_paid:   { cls: 'c-orphan',    sym: '✓', label: 'سداد بلا عقد مسجّل' },
@@ -4319,7 +4670,7 @@ button { font-family: inherit; }
       const bus = us.filter(u => u.buildingId === b.id);
       if (!bus.length) continue;
       bodyRows.push(h('tr.mx-bhead', h('td', { colspan: 14 }, [
-        h('b', b.name), ' ', b.demo ? h('span.chip.chip-neutral', 'توضيحي') : h('span.chip.chip-unknown', 'الكشف الفعلي'),
+        h('b', b.name), ' ', b.demo ? h('span.chip.chip-neutral', 'تجريبي') : h('span.chip.chip-unknown', 'مشروع فعلي'),
       ])));
       for (const u of bus) {
         const tid = unitTenantIds(u).slice(-1)[0];
@@ -4344,11 +4695,11 @@ button { font-family: inherit; }
             if (ci.status === 'late' && ci.unknownAmount) html += '<br>القيمة غير معروفة — لا عقد مسجّل';
             if (ci.paid && ci.status !== 'paid_imported') html += `<br>المسدَّد: ${money(ci.paid)}${ci.paidDate ? ' في ' + shortDate(ci.paidDate) : ''}`;
             if (ci.status === 'late' && !ci.unknownAmount) html += `<br>أيام التأخير: ${ci.overdueDays}`;
-            return html + (VS.tafrigh ? '<br><i>وضع التفريغ: الضغط يقلّب ✓/✗/مسح</i>' : '<br><i>اضغط للتفاصيل والتسجيل</i>');
+            return html + (VS.tafrigh ? '<br><i>وضع نقل الورقة: الضغط يقلّب ✓/✗/مسح</i>' : '<br><i>اضغط للتفاصيل والتسجيل</i>');
           });
           const open = () => {
             if (VS.tafrigh) {
-              if (ci.payments.length) { toast('الشهر عليه دفعات مسجَّلة — أطفئ وضع التفريغ لتعديلها', 'warning'); return; }
+              if (ci.payments.length) { toast('الشهر عليه دفعات مسجَّلة — أطفئ وضع نقل الورقة لتعديلها', 'warning'); return; }
               const cur = ci.mark ? ci.mark.mark : null;
               const next = cur === null ? 'paid' : cur === 'paid' ? 'unpaid' : null;
               Store.setMark(u.id, p, next);
@@ -4393,7 +4744,7 @@ button { font-family: inherit; }
         }, [icon('money'), ' تسجيل دفعات — اضغط الخلية تفتح دفعة كاملة']),
         h('button.mode-opt' + (VS.tafrigh ? '.on' : ''), {
           onclick: () => { VS.tafrigh = true; App.render(); },
-        }, [icon('check'), ' تفريغ ورقة — الضغطة تقلّب ✓ ← ✗ ← فاضي']),
+        }, [icon('check'), ' نقل ورقة قديمة — الضغطة تقلّب ✓ ← ✗ ← فاضي']),
       ]),
       h('button.btn.btn-primary', { onclick: () => openBulkDrawer() }, [icon('bolt'), ' سداد جماعي لشهر كامل']),
     ]);
@@ -4403,25 +4754,25 @@ button { font-family: inherit; }
     const emptyMatrix = !us.length
       ? h('div.card.mx-empty', [
           h('h3.empty-title', fb
-            ? `كشف «${fb.name}» لسه مفيهوش صفوف`
+            ? `مشروع «${fb.name}» لسه مفيهوش صفوف`
             : 'لا وحدات ضمن الترشيح الحالي'),
           h('p.empty-sub', fb
             ? 'علامات ✓/✗ بتتعلّم على صفوف الورقة (وحدة + مستأجر + عقد). أضف صفوف الورقة الأول، وبعدين ارجع هنا فرّغ العلامات.'
             : 'وسّع الترشيح من السلايسرز فوق، أو امسح البحث.'),
           fb ? h('button.btn.btn-primary', {
             onclick: () => { VS.wizardBid = fb.id; location.hash = '#intake'; },
-          }, [icon('plus'), ` أضف صفوف كشف «${fb.name}»`]) : null,
+          }, [icon('plus'), ` أضف صفوف مشروع «${fb.name}»`]) : null,
         ])
       : null;
 
     return h('div.view', [
-      pageHead('مصفوفة التحصيل', 'نفس جدول الورقة — وضعان: تسجيل دفعات موثَّقة، أو تفريغ سريع لعلامات ورقة.', [
+      pageHead('جدول التحصيل', 'نفس جدول الورقة — وضعان: تسجيل دفعات موثَّقة، أو تفريغ سريع لعلامات ورقة.', [
         h('button.btn.btn-ghost', { onclick: () => exportMatrix(year) }, [icon('download'), ' تصدير CSV']),
       ]),
       demoBanner(),
       modeBar,
       VS.tafrigh && us.length ? h('div.banner.banner-info', [icon('check'),
-        h('div', [h('b', 'وضع التفريغ شغّال: '), 'كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فاضي. الخانة اللي الورقة ساكتة عنها سيبها فاضية. ارجع لوضع «تسجيل دفعات» للدفعات الموثَّقة.'])]) : null,
+        h('div', [h('b', 'وضع نقل الورقة شغّال: '), 'كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فاضي. الخانة اللي الورقة ساكتة عنها سيبها فاضية. ارجع لوضع «تسجيل دفعات» للدفعات الموثَّقة.'])]) : null,
       emptyMatrix,
       us.length ? h('div.filter-row', [
         h('span.filter-label', 'السنة'),
@@ -4641,7 +4992,7 @@ button { font-family: inherit; }
       if (!bus.length) continue;
       sections.push(h('div.bsec-head', [
         h('h3.bsec-title', b.name),
-        b.demo ? h('span.chip.chip-neutral', 'توضيحي') : h('span.chip.chip-unknown', 'الكشف الفعلي'),
+        b.demo ? h('span.chip.chip-neutral', 'تجريبي') : h('span.chip.chip-unknown', 'مشروع فعلي'),
         h('span.bsec-area', b.area),
       ]));
       sections.push(h('div.cards-grid', bus.map(u => {
@@ -4670,6 +5021,17 @@ button { font-family: inherit; }
             last ? h('div.fact', [h('span.fact-k', 'العقد'), h('span.fact-v', `${shortDate(last.start)} ← ${shortDate(last.end)}`)]) : null,
             unitArrears > 0 ? h('div.fact', [h('span.fact-k', 'متأخرات'), h('span.fact-v.val-critical', money(unitArrears))]) : null,
             unknownArr ? h('div.fact', [h('span.fact-k', 'متأخرات مجهولة'), h('span.fact-v.val-critical', pluralMonths(unknownArr))]) : null,
+            ...(function () {
+              // وحدة مش داخلة فلوس: من إمتى فاضية وبتخسّر قد إيه
+              if (Store.unitIsEarning(u, Store.periodOf(asOf), asOf)) return [];
+              const vrow = Store.vacancyInfo(asOf, new Set([u.id])).rows[0];
+              if (!vrow) return [];
+              return [
+                vrow.months != null ? h('div.fact', [h('span.fact-k', 'فاضية من'), h('span.fact-v.val-warning', pluralMonths(Math.round(vrow.months)))]) : null,
+                vrow.estMonthly != null ? h('div.fact', [h('span.fact-k', 'بتخسّرك شهريًا'), h('span.fact-v.val-critical', '≈' + money(vrow.estMonthly))]) : null,
+                vrow.accumLoss ? h('div.fact', [h('span.fact-k', 'ضاع منك حتى الآن'), h('span.fact-v.val-critical', '≈' + money(vrow.accumLoss))]) : null,
+              ];
+            })(),
           ]),
           issues.length ? h('div.unit-flags', [icon('warn'), ` ${issues.length} ملاحظة جودة مفتوحة`]) : null,
         ]));
@@ -4871,7 +5233,7 @@ button { font-family: inherit; }
     const s = Store.state.settings;
     const unitIn = h('select.input');
     for (const b of Store.state.buildings) {
-      const og = h('optgroup', { label: b.name + (b.demo ? ' · توضيحي' : '') });
+      const og = h('optgroup', { label: b.name + (b.demo ? ' · تجريبي' : '') });
       for (const u of Store.state.units.filter(u => u.buildingId === b.id)) {
         const opt = h('option', { value: u.id }, u.name);
         if (u.id === presetUnitId) opt.selected = true;
@@ -5141,22 +5503,22 @@ button { font-family: inherit; }
         h('h3.issue-title', q.title),
         h('p.issue-detail', q.detail),
         h('p.issue-action', [h('b', 'المطلوب: '), q.action]),
-        q.resolution ? h('p.issue-detail.issue-res', [h('b', 'قرار الحسم: '), q.resolution]) : null,
+        q.resolution ? h('p.issue-detail.issue-res', [h('b', 'رد المالك: '), q.resolution]) : null,
         h('div.issue-btns', q.status === 'open'
           ? [h('button.btn.btn-primary', {
               onclick: () => {
                 const res = prompt('اكتب إجابة المالك / القرار النهائي لهذا السؤال (مثال: «المدة سنتان فعلًا والقيمة 39,000 صحيحة»). سيُحفظ نصيًا مع البند ويقفله:');
-                if (res != null && res.trim()) { Store.setIssueStatus(q.id, 'resolved', res.trim()); toast('اتسجّل القرار واتقفل البند'); }
+                if (res != null && res.trim()) { Store.setIssueStatus(q.id, 'resolved', res.trim()); toast('اتسجّل رد المالك واتقفل البند'); }
               },
               title: 'الحسم = إجابة المالك على السؤال. بتتسجّل نصيًا مع البند وبيتقفل — وتدخل بياناتها النظام (تعديل عقد/توثيق دفعة…)',
-            }, 'سجّل قرار الحسم')]
+            }, 'سجّل رد المالك')]
           : [h('button.btn.btn-ghost', { onclick: () => { Store.setIssueStatus(q.id, 'open'); } }, 'إعادة فتح')]),
       ]);
     });
 
     const openCount = all.filter(q => q.status === 'open').length;
     return h('div.view', [
-      pageHead('جودة البيانات — كشف «بيان عبدالمنعم سكرية»',
+      pageHead('مراجعات مطلوبة — أسئلة للمالك',
         `${all.length} ملاحظة من تفريغ الكشف الورقي — قائمة الأسئلة التي يجيب عنها المالك، وكل إجابة تُدخل النظام وتُقفل بندها.`),
       h('div.filter-row', [
         h('span.filter-label', 'الخطورة'),
@@ -5219,7 +5581,7 @@ button { font-family: inherit; }
         h('tbody', Store.state.buildings.map(b => h('tr', [
           h('td', b.name), h('td', b.area || '—'),
           h('td', String(Store.state.units.filter(u => u.buildingId === b.id).length)),
-          h('td', b.demo ? h('span.chip.chip-neutral', 'توضيحي') : h('span.chip.chip-unknown', 'فعلي')),
+          h('td', b.demo ? h('span.chip.chip-neutral', 'تجريبي') : h('span.chip.chip-unknown', 'فعلي')),
         ]))),
       ]),
       h('div.form-inline', [
@@ -5228,7 +5590,7 @@ button { font-family: inherit; }
           onclick: () => {
             if (!bNameIn.value.trim()) { toast('أدخل اسم المبنى', 'warning'); return; }
             Store.addBuilding({ name: bNameIn.value.trim(), area: bAreaIn.value.trim() });
-            toast('أُضيف المبنى — أضف وحداته من شاشة الوحدات ثم عقوده، أو فرّغ كشفه من المصفوفة بوضع التفريغ');
+            toast('أُضيف المبنى — أضف وحداته من شاشة الوحدات ثم عقوده، أو انقل ورقته من جدول التحصيل بوضع نقل الورقة');
           },
         }, [icon('plus'), ' كشف/مبنى جديد']),
       ]),
@@ -5529,6 +5891,38 @@ button { font-family: inherit; }
             ]))),
           ]))
         : emptyState('يُحسب من الدفعات الموثَّقة فقط', 'كشف سكرية كله علامات ✓ بلا تواريخ — أول شهر توثيق حقيقي سيُظهر هذا الجدول')),
+      h('div.grid-2', [
+        sectionCard('الدخل السنوي المتوقع لكل مشروع (التأمينات مفصولة — مش دخل)',
+          (function () {
+            const rows = Store.annualByProject(currentPeriod());
+            return rows.length
+              ? h('div', [
+                  Charts.typeBars(rows.map(r => ({ label: r.building.name, v: r.annual, sub: 'تأمينات محتجزة: ' + money(r.deposits) }))),
+                  h('p.note-line', [icon('shield'), ' التأمينات التزام هيترد — اعرف سيولتك الحقيقية من غيرها.']),
+                ])
+              : emptyState('لا بيانات');
+          })()),
+        sectionCard('تركيز المخاطر وصحة المحفظة', (function () {
+          const risk = Store.topTenantShare(defaultDashMonth(), uset);
+          const health = Store.healthScore(asOf, uset);
+          return h('div.insights-grid', [
+            risk ? insightCard({
+              tone: risk.share >= 35 ? 'serious' : 'accent', ic: 'warn',
+              num: risk.share + '٪',
+              title: `من دخل الشهر معتمد على مستأجر واحد: ${risk.tenant.name}`,
+              text: risk.share >= 35
+                ? 'اعتماد عالي — خروجه يضرب الدخل. وزّع العقود الجاية أو أمّن تجديده بدري.'
+                : 'توزيع صحي للدخل على المستأجرين.',
+            }) : emptyState('لا بيانات'),
+            insightCard({
+              tone: health.score >= 75 ? 'good' : health.score >= 50 ? 'warning' : 'critical', ic: 'shield',
+              num: health.score + '/100',
+              title: 'صحة المحفظة — مؤشر مجمَّع',
+              text: `تحصيل ${health.parts.collectScore}/40 · إشغال ${health.parts.occScore}/25 · خصم عدم التأكيد ${health.parts.unknownPenalty} · خصم تعمّر المتأخرات ${health.parts.agingPenalty} · خصم الانتهاءات ${health.parts.expiringPenalty}`,
+            }),
+          ]);
+        })()),
+      ]),
     ]);
   }
 
@@ -5541,11 +5935,11 @@ button { font-family: inherit; }
     /* الخطوة 1: بيانات الكشف */
     const ownerIn = input({ type: 'text', placeholder: 'مثال: عبدالمنعم سكرية' });
     const areaIn = input({ type: 'text', placeholder: 'مثال: الدقي — الجيزة' });
-    const step1 = sectionCard('الخطوة 1 — بيانات الكشف (الورقة)', bid
+    const step1 = sectionCard('الخطوة 1 — بيانات المشروع (الورقة)', bid
       ? h('p.step-done', [icon('check'), ' الكشف: ', h('b', Store.building(bid).name),
           ' — أضف صفوفه بالأسفل، أو ', h('a', { href: '#intake', onclick: e => { e.preventDefault(); VS.wizardBid = null; App.render(); } }, 'ابدأ كشفًا آخر'), '.'])
       : h('div', [
-          h('p.step-hint', 'كل ورقة تصلك = كشف مستقل باسم مالكها. اكتب اسم المالك كما هو على الورقة.'),
+          h('p.step-hint', 'كل ورقة بتوصلك = مشروع مستقل باسم صاحبه. اكتب اسم المالك زي ما هو مكتوب على الورقة.'),
           h('div.form-inline', [
             ownerIn, areaIn,
             h('button.btn.btn-primary', {
@@ -5558,7 +5952,7 @@ button { font-family: inherit; }
                 VS.wizardBid = b.id;
                 App.render();
               },
-            }, [icon('plus'), ' إنشاء الكشف']),
+            }, [icon('plus'), ' إنشاء المشروع']),
           ]),
         ]));
 
@@ -5660,7 +6054,7 @@ button { font-family: inherit; }
 
       step3 = sectionCard('الخطوة 3 — علامات الشهور ✓/✗', bUnits.length
         ? h('div', [
-            h('p.step-hint', 'افتح المصفوفة بوضع التفريغ: كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فاضي — بسرعة الورقة نفسها. الخانة اللي الورقة ساكتة عنها سيبها فاضية وسيعلّمها النظام «غير موثَّق».'),
+            h('p.step-hint', 'افتح جدول التحصيل بوضع نقل الورقة: كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فاضي — بسرعة الورقة نفسها. الخانة اللي الورقة ساكتة عنها سيبها فاضية وهيعلّمها النظام «يحتاج تأكيد».'),
             h('button.btn.btn-primary', {
               onclick: () => {
                 App.filters.b = bid;
@@ -5668,7 +6062,7 @@ button { font-family: inherit; }
                 VS.matrixYear = Store.today().getUTCFullYear();
                 location.hash = '#matrix';
               },
-            }, [icon('bolt'), ` ابدأ تفريغ العلامات (${bUnits.length} ${bUnits.length === 1 ? 'صف' : 'صفوف'})`]),
+            }, [icon('bolt'), ` ابدأ نقل العلامات (${bUnits.length} ${bUnits.length === 1 ? 'صف' : 'صفوف'})`]),
           ])
         : h('p.step-hint', [icon('warn'), ' العلامات بتتعلّم على صفوف الورقة — أضف الصفوف في الخطوة 2 الأول وبعدها الزر هيظهر هنا.']));
     }
@@ -5677,7 +6071,7 @@ button { font-family: inherit; }
       if (s2) { s2.classList.add('step-card'); s2.dataset.step = String(i + 1); }
     });
     return h('div.view', [
-      pageHead('إدخال كشف جديد', 'ثلاث خطوات تحوّل أي ورقة تصلك إلى كشف حي بمؤشراته — من غير Excel في النص.'),
+      pageHead('إضافة مشروع جديد', 'ثلاث خطوات تحوّل أي ورقة تصلك إلى كشف حي بمؤشراته — من غير Excel في النص.'),
       step1, step2, step3,
     ].filter(Boolean));
   }
@@ -5765,7 +6159,7 @@ button { font-family: inherit; }
     /* توثيق الشاشات */
     const dashDocs = docSection('لوحة المؤشرات — كارد كارد', null, [
       { name: 'تحصيل الشهر + ▲▼', what: 'نسبة المحصَّل من المستحق لشهر التقرير، والسهم فرقها عن الشهر السابق بالنقاط', source: 'الدفعات + العقود', calc: 'Σ المحصَّل ÷ Σ المستحق (السداد المستورد ✓ يُحسب كاملًا — افتراض معلن)', example: `${Store.periodLabel(m, true)}: ${mt.rate == null ? '—' : pct(mt.rate)}` },
-      { name: 'متأخرات مؤكَّدة', what: 'فلوس مستحقة وثابت عدم سدادها', source: '✗ الورقة + الشهور المتجاوزة للسماح بلا سداد', calc: 'Σ (مستحق − مسدَّد) لكل شهر×وحدة متأخر — والمجهول القيمة (سكرية) يُعد منفصلًا ولا يُخلَط', example: `${money(ar.total)} + ${ar.unknowns.length} أشهر مجهولة` },
+      { name: 'المتأخرات', what: 'فلوس مستحقة وثابت عدم سدادها', source: '✗ الورقة + الشهور المتجاوزة للسماح بلا سداد', calc: 'Σ (مستحق − مسدَّد) لكل شهر×وحدة متأخر — والمجهول القيمة (سكرية) يُعد منفصلًا ولا يُخلَط', example: `${money(ar.total)} + ${ar.unknowns.length} أشهر مجهولة` },
       { name: 'غير موثَّق', what: 'خانات فاضية داخل تغطية الورقة — سداد ولا تأخير؟ محدش يعرف', source: 'الفراغات في شبكة شهور الورقة', calc: 'Σ استحقاق الشهور الفاضية داخل التغطية — يُعرض كنطاق عدم يقين مش كمتأخرات', example: `${money(ar.undocumentedTotal)} (تقوى: يناير–مارس)` },
       { name: 'الإشغال / التجديدات / التأمينات', what: 'وحدات بعقد نشط اليوم · عقود تنتهي ≤90 يوم بلا لاحق · مجموع التأمينات المحتجزة', source: 'تواريخ العقود + خانات التأمين', calc: 'مقارنات تواريخ مباشرة — «منتهٍ بلا تجديد» يعني آخر عقد للوحدة انتهى ومفيش عقد مربوط به', example: '42 انتهى 2026/7/30 بلا تجديد ⇒ تنبيه أحمر' },
       { name: 'حالة المباني (الواجهات)', what: 'كل وحدة مربع بلون حالتها في شهر التقرير — نظرة واحدة تعرف منها مين واقف فين', source: 'محرك الحالات لكل وحدة×الشهر', calc: 'نفس ألوان المصفوفة: أخضر محصَّل، كهرماني جزئي/متأخر السداد، أحمر متأخر، مقلّم غير موثَّق', example: 'صف سكرية أحمر كامل — 6 أشهر ✗' },
@@ -5808,7 +6202,474 @@ button { font-family: inherit; }
     insights: viewInsights, intake: viewIntake, guide: viewGuide,
     slicerBar,
     openAddContract, openAddUnit, openTenantDrawer, openAddComplaint,
+    openCellDrawer, openUnitDrawer,
+    filteredUnits, fset,
   };
+})();
+
+</script>
+  <script>
+/* =========================================================
+   dashboard.js — اللوحة v3: من فوق لتحت زي ما المدير بيفكر
+   1) المحفظة كلها  2) المشاريع  3) الفلوس والمخاطر  4) الأكشن
+   كل كارد يودّيك للشاشة المفلترة على اللي ضغطت عليه بالظبط.
+   ========================================================= */
+(function () {
+  'use strict';
+  const { h, money, pct, icon, statusChip, bindTip, openDrawer, closeDrawer, emptyState, shortDate } = UI;
+
+  const bName = id => (Store.building(id) || {}).name || '—';
+  const tName = id => (Store.tenant(id) || {}).name || '—';
+
+  function keyClickable(el) {
+    if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+    el.setAttribute('role', 'button');
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+    });
+    return el;
+  }
+  /* التنقل المفلتر: الكارد يودّي للشاشة وعليها نفس الترشيح */
+  function go(hash, patch) {
+    App.filters = Object.assign({ b: '', ty: '', tn: '', st: '', q: '' }, patch || {});
+    if (location.hash === hash) App.render(); else location.hash = hash;
+  }
+
+  function sectionCard(title, node, actions) {
+    return h('section.card', [
+      h('div.card-head', [h('h3.card-title', title), actions ? h('div.card-actions', actions) : null]),
+      node,
+    ]);
+  }
+  function tile(o) {
+    const delta = o.delta ? h('span.delta.' + (o.delta.good ? 'delta-good' : 'delta-bad'), [
+      icon(o.delta.dir === 'up' ? 'up' : 'down'), h('span', o.delta.text),
+    ]) : null;
+    const t = h('div.tile' + (o.onclick ? '.tile-click' : ''), { onclick: o.onclick }, [
+      o.ic ? h('span.tile-ic.tone-' + (o.tone || 'accent'), icon(o.ic)) : null,
+      h('div.tile-top', [h('span.tile-label', o.label), o.chip || null]),
+      h('div.tile-value-row', [h('span.tile-value.count-up' + (o.valueClass ? '.' + o.valueClass : ''), o.value), delta]),
+      o.sub ? h('div.tile-sub', o.sub) : null,
+      o.spark ? h('div.tile-spark', o.spark) : null,
+    ]);
+    if (o.onclick) keyClickable(t);
+    return t;
+  }
+
+  let dashMonth = null;
+
+  function viewDashboardV3() {
+    const asOf = Store.today();
+    const cur = Store.periodOf(asOf);
+    if (!dashMonth) dashMonth = Store.addMonths(cur, -1);
+    const m = dashMonth;
+    const F = App.filters;
+    const uset = Views.fset(asOf);
+    const us = Views.filteredUnits(asOf);
+
+    const mt = Store.monthTotals(m, asOf, uset);
+    const mtPrev = Store.monthTotals(Store.addMonths(m, -1), asOf, uset);
+    const ar = Store.arrears(asOf, uset);
+    const vac = Store.vacancyInfo(asOf, uset);
+    const ren = Store.renewals(90, asOf, uset);
+    const alarms = Store.consecutiveLateAlarms(asOf, uset);
+    const health = Store.healthScore(asOf, uset);
+    const comp = Store.complianceBuckets(uset);
+    const deps = Store.depositsHeld(uset).reduce((s, x) => s + x.amount, 0);
+    const rented = us.filter(u => Store.unitIsEarning(u, m, asOf)).length;
+    const projects = Store.state.buildings.filter(b => !F.b || b.id === F.b);
+    const pstats = projects.map(b => Store.projectStats(b.id, m, asOf));
+
+    /* ---------- 0) سطر المحفظة: الصورة من فوق ---------- */
+    const hero = h('div.hero-strip', [
+      h('div.hero-item', { onclick: () => go('#dashboard', {}) }, [
+        h('span.hero-k', 'المشاريع'), h('span.hero-v.count-up', String(Store.state.buildings.length))]),
+      h('div.hero-item', { onclick: () => go('#units', {}) }, [
+        h('span.hero-k', 'الوحدات'), h('span.hero-v.count-up', String(us.length))]),
+      h('div.hero-item.hero-good', { onclick: () => go('#units', { st: 'occupied', b: F.b }) }, [
+        h('span.hero-k', 'مؤجَّر'), h('span.hero-v.count-up', String(rented))]),
+      h('div.hero-item.hero-bad', { onclick: () => go('#units', { st: 'notEarning', b: F.b }) }, [
+        h('span.hero-k', 'فاضي'), h('span.hero-v.count-up', String(us.length - rented))]),
+      h('div.hero-item', [
+        h('span.hero-k', 'المطلوب تحصيله — ' + Store.periodLabel(m)),
+        h('span.hero-v.count-up', money(mt.due + mt.unknownDue, { bare: true }))]),
+      h('div.hero-item', [
+        h('span.hero-k', 'اللي اتحصّل فعلًا'),
+        h('span.hero-v.count-up' + (mt.rate != null && mt.rate < 0.7 ? '.val-critical' : ''), money(mt.collected, { bare: true }))]),
+      h('div.hero-item.hero-score', [
+        h('span.hero-k', 'صحة المحفظة'),
+        h('span.hero-gauge', [
+          h('span.hero-v.count-up', String(health.score)),
+          h('span.hero-max', '/100'),
+        ]),
+      ]),
+    ]);
+    hero.querySelectorAll('.hero-item[onclick], .hero-item').forEach(el => { if (el.onclick) keyClickable(el); });
+
+    /* ---------- 1) المشاريع: البطاقة الأم لكل مشروع ---------- */
+    const projCards = pstats.map(ps => {
+      const b = ps.building;
+      const rPct = ps.unitsTotal ? ps.rented / ps.unitsTotal : 0;
+      const card = h('div.proj-card' + (F.b === b.id ? '.proj-on' : ''), {
+        onclick: () => go('#dashboard', { b: F.b === b.id ? '' : b.id }),
+      }, [
+        h('div.proj-head', [
+          h('div', [
+            h('h3.proj-name', b.name),
+            h('div.proj-owner', (b.owner ? 'المالك: ' + b.owner : '') + (b.demo ? ' · بيانات تجريبية' : '')),
+          ]),
+          b.demo ? h('span.chip.chip-neutral', 'تجريبي') : h('span.chip.chip-good-soft', 'فعلي'),
+        ]),
+        h('div.proj-units', [
+          h('div.proj-bar', [
+            h('span.proj-bar-rented', { style: { width: (rPct * 100) + '%' } }),
+          ]),
+          h('div.proj-bar-legend', [
+            h('span.pb-good', `مؤجَّر ${ps.rented}`),
+            h('span.pb-mid', `${ps.unitsTotal} وحدة`),
+            h('span.pb-bad', `فاضي ${ps.vacant}`),
+          ]),
+        ]),
+        h('div.proj-nums', [
+          h('div.pn', [h('span.pn-k', 'إيجارات ' + Store.periodLabel(m)), h('span.pn-v', money(ps.monthDue, { bare: true }))]),
+          h('div.pn', [h('span.pn-k', 'اتحصّل'), h('span.pn-v' + (ps.rate != null && ps.rate < 0.7 ? '.val-critical' : '.val-good'), ps.rate == null ? '—' : pct(ps.rate))]),
+          h('div.pn', [h('span.pn-k', 'متأخرات'), h('span.pn-v' + (ps.arrears ? '.val-critical' : ''), money(ps.arrears, { bare: true }))]),
+          h('div.pn', [h('span.pn-k', 'خسارة الفاضي/شهر'), h('span.pn-v' + (ps.vacancyLossMonthly ? '.val-warning' : ''), ps.vacancyLossMonthly ? '≈' + money(ps.vacancyLossMonthly, { bare: true }) : '—')]),
+        ]),
+        (ps.expiringSoon || ps.unknownArrears) ? h('div.proj-flags', [
+          ps.expiringSoon ? h('span.chip.chip-serious', `${ps.expiringSoon} عقد بيخلص قريب`) : null,
+          ps.unknownArrears ? h('span.chip.chip-critical', 'متأخرات قيمتها مش معروفة') : null,
+        ]) : null,
+      ]);
+      bindTip(card, () =>
+        `<b>${b.name}</b><br>` +
+        `مؤجَّر: ${ps.rented} · فاضي: ${ps.vacant} من ${ps.unitsTotal}<br>` +
+        `إيجارات ${Store.periodLabel(m, true)}: ${money(ps.monthDue)}<br>` +
+        `اتحصّل: ${money(ps.monthCollected)} (${ps.rate == null ? '—' : pct(ps.rate)})<br>` +
+        `تأمينات عند المالك: ${money(ps.deposits)}<br>` +
+        '<i>اضغط لتركيز كل الشاشات على المشروع ده</i>');
+      return keyClickable(card);
+    });
+
+    /* ---------- 2) فلوس ومخاطر — كل كارد يودّي للمفلتر الصح ---------- */
+    const rateDelta = (mt.rate != null && mtPrev.rate != null)
+      ? Math.round((mt.rate - mtPrev.rate) * 100) : null;
+    const tiles = h('div.tiles', [
+      tile({
+        label: 'تحصيل ' + Store.periodLabel(m, true),
+        value: mt.rate == null ? '—' : pct(mt.rate),
+        ic: 'money', tone: 'accent',
+        delta: rateDelta ? { dir: rateDelta > 0 ? 'up' : 'down', good: rateDelta > 0, text: Math.abs(rateDelta) + ' نقطة' } : null,
+        sub: `${money(mt.collected, { bare: true })} من ${money(mt.due)}`,
+        spark: Charts.sparkline(Store.collectionSeries(m, 6, asOf, uset).map(x => x.rate)),
+        onclick: () => go('#matrix', { b: F.b }),
+      }),
+      tile({
+        label: 'المتأخرات',
+        value: money(ar.total, { bare: true }),
+        ic: 'trendDown', tone: 'critical',
+        valueClass: ar.total > 0 ? 'val-critical' : '',
+        sub: `${ar.rows.length} شهر متأخر` + (ar.unknowns.length ? ` + ${ar.unknowns.length} أشهر قيمتها مش معروفة` : ''),
+        onclick: () => go('#matrix', { st: 'arrears', b: F.b }),
+      }),
+      tile({
+        label: 'خسارة الوحدات الفاضية',
+        value: vac.totalMonthly ? '≈' + money(vac.totalMonthly, { bare: true }) : '0',
+        ic: 'bolt', tone: 'serious',
+        valueClass: vac.totalMonthly ? 'val-warning' : '',
+        sub: vac.count
+          ? `${vac.count} وحدة فاضية · متوسط الشغور ${vac.avgMonths != null ? vac.avgMonths + ' شهر' : '—'} · ضاع منك ≈${money(vac.totalAccum, { bare: true })}`
+          : 'مفيش وحدات فاضية',
+        onclick: () => go('#units', { st: 'notEarning', b: F.b }),
+      }),
+      tile({
+        label: 'سداد يحتاج تأكيد',
+        value: money(ar.undocumentedTotal, { bare: true }),
+        ic: 'question', tone: 'warning',
+        valueClass: ar.undocumentedTotal > 0 ? 'val-warning' : '',
+        sub: ar.undocumented.length ? `${ar.undocumented.length} شهر من الورقة مش معروف اتدفع ولا لأ` : 'كله متأكد منه',
+        onclick: () => go('#quality', {}),
+      }),
+      tile({
+        label: 'تأمينات عند المالك',
+        value: money(deps, { bare: true }),
+        ic: 'shield', tone: 'violet',
+        sub: 'دي مش دخل — التزام بيترد آخر العقد (محسوبة خارج الإيرادات)',
+        onclick: () => {
+          const rows = Store.depositsHeld(uset);
+          openDrawer('التأمينات عند المالك', [
+            h('p.step-hint', 'التأمين ≈ شهر إيجار (البند الخامس) — بيترد بالكامل عند التسليم أو بيتخصم منه الإصلاحات. مش بيدخل في حسابات الدخل.'),
+            h('table.table.table-mini', [
+              h('thead', h('tr', [h('th', 'المشروع'), h('th', 'الوحدة'), h('th', 'المستأجر'), h('th', 'المبلغ')])),
+              h('tbody', rows.map(x => h('tr', [
+                h('td', bName(Store.unit(x.contract.unitId).buildingId)),
+                h('td', (Store.unit(x.contract.unitId) || {}).name),
+                h('td', tName(x.contract.tenantId)),
+                h('td', money(x.amount, { bare: true })),
+              ]))),
+            ]),
+          ], [h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إغلاق')]);
+        },
+      }),
+      tile({
+        label: 'التزام المستأجرين',
+        value: comp.perTenant.length ? `${comp.punctual} ملتزم` : '—',
+        ic: 'check', tone: 'good',
+        sub: comp.perTenant.length
+          ? `${comp.sometimesLate} بيتأخر أحيانًا · ${comp.delinquent} متعثر — بالنقاط من سجل الدفع الفعلي`
+          : 'بيتحسب من الدفعات المسجّلة بتاريخ — هيظهر مع أول شهور التشغيل',
+        onclick: () => go('#insights', { b: F.b }),
+      }),
+    ]);
+
+    /* ---------- 3) الدخل الجاي + داخل/خارج ---------- */
+    const rev = Store.contractedRevenue(cur, 12, uset);
+    const io = Store.inOutForecast(cur, 12, uset);
+    const ioNotes = io.filter(x => x.starts.length || x.ends.length);
+    const ioStrip = ioNotes.length
+      ? h('div.io-strip', ioNotes.map(x => {
+          const bad = x.ends.length > x.starts.length;
+          const el = h('span.io-badge' + (bad ? '.io-bad' : '.io-good'), {
+            onclick: () => openIoDrawer(io),
+          }, [
+            h('b', Store.periodLabel(x.period)),
+            h('span', ` ${x.starts.length ? '+' + x.starts.length + ' داخلة' : ''}${x.starts.length && x.ends.length ? ' · ' : ''}${x.ends.length ? '−' + x.ends.length + ' خارجة' : ''}`),
+            x.deltaPct != null && x.deltaPct !== 0 ? h('span.io-delta', ` → الدخل ${x.deltaPct > 0 ? '+' : ''}${x.deltaPct}%`) : null,
+          ]);
+          return keyClickable(el);
+        }))
+      : h('p.note-line', 'مفيش دخول أو خروج متوقع في الـ12 شهر الجايين.');
+
+    function openIoDrawer(list) {
+      openDrawer('حركة الوحدات: داخل / خارج', [
+        h('p.step-hint', 'كل شهر: عقود بتبدأ (داخلة) وعقود بتنتهي من غير تجديد (خارجة) وأثرها على دخل الشهر.'),
+        h('table.table.table-mini', [
+          h('thead', h('tr', [h('th', 'الشهر'), h('th', 'داخلة'), h('th', 'خارجة'), h('th', 'الدخل المتوقع'), h('th', 'التغير')])),
+          h('tbody', list.map(x => h('tr', [
+            h('td', Store.periodLabel(x.period, true)),
+            h('td', x.starts.length ? x.starts.map(c => (Store.unit(c.unitId) || {}).name).join('، ') : '—'),
+            h('td', x.ends.length ? h('span.val-critical', x.ends.map(c => (Store.unit(c.unitId) || {}).name).join('، ')) : '—'),
+            h('td', money(x.income, { bare: true })),
+            h('td', x.deltaPct == null ? '—' : h('span' + (x.deltaPct < 0 ? '.val-critical' : '.val-good'), (x.deltaPct > 0 ? '+' : '') + x.deltaPct + '%')),
+          ]))),
+        ]),
+      ], [h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إغلاق')]);
+    }
+
+    /* ---------- 4) عقود بتخلص خلال 90 يوم (أعلن / اتصرف) ---------- */
+    const expiring = [...ren.overdue.map(r => ({ c: r.contract, days: -r.daysAgo })),
+                      ...ren.soon.map(r => ({ c: r.contract, days: r.daysLeft }))];
+    const expiringList = expiring.length
+      ? h('ul.exp-list', expiring.slice(0, 8).map(x => {
+          const u = Store.unit(x.c.unitId);
+          const row = h('li.exp-row', { onclick: () => Views.openUnitDrawer(u) }, [
+            h('span.exp-unit', [h('b', u.name), h('span.exp-proj', ' — ' + bName(u.buildingId))]),
+            h('span.exp-tenant', tName(x.c.tenantId)),
+            h('span.exp-date', shortDate(x.c.end)),
+            x.days < 0
+              ? statusChip('critical', `خلص من ${Math.abs(x.days)} يوم`)
+              : statusChip('serious', `باقي ${x.days} يوم`),
+          ]);
+          return keyClickable(row);
+        }))
+      : emptyState('مفيش عقود بتخلص خلال 90 يوم');
+
+    /* ---------- 5) الألارم: شهرين ورا بعض من غير سداد ---------- */
+    const alarmCard = alarms.length ? h('section.card.alarm-card', [
+      h('div.card-head', [h('h3.card-title', [icon('warn'), ' 🚨 متأخرين شهرين ورا بعض — اتصرف']),
+        h('span.chip.chip-critical', alarms.length + ' حالة')]),
+      h('ul.alarm-list', alarms.map(a => {
+        const row = h('li.alarm-row', {
+          onclick: () => Views.openCellDrawer(a.unit, a.periods[a.periods.length - 1], asOf),
+        }, [
+          h('span.alarm-who', [h('b', a.tenant ? a.tenant.name : '—'), h('span.exp-proj', ` — ${a.unit.name} (${bName(a.unit.buildingId)})`)]),
+          h('span.alarm-months', `${a.months} شهور ورا بعض`),
+          h('span.alarm-amt.val-critical', a.unknownAmt ? 'القيمة مش معروفة' : money(a.amount)),
+        ]);
+        return keyClickable(row);
+      })),
+    ]) : null;
+
+    /* ---------- 6) مين ما دفعش الشهر ده ---------- */
+    function unpaidCard() {
+      const rows = [];
+      for (const u of us) {
+        const ci = Store.cellInfo(u.id, m, asOf);
+        if (!['late', 'partial', 'due', 'unknown'].includes(ci.status)) continue;
+        const cs = Store.unitContracts(u.id);
+        const tid = cs.length ? cs[cs.length - 1].tenantId : null;
+        rows.push({
+          u, ci, tenant: tid ? tName(tid) : '—',
+          amount: ci.unknownAmount ? null : ci.due ? Math.max(0, ci.due.amount - ci.paid) : null,
+        });
+      }
+      rows.sort((a, b) => (b.amount || 0) - (a.amount || 0));
+      const total = rows.reduce((s, r) => s + (r.amount || 0), 0);
+      const chipOf = ci =>
+        ci.status === 'late' ? statusChip('critical', ci.unknownAmount ? 'متأخر — قيمته مش معروفة' : 'متأخر')
+        : ci.status === 'partial' ? statusChip('warning', 'دفع جزء')
+        : ci.status === 'unknown' ? statusChip('unknown', 'يحتاج تأكيد')
+        : statusChip('neutral', 'لسه في المهلة');
+      return sectionCard(`مين ما دفعش ${Store.periodLabel(m, true)}؟`,
+        rows.length
+          ? h('div', [
+              h('ul.unpaid-list', rows.slice(0, 8).map(r =>
+                keyClickable(h('li.unpaid-row', { onclick: () => Views.openCellDrawer(r.u, m, asOf) }, [
+                  h('div.unpaid-who', [h('b', r.tenant), h('span.unpaid-unit', ` — ${r.u.name} (${bName(r.u.buildingId)})`)]),
+                  h('div.unpaid-side', [
+                    r.amount != null ? h('span.unpaid-amt', money(r.amount, { bare: true })) : h('span.unpaid-amt.val-critical', '؟'),
+                    chipOf(r.ci),
+                  ]),
+                ])))),
+              h('p.unpaid-total', ['الإجمالي اللي برة: ', h('b.val-critical', money(total)),
+                rows.some(r => r.amount == null) ? ' + مبالغ مش معروفة' : '']),
+            ])
+          : emptyState('الكل دفع الشهر ده ✓'));
+    }
+
+    /* ---------- تجميع الصفحة ---------- */
+    const filterRow = h('div.filter-row', [
+      h('span.filter-label', 'شهر التقرير'),
+      h('div.month-nav', [
+        h('button.btn-icon', { onclick: () => { dashMonth = Store.addMonths(dashMonth, -1); App.render(); }, 'aria-label': 'شهر أسبق' }, icon('right')),
+        h('span.month-name', Store.periodLabel(m, true)),
+        h('button.btn-icon', { onclick: () => { dashMonth = Store.addMonths(dashMonth, 1); App.render(); }, 'aria-label': 'شهر أحدث' }, icon('left')),
+      ]),
+      h('button.btn.btn-ghost', { onclick: () => { dashMonth = Store.addMonths(cur, -1); App.render(); } }, 'آخر شهر مكتمل'),
+    ]);
+
+    return h('div.view.anim-in', [
+      hero,
+      filterRow,
+      alarmCard,
+      sectionCard('المشاريع — اضغط على مشروع تركّز عليه كل الأرقام',
+        h('div.proj-grid', projCards),
+        F.b ? h('button.btn.btn-ghost', { onclick: () => go('#dashboard', {}) }, 'رجّع كل المشاريع') : null),
+      tiles,
+      h('div.grid-2', [
+        sectionCard('الدخل المتوقع 12 شهر (من العقود — التأمينات مش محسوبة)', h('div', [
+          h('p.hero-line', [h('span.hero-num.count-up', money(rev.total, { bare: true })), h('span.hero-unit', ' ج.م'),
+            rev.anyEstimated ? statusChip('unknown', 'فيه قيم تقديرية') : null]),
+          Charts.revenueChart(rev.series),
+          h('div.io-wrap', [h('h4.io-title', 'حركة داخل/خارج وأثرها'), ioStrip]),
+        ])),
+        sectionCard('عقود بتخلص خلال 90 يوم — أعلن أو جدد', expiringList),
+      ]),
+      h('div.grid-2', [
+        sectionCard('التحصيل شهر بشهر', Charts.collectionChart(Store.collectionSeries(m, 12, asOf, uset))),
+        unpaidCard(),
+      ]),
+      h('div.grid-2', [
+        sectionCard('أعمار المتأخرات', h('div', [
+          Charts.agingChart(ar.buckets),
+          ar.unknowns.length ? h('p.note-line', [icon('warn'), ` مش محسوب: ${ar.unknowns.length} أشهر قيمتها مش معروفة (مفيش عقد مسجّل).`]) : null,
+        ])),
+        sectionCard('آخر الحركات', Store.state.log.length
+          ? h('ul.acts', Store.state.log.slice(0, 8).map(x => h('li.act', [h('span.act-t', x.at), h('span', x.txt)])))
+          : emptyState('لا حركات بعد')),
+      ]),
+    ]);
+  }
+
+  /* ترجمات اللوحة الجديدة */
+  I18N.extend({
+    'المشاريع': 'Projects', 'الوحدات': 'Units', 'مؤجَّر': 'Rented', 'فاضي': 'Vacant',
+    'اللي اتحصّل فعلًا': 'Actually collected', 'صحة المحفظة': 'Portfolio health',
+    'المشاريع — اضغط على مشروع تركّز عليه كل الأرقام': 'Projects — click one to focus every figure on it',
+    'رجّع كل المشاريع': 'Back to all projects', 'بيانات تجريبية': 'sample data',
+    'تجريبي': 'Sample', 'فعلي': 'Real', 'وحدة': 'units',
+    'المتأخرات': 'Arrears', 'شهر متأخر': 'late months',
+    'خسارة الوحدات الفاضية': 'Vacancy loss', 'مفيش وحدات فاضية': 'No vacant units',
+    'سداد يحتاج تأكيد': 'Payments needing confirmation', 'كله متأكد منه': 'All confirmed',
+    'تأمينات عند المالك': 'Deposits held by owner',
+    'دي مش دخل — التزام بيترد آخر العقد (محسوبة خارج الإيرادات)': 'Not income — a liability returned at contract end (kept out of revenue)',
+    'التزام المستأجرين': 'Tenant punctuality',
+    'الدخل المتوقع 12 شهر (من العقود — التأمينات مش محسوبة)': 'Expected income, 12 months (from contracts — deposits excluded)',
+    'حركة داخل/خارج وأثرها': 'Move-ins / move-outs and their impact',
+    'حركة الوحدات: داخل / خارج': 'Unit movement: in / out',
+    'عقود بتخلص خلال 90 يوم — أعلن أو جدد': 'Contracts ending within 90 days — advertise or renew',
+    'مفيش عقود بتخلص خلال 90 يوم': 'No contracts ending within 90 days',
+    '🚨 متأخرين شهرين ورا بعض — اتصرف': '🚨 Two consecutive unpaid months — act now',
+    'حالة': 'cases', 'شهور ورا بعض': 'consecutive months', 'القيمة مش معروفة': 'amount unknown',
+    'التحصيل شهر بشهر': 'Collection month by month',
+    'أعمار المتأخرات': 'Arrears aging', 'المطلوب تحصيله — ': 'To collect — ',
+    'الكل دفع الشهر ده ✓': 'Everyone paid this month ✓',
+    'الإجمالي اللي برة: ': 'Total outstanding: ', ' + مبالغ مش معروفة': ' + unknown amounts',
+    'متأخر — قيمته مش معروفة': 'Late — amount unknown', 'دفع جزء': 'Partial',
+    'يحتاج تأكيد': 'Needs confirmation', 'لسه في المهلة': 'Still in grace',
+    'داخلة': 'in', 'خارجة': 'out', 'الدخل المتوقع': 'Expected income', 'التغير': 'Change',
+    'مفيش دخول أو خروج متوقع في الـ12 شهر الجايين.': 'No move-ins or move-outs expected in the next 12 months.',
+    'كل شهر: عقود بتبدأ (داخلة) وعقود بتنتهي من غير تجديد (خارجة) وأثرها على دخل الشهر.':
+      'Each month: contracts starting (in), contracts ending without renewal (out), and the impact on that month’s income.',
+    'التأمين ≈ شهر إيجار (البند الخامس) — بيترد بالكامل عند التسليم أو بيتخصم منه الإصلاحات. مش بيدخل في حسابات الدخل.':
+      'Deposit ≈ one month’s rent (clause 5) — returned in full on handover or reduced by repairs. Never counted as income.',
+  });
+  I18N.addPatterns([
+    [/^مين ما دفعش (.+)؟$/, m2 => 'Who has not paid — ' + I18N.tt(m2[1]) + '?'],
+    [/^تحصيل (.+)$/, m2 => 'Collection — ' + I18N.tt(m2[1])],
+    [/^إيجارات (.+)$/, m2 => I18N.tt(m2[1]) + ' rents'],
+    [/^خلص من (\d+) يوم$/, m2 => `Ended ${m2[1]}d ago`],
+    [/^باقي (\d+) يوم$/, m2 => `${m2[1]}d left`],
+    [/^(\d+) عقد بيخلص قريب$/, m2 => `${m2[1]} contracts ending soon`],
+    [/^متأخرات قيمتها مش معروفة$/, () => 'Arrears of unknown amount'],
+    [/^(\d+) وحدة فاضية · متوسط الشغور (.+) · ضاع منك ≈([\d,]+)$/,
+      m2 => `${m2[1]} vacant units · avg vacancy ${I18N.tt(m2[2])} · lost so far ≈${m2[3]}`],
+    [/^(\d+) شهر من الورقة مش معروف اتدفع ولا لأ$/, m2 => `${m2[1]} paper months unconfirmed — paid or late?`],
+    [/^(\d+) بيتأخر أحيانًا · (\d+) متعثر — بالنقاط من سجل الدفع الفعلي$/,
+      m2 => `${m2[1]} sometimes late · ${m2[2]} delinquent — scored from actual payment history`],
+    [/^بيتحسب من الدفعات المسجّلة بتاريخ — هيظهر مع أول شهور التشغيل$/,
+      () => 'Scored from dated payments — appears after the first operating months'],
+    [/^خسارة الفاضي\/شهر$/, () => 'Vacancy loss/mo'],
+    [/^اتحصّل$/, () => 'Collected'],
+    [/^(\d+) ملتزم$/, m2 => `${m2[1]} punctual`],
+    [/^مؤجَّر (\d+)$/, m2 => `Rented ${m2[1]}`],
+    [/^فاضي (\d+)$/, m2 => `Vacant ${m2[1]}`],
+    [/^(\d+) وحدة$/, m2 => `${m2[1]} units`],
+    [/^(\d+) شهور ورا بعض$/, m2 => `${m2[1]} months in a row`],
+    [/^المالك: (.+)$/, m2 => 'Owner: ' + I18N.tt(m2[1])],
+    /* شظايا مركّبة رصدها السكانر */
+    [/^المطلوب تحصيله — (.+)$/, m2 => 'To collect — ' + I18N.tt(m2[1])],
+    [/^(\d+) شهر متأخر \+ (\d+) أشهر قيمتها مش معروفة$/, m2 => `${m2[1]} late months + ${m2[2]} months of unknown amount`],
+    [/^(\d+) شهر متأخر$/, m2 => `${m2[1]} late months`],
+    [/^(\d+) حالة$/, m2 => `${m2[1]} cases`],
+    [/^\+(\d+) داخلة · −(\d+) خارجة$/, m2 => `+${m2[1]} in · −${m2[2]} out`],
+    [/^\+(\d+) داخلة$/, m2 => `+${m2[1]} in`],
+    [/^−(\d+) خارجة$/, m2 => `−${m2[1]} out`],
+    [/^→ الدخل ([+\-−]?\d+)%$/, m2 => ` → income ${m2[1]}%`],
+    [/^تحصيل (.+?) (انخفض|ارتفع) (\d+) نقطة$/,
+      m2 => `Collection — ${I18N.tt(m2[1])} ${m2[2] === 'انخفض' ? 'down' : 'up'} ${m2[3]} pts`],
+    [/^تحصيل (\d+)\/40 · إشغال (\d+)\/25 · خصم عدم التأكيد (\d+) · خصم تعمّر المتأخرات (\d+) · خصم الانتهاءات (\d+)$/,
+      m2 => `Collection ${m2[1]}/40 · occupancy ${m2[2]}/25 · unconfirmed −${m2[3]} · arrears aging −${m2[4]} · expiries −${m2[5]}`],
+    [/^من دخل الشهر معتمد على مستأجر واحد: (.+)$/, m2 => "of this month's income depends on a single tenant: " + I18N.tt(m2[1])],
+    [/^(\d+) vacant units · avg vacancy ([\d.]+) شهر · lost so far ≈([\d,]+)$/,
+      m2 => `${m2[1]} vacant units · avg vacancy ${m2[2]} mo · lost so far ≈${m2[3]}`],
+    [/^مش محسوب: (\d+) أشهر قيمتها مش معروفة \(مفيش عقد مسجّل\)\.$/,
+      m2 => `Excluded: ${m2[1]} months of unknown amount (no contract on file).`],
+  ]);
+  I18N.addTokens([
+    [/،/g, ','],
+    [/([\d.]+) شهر/g, '$1 mo'],
+  ]);
+  I18N.extend({
+    'كل ورقة بتوصلك = مشروع مستقل باسم صاحبه. اكتب اسم المالك زي ما هو مكتوب على الورقة.':
+      'Every incoming paper = an independent project named after its owner. Type the owner name exactly as written on it.',
+    'الدخل السنوي المتوقع لكل مشروع (التأمينات مفصولة — مش دخل)': 'Expected annual income per project (deposits separated — not income)',
+    'التأمينات التزام هيترد — اعرف سيولتك الحقيقية من غيرها.': 'Deposits are a returnable liability — know your real liquidity without them.',
+    'توزيع صحي للدخل على المستأجرين.': 'Healthy income spread across tenants.',
+    'مراجعات مطلوبة — أسئلة للمالك': 'Reviews needed — questions for the owner',
+    'تركيز المخاطر وصحة المحفظة': 'Risk concentration & portfolio health',
+    'صحة المحفظة — مؤشر مجمَّع': 'Portfolio health — composite index',
+    'التأمينات عند المالك': 'Deposits held by owner',
+    'الإجمالي اللي برة:': 'Total outstanding:',
+    'ضاع منك حتى الآن': 'Lost so far', 'بتخسّرك شهريًا': 'Costing you monthly', 'فاضية من': 'Vacant for',
+    'فيه قيم تقديرية': 'Includes estimates', 'المشروع': 'Project', 'جودة البيانات': 'Data quality',
+    'اعتماد عالي — خروجه يضرب الدخل. وزّع العقود الجاية أو أمّن تجديده بدري.':
+      'High dependency — losing them dents the income. Diversify upcoming leases or secure their renewal early.',
+    'رد تجريبي من المالك': 'Sample owner answer',
+  });
+
+  /* اللوحة الجديدة هي الافتراضية */
+  Views.dashboard = viewDashboardV3;
 })();
 
 </script>
@@ -5820,18 +6681,18 @@ button { font-family: inherit; }
   'use strict';
   const { h, icon } = UI;
 
-  const BRAND = { name: 'إيجاري', sub: 'منظومة إدارة بيانات الإيجارات' };
+  const BRAND = { name: 'تحصيل', sub: 'ذكاء محفظة الإيجارات' };
 
   const NAV = [
     { id: 'dashboard',  label: 'لوحة المؤشرات',   path: 'M2.5 2.5h4.5v6H2.5zM9 2.5h4.5v3.5H9zM9 8h4.5v5.5H9zM2.5 10.5h4.5v3H2.5z' },
     { id: 'insights',   label: 'التحليلات',        path: 'M2.5 11.5l3.4-4 2.4 2.4 4.6-5.2M13 4.5v3M13 4.5h-3M2.5 13.5h11' },
-    { id: 'matrix',     label: 'مصفوفة التحصيل',  path: 'M2.5 4h11M2.5 8h11M2.5 12h11M5.5 2.5v11M10.5 2.5v11' },
-    { id: 'intake',     label: 'إدخال كشف جديد',  path: 'M4 2.5h5L11.5 5v3M4 2.5V13.5h4.5M9 2.5V5h2.5M11.5 9.5v4M9.5 11.5h4' },
+    { id: 'matrix',     label: 'جدول التحصيل',  path: 'M2.5 4h11M2.5 8h11M2.5 12h11M5.5 2.5v11M10.5 2.5v11' },
+    { id: 'intake',     label: 'إضافة مشروع جديد',  path: 'M4 2.5h5L11.5 5v3M4 2.5V13.5h4.5M9 2.5V5h2.5M11.5 9.5v4M9.5 11.5h4' },
     { id: 'units',      label: 'الوحدات',          path: 'M3 13.5V6l5-3.5L13 6v7.5M6.5 13.5v-4h3v4' },
     { id: 'contracts',  label: 'العقود',           path: 'M4 2.5h6l2.5 2.5v8.5H4zM10 2.5V5h2.5M6 8h4M6 10.5h4' },
     { id: 'tenants',    label: 'المستأجرون',       path: 'M5.5 7a2.2 2.2 0 100-4.4A2.2 2.2 0 005.5 7zM1.8 13.2c0-2 1.7-3.6 3.7-3.6s3.7 1.6 3.7 3.6M11 6.8a1.9 1.9 0 100-3.8M10.6 9.7c1.9.2 3.4 1.7 3.4 3.5' },
     { id: 'complaints', label: 'الشكاوى',          path: 'M13.5 7.5a5.5 5.5 0 01-8 4.9L2.5 13.5l1.1-3a5.5 5.5 0 119.9-3zM8 5.5v2.5M8 10.4v.1' },
-    { id: 'quality',    label: 'جودة البيانات',    path: 'M8 1.8l5.5 2v4c0 3.2-2.3 5.6-5.5 6.4-3.2-.8-5.5-3.2-5.5-6.4v-4zM8 5.2v3M8 10.6v.1' },
+    { id: 'quality',    label: 'مراجعات مطلوبة',    path: 'M8 1.8l5.5 2v4c0 3.2-2.3 5.6-5.5 6.4-3.2-.8-5.5-3.2-5.5-6.4v-4zM8 5.2v3M8 10.6v.1' },
     { id: 'guide',      label: 'دليل الشرح',       path: 'M8 3c-1.4-.9-3.2-1.2-5.5-1v10c2.3-.2 4.1.1 5.5 1 1.4-.9 3.2-1.2 5.5-1V2c-2.3-.2-4.1.1-5.5 1zM8 3v10' },
     { id: 'settings',   label: 'الإعدادات',        path: 'M8 10.2a2.2 2.2 0 100-4.4 2.2 2.2 0 000 4.4zM13 8c0-.4 0-.8-.1-1.2l1.4-1-1.2-2.1-1.6.6c-.6-.5-1.2-.9-2-1.1L9.2 1.5H6.8l-.3 1.7c-.8.2-1.4.6-2 1.1l-1.6-.6-1.2 2.1 1.4 1C3 7.2 3 7.6 3 8s0 .8.1 1.2l-1.4 1 1.2 2.1 1.6-.6c.6.5 1.2.9 2 1.1l.3 1.7h2.4l.3-1.7c.8-.2 1.4-.6 2-1.1l1.6.6 1.2-2.1-1.4-1c.1-.4.1-.8.1-1.2z' },
   ];
@@ -5871,19 +6732,33 @@ button { font-family: inherit; }
     return wrap;
   }
 
+  /* شريط السلايسرز عنصر مُعاد استخدامه: لو الكتابة جارية جواه لا يُعاد بناؤه
+     أبدًا (كان ده سبب «السيرش مش بيكتب» — إعادة البناء كانت بتسرق الفوكس) */
+  let slicerEl = null;
+
   function render() {
     UI.closeDrawer();
     UI.tipHide();
     const cur = route();
     const openIssues = Store.state.issues.filter(q => q.status === 'open').length;
 
+    const wantSlicer = SLICER_VIEWS.includes(cur);
+    let keepFocus = null, selS = 0, selE = 0;
+    if (wantSlicer && slicerEl && slicerEl.contains(document.activeElement)) {
+      keepFocus = document.activeElement;
+      try { selS = keepFocus.selectionStart; selE = keepFocus.selectionEnd; } catch (e) {}
+      if (Views.refreshSlicerCount) Views.refreshSlicerCount(slicerEl);
+    } else {
+      slicerEl = wantSlicer ? Views.slicerBar() : null;
+    }
+
     const sidebar = h('nav.sidebar', [
       h('div.brand', [
         h('span.brand-logo', {
           html: '<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">' +
-            '<path d="M3.5 20.5V9.8L12 3.4l8.5 6.4v10.7" stroke="#fff" stroke-width="1.7"/>' +
-            '<path d="M7.8 20.5v-4.4M12 20.5v-7M16.2 20.5v-9.6" stroke="#fff" stroke-width="2" opacity="0.95"/>' +
-            '<circle cx="16.2" cy="7.6" r="1.4" fill="#fff"/></svg>',
+            '<path d="M4.5 20.5v-4.2M9.5 20.5v-7M14.5 20.5v-9.8" stroke="rgba(255,255,255,0.55)" stroke-width="2.6"/>' +
+            '<path d="M4 13.5l5 5L20.5 6.5" stroke="#fff" stroke-width="2.6"/>' +
+            '<path d="M15.8 6.5h4.7v4.7" stroke="#fff" stroke-width="2.2"/></svg>',
         }),
         h('div', [
           h('div.brand-name', BRAND.name),
@@ -5933,7 +6808,7 @@ button { font-family: inherit; }
 
     const main = h('main.main', [
       header,
-      SLICER_VIEWS.includes(cur) ? Views.slicerBar() : null,
+      slicerEl,
       Views[cur](),
     ]);
 
@@ -5942,6 +6817,32 @@ button { font-family: inherit; }
     root.appendChild(sidebar);
     root.appendChild(main);
     I18N.translateNode(root);
+    if (keepFocus && document.contains(keepFocus)) {
+      keepFocus.focus({ preventScroll: true });
+      try { keepFocus.setSelectionRange(selS, selE); } catch (e) {}
+    }
+    animateCounts(root);
+  }
+
+  /* أرقام بتعدّ لفوق — حياة من غير دوشة، وبتحترم تقليل الحركة */
+  function animateCounts(root) {
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    root.querySelectorAll('.count-up').forEach(el => {
+      const raw = el.textContent.trim();
+      const m = raw.match(/^(≈?)([\d,]+)(٪|%)?$/);
+      if (!m) return;
+      const target = parseInt(m[2].replace(/,/g, ''), 10);
+      if (!isFinite(target) || target === 0) return;
+      const prefix = m[1] || '', suffix = m[3] || '';
+      const t0 = performance.now(), dur = 500;
+      function tick(t) {
+        const p = Math.min(1, (t - t0) / dur);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = prefix + Math.round(target * eased).toLocaleString('en-US') + suffix;
+        if (p < 1 && document.contains(el)) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
   }
 
   window.App = {

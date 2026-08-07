@@ -17,23 +17,24 @@
   /* ---------- القاموس: مطابقة تامة ---------- */
   const D = {
     // الهوية والتنقل
+    'تحصيل': 'Tahseel', 'ذكاء محفظة الإيجارات': 'Rental Portfolio Intelligence',
     'إيجاري': 'Egary', 'منظومة إدارة بيانات الإيجارات': 'Rental Data Management Suite',
-    'لوحة المؤشرات': 'Dashboard', 'التحليلات': 'Insights', 'مصفوفة التحصيل': 'Collection Matrix',
-    'إدخال كشف جديد': 'New Statement Intake', 'الوحدات': 'Units', 'العقود': 'Contracts',
-    'المستأجرون': 'Tenants', 'الشكاوى': 'Complaints', 'جودة البيانات': 'Data Quality',
+    'لوحة المؤشرات': 'Dashboard', 'التحليلات': 'Insights', 'جدول التحصيل': 'Collection Sheet',
+    'إضافة مشروع جديد': 'Add New Project', 'الوحدات': 'Units', 'العقود': 'Contracts',
+    'المستأجرون': 'Tenants', 'الشكاوى': 'Complaints', 'مراجعات مطلوبة': 'Reviews Needed',
     'الإعدادات': 'Settings', 'إدخال': 'Add', 'دليل الشرح': 'User Guide',
     'دليل الاستخدام الكامل': 'Full documentation',
     'نسخة عرض · كشف سكرية الفعلي + كشفان توضيحيان':
       'Demo build · Sokareya (real) + 2 sample statements',
     // السلايسرز
     'ابحث عن وحدة أو مستأجر…': 'Search unit, tenant, phone, receipt…',
-    'كل الكشوف': 'All statements', 'كل الأنواع': 'All types', 'كل المستأجرين': 'All tenants',
+    'كل المشاريع': 'All projects', 'كل الأنواع': 'All types', 'كل المستأجرين': 'All tenants',
     'كل الحالات': 'All states', 'مسح': 'Clear', 'مؤجَّرة': 'Occupied',
     'تنتهي خلال 90 يوم': 'Ending within 90 days', 'عقد منتهٍ بلا تجديد': 'Ended, no renewal',
     'بلا عقد مسجّل': 'No contract on file', 'شاغرة': 'Vacant', 'عليها متأخرات': 'Has arrears',
     '· توضيحي': '· sample',
     // عام
-    'الكشف الفعلي': 'Real statement', 'توضيحي': 'Sample', 'المبنى': 'Building',
+    'مشروع فعلي': 'Real project', 'تجريبي': 'Sample', 'المبنى': 'Building',
     'الوحدة': 'Unit', 'المستأجر': 'Tenant', 'الشهر': 'Month', 'الحالة': 'State',
     'النوع': 'Type', 'ملاحظات': 'Notes', 'ملاحظة': 'Note', 'المنطقة': 'District',
     'محل': 'Shop', 'مكتب': 'Office', 'شقة': 'Apartment', 'جراج': 'Garage',
@@ -48,13 +49,13 @@
     'ساري': 'Active', 'ينتهي خلال 90 يوم': 'Ending in 90 days', 'ينتهي قريبًا': 'Ending soon',
     'حرج': 'Critical', 'مهم': 'Important', 'تنبيه': 'Notice',
     // لوحة المؤشرات
-    'متأخرات مؤكَّدة': 'Confirmed arrears', 'غير موثَّق (تغطية الكشف)': 'Undocumented (statement range)',
+    'المتأخرات': 'Arrears', 'سداد يحتاج تأكيد': 'Payments needing confirmation',
     'الإشغال': 'Occupancy', 'تجديدات خلال 90 يوم': 'Renewals within 90 days',
     'تأمينات محتجزة': 'Deposits held', 'جزء تقديري': 'Includes estimates',
     'بند مجهول القيمة': 'Unknown-value item', 'لا استحقاقات محسوبة لهذا الشهر': 'No dues computed for this month',
     'لا شيء معلَّق': 'Nothing pending',
     'التحصيل الشهري — المحصَّل من المستحق': 'Monthly collection — collected vs due',
-    'أعمار المتأخرات المؤكَّدة': 'Confirmed arrears aging',
+    'أعمار المتأخرات': 'Arrears aging',
     'الإيراد المتعاقد عليه — 12 شهرًا قادمة': 'Contracted revenue — next 12 months',
     'يتضمن قيمًا تقديرية': 'Includes estimated values',
     'يحتاج انتباهك': 'Needs your attention', 'آخر الحركات': 'Recent activity',
@@ -69,18 +70,18 @@
     'نفس جدول الورقة — وضعان: تسجيل دفعات موثَّقة، أو تفريغ سريع لعلامات ورقة.':
       'Same grid as the paper — two modes: record documented payments, or fast-transcribe paper marks.',
     'وضع العمل': 'Mode', 'تسجيل دفعات — اضغط الخلية تفتح دفعة كاملة': 'Record payments — click a cell to log a full payment',
-    'تفريغ ورقة — الضغطة تقلّب ✓ ← ✗ ← فاضي': 'Transcribe paper — click cycles ✓ → ✗ → blank',
+    'نقل ورقة قديمة — الضغطة تقلّب ✓ ← ✗ ← فاضي': 'Transfer old paper — click cycles ✓ → ✗ → blank',
     'سداد جماعي لشهر كامل': 'Bulk collect a whole month',
     'الوحدة / المستأجر': 'Unit / Tenant', 'متأخرات': 'Arrears',
     'الإجمالي (محصَّل / مستحق)': 'Total (collected / due)',
     'مدفوع (موثَّق)': 'Paid (documented)', 'مدفوع متأخرًا عن ميعاده': 'Paid late',
-    'مدفوع من الكشف — بلا مبلغ/تاريخ': 'Paid per paper — no amount/date',
+    'مدفوع (من الورقة) — من غير مبلغ/تاريخ': 'Paid (per old paper) — no amount/date',
     'سداد جزئي': 'Partial payment', 'مستحق الآن (في السماح)': 'Due now (in grace)',
-    'غير موثَّق — سداد أم تأخير؟': 'Undocumented — paid or late?',
+    'يحتاج تأكيد — اتدفع ولا اتأخر؟': 'Needs confirmation — paid or late?',
     'لم يستحق بعد': 'Not yet due', 'قبل تغطية الكشف': 'Before statement range',
     'سداد بلا عقد مسجّل': 'Paid, no contract on file', 'خارج مدة العقد': 'Outside contract term',
     'قيمة تقديرية (+10٪) غير مدوَّنة': 'Estimated value (+10%), not on paper',
-    'وضع التفريغ شغّال: ': 'Transcribe mode is ON: ',
+    'وضع نقل الورقة شغّال: ': 'Paper-transfer mode is ON: ',
     'كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فاضي. الخانة اللي الورقة ساكتة عنها سيبها فاضية. ارجع لوضع «تسجيل دفعات» للدفعات الموثَّقة.':
       'Each click cycles the cell ✓ → ✗ → blank. Leave blank whatever the paper is silent about. Switch back to “Record payments” for documented entries.',
     'تسجيل دفعة': 'Record payment', 'توثيق دفعة الكشف (مبلغ وتاريخ فعليان)': 'Document the paper payment (real amount & date)',
@@ -127,8 +128,8 @@
     // جودة البيانات
     'الخطورة': 'Severity', 'حرجة': 'Critical', 'عالية': 'High', 'متوسطة': 'Medium', 'منخفضة': 'Low',
     'الكل': 'All', 'محسومة': 'Resolved', 'مفتوحة': 'Open', 'عام': 'General',
-    'سجّل قرار الحسم': 'Record resolution', 'إعادة فتح': 'Reopen', 'المطلوب: ': 'Action needed: ',
-    'قرار الحسم: ': 'Resolution: ',
+    'سجّل رد المالك': 'Record owner’s answer', 'إعادة فتح': 'Reopen', 'المطلوب: ': 'Action needed: ',
+    'رد المالك: ': 'Owner’s answer: ',
     // الإعدادات
     'كل افتراض في النظام مُعلَن هنا وقابل للتغيير — ويُعاد الحساب فورًا.':
       'Every assumption is declared here and switchable — figures recompute instantly.',
@@ -140,8 +141,8 @@
     // الإدخال
     'ثلاث خطوات تحوّل أي ورقة تصلك إلى كشف حي بمؤشراته — من غير Excel في النص.':
       'Three steps turn any incoming paper into a live statement with its own KPIs — no Excel in between.',
-    'الخطوة 1 — بيانات الكشف (الورقة)': 'Step 1 — Statement (paper) details',
-    'إنشاء الكشف': 'Create statement', 'أضف الصف': 'Add row', 'الصفوف المُدخلة': 'Entered rows',
+    'الخطوة 1 — بيانات المشروع (الورقة)': 'Step 1 — Project (paper) details',
+    'إنشاء المشروع': 'Create project', 'أضف الصف': 'Add row', 'الصفوف المُدخلة': 'Entered rows',
     'مين لم يسدِّد': 'Who has not paid',
     'كل ورقة تصلك = كشف مستقل باسم مالكها. اكتب اسم المالك كما هو على الورقة.':
       'Every incoming paper = an independent statement named after its owner. Type the owner name exactly as written.',
@@ -271,7 +272,7 @@
   function apply() {
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
-    document.title = lang === 'ar' ? 'إيجاري — منظومة إدارة بيانات الإيجارات' : 'Egary — Rental Data Management Suite';
+    document.title = lang === 'ar' ? 'تحصيل — ذكاء محفظة الإيجارات' : 'Tahseel — Rental Portfolio Intelligence';
   }
   function setLang(l) {
     lang = l === 'en' ? 'en' : 'ar';
@@ -282,6 +283,10 @@
   window.I18N = {
     get lang() { return lang; },
     setLang, apply, tt, translateNode,
+    /* لإضافة ترجمات من ملفات لاحقة التحميل (dashboard.js وغيره) */
+    extend(dict) { Object.assign(D, dict); },
+    addPatterns(list) { for (const p of list) P.unshift(p); },
+    addTokens(list) { for (const t of list) TOKENS.push(t); },
   };
   apply();
 
