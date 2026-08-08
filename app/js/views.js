@@ -114,9 +114,17 @@
     return !!(f.b || f.ty || f.tn || f.st || (f.q || '').trim());
   }
 
-  /* شريط السلايسرز — يُبنى من app.js أعلى كل شاشة */
+  /* شريط السلايسرز — يُبنى من app.js أعلى كل شاشة.
+     الشريط يبقى حيًّا بين عمليات الرسم، لذا نكتب دائمًا في App.filters الحالي
+     لا في نسخة مُلتقطة وقت البناء — وإلا توقّف الترشيح بصمت بعد أي استبدال للكائن */
   function slicerBar() {
-    const f = F();
+    const f = {
+      get b() { return F().b; }, set b(v) { F().b = v; },
+      get ty() { return F().ty; }, set ty(v) { F().ty = v; },
+      get tn() { return F().tn; }, set tn(v) { F().tn = v; },
+      get st() { return F().st; }, set st(v) { F().st = v; },
+      get q() { return F().q; }, set q(v) { F().q = v; },
+    };
     const asOf = Store.today();
     const types = [...new Set(Store.state.units.map(u => u.type))];
     const bSel = UI.combo({
@@ -187,8 +195,11 @@
         ]);
         item.addEventListener('mousedown', e => {
           e.preventDefault();
-          // الفلترة دائمًا بالنص العربي المخزَّن — المعروض قد يكون ترجمة
-          qIn.value = s.label; f.q = s.raw;
+          // لو المطابقة كانت على الكود نحتفظ به — الاسم وحده قد يطابق وحدات أخرى
+          // وفيما عدا ذلك نفلتر بالنص العربي المخزَّن لأن المعروض قد يكون ترجمة
+          const byCode = !!(s.code && UI.arMatch(s.code, qIn.value.trim()));
+          qIn.value = byCode ? s.code : s.label;
+          f.q = byCode ? s.code : s.raw;
           sugList.hidden = true; qIn.setAttribute('aria-expanded', 'false');
           App.render();
         });
@@ -1252,33 +1263,64 @@
       onPick: v => { tenantVal = v; newTenantBox.style.display = v === '__new' ? '' : 'none'; },
     });
 
-    /* 2) المشروع ← 3) الوحدة: القائمة تعرض الشاغر فقط في تاريخ البداية المختار */
+    /* 2) المشروع ← 3) الوحدة: القائمة تعرض ما هو متاح فعلًا في مدة العقد المطلوبة */
     const projIn = select({}, Store.state.buildings.map(b => ({
       value: b.id, label: (b.code ? b.code + ' · ' : '') + b.name + (b.demo ? ' · تجريبي' : ''),
-    })), presetU ? presetU.buildingId : Store.state.buildings[0].id);
+    })), presetU ? presetU.buildingId : (F().b || Store.state.buildings[0].id));
     const unitIn = h('select.input');
     const unitHint = h('p.field-hint');
     const showAllChk = h('input', { type: 'checkbox' });
-    const unitVacantAt = (u, dateIso) => !Store.unitContracts(u.id).some(c => c.end >= dateIso);
-    if (presetU && !unitVacantAt(presetU, Store.iso(Store.today()))) showAllChk.checked = true;
+
+    /* نهاية المدة المطلوبة = البداية + عدد السنوات − يوم (نفس حساب Store.addContract) */
+    function termEnd(startIso, nYears) {
+      const [y, m, dd] = startIso.split('-').map(Number);
+      const e = new Date(Date.UTC(y + (Number(nYears) || 1), m - 1, dd));
+      e.setUTCDate(e.getUTCDate() - 1);
+      return e.toISOString().slice(0, 10);
+    }
+    /* التعارض تداخل مدتين لا مجرد «انتهى بعد كذا» — عقد مستقبلي يشغل الوحدة أيضًا */
+    function clashingContract(u, startIso, nYears) {
+      const to = termEnd(startIso, nYears);
+      return Store.unitContracts(u.id).find(c => c.start <= to && c.end >= startIso) || null;
+    }
+    /* عميل ساكن بلا عقد مسجَّل: الوحدة ليست شاغرة حقيقة (سكرية، جراج الهدم) */
+    function sittingClient(u) {
+      return unitStatusKey(u, Store.today()) === 'noContract' ? (ORPHAN_TENANT[u.id] ? Store.tenant(ORPHAN_TENANT[u.id]) : null) || true : null;
+    }
+    const isFree = (u, st, ny) => !clashingContract(u, st, ny) && !sittingClient(u);
+    if (presetU && !isFree(presetU, Store.iso(Store.today()), 1)) showAllChk.checked = true;
+
+    let presetApplied = false;
     function refreshUnits() {
-      const bid = projIn.value, st = startIn.value || Store.iso(Store.today());
+      const bid = projIn.value, st = startIn.value || Store.iso(Store.today()), ny = yearsIn.value;
       const all = Store.state.units.filter(u => u.buildingId === bid);
-      const vac = all.filter(u => unitVacantAt(u, st));
-      const list = showAllChk.checked ? all : vac;
+      const free = all.filter(u => isFree(u, st, ny));
+      const list = showAllChk.checked ? all : free;
       const keep = unitIn.value;
       unitIn.innerHTML = '';
       for (const u of list) {
+        const clash = clashingContract(u, st, ny);
+        const sitting = !clash && sittingClient(u);
         unitIn.appendChild(h('option', { value: u.id },
-          (u.code ? u.code + ' · ' : '') + u.name + (unitVacantAt(u, st) ? '' : ' — عليها عقد قائم')));
+          (u.code ? u.code + ' · ' : '') + u.name
+          + (clash ? ' — عليها عقد حتى ' + shortDate(clash.end) : '')
+          + (sitting ? ' — عليها عميل بلا عقد مسجَّل' : '')));
       }
-      if (presetUnitId && list.some(u => u.id === presetUnitId)) unitIn.value = presetUnitId;
-      else if (list.some(u => u.id === keep)) unitIn.value = keep;
-      unitHint.textContent = showAllChk.checked
-        ? `كل وحدات المشروع (${all.length}) — التي عليها عقد معلَّمة بجوار اسمها`
-        : (vac.length
-          ? `${vac.length} من ${all.length} وحدة شاغرة في تاريخ البداية المختار`
-          : 'لا وحدات شاغرة في هذا المشروع بهذا التاريخ — علِّم «عرض كل الوحدات» إن كان تجديدًا');
+      // الوحدة المُمرَّرة تُطبَّق أول مرة فقط — بعدها اختيار المستخدم هو صاحب القرار
+      const want = (!presetApplied && presetUnitId) ? presetUnitId : keep;
+      let lost = null;
+      if (list.some(u => u.id === want)) unitIn.value = want;
+      else if (keep) lost = Store.unit(keep);
+      presetApplied = true;
+
+      unitHint.textContent = !all.length
+        ? 'لا وحدات مسجَّلة في هذا المشروع — أضِفها من شاشة الوحدات أولًا'
+        : showAllChk.checked
+          ? `كل وحدات المشروع (${all.length}) — غير المتاحة معلَّم سببها بجوار اسمها`
+          : (free.length
+            ? `${free.length} من ${all.length} وحدة متاحة في المدة المطلوبة`
+            : 'لا وحدة متاحة في هذا المشروع بهذه المدة — علِّم «عرض كل الوحدات» إن كان تجديدًا');
+      if (lost) toast(`«${lost.name}» لم تعد متاحة بهذه المدة — اختر وحدة أخرى`, 'warning');
       refreshPreview();
     }
     projIn.addEventListener('change', refreshUnits);
@@ -1308,14 +1350,21 @@
         h('tbody', rowsEl),
       ]));
       const uid = unitIn.value, st = startIn.value;
-      if (st && uid) {
-        const overlap = Store.unitContracts(uid).find(c => c.end >= st);
-        if (overlap)
+      const uSel = uid ? Store.unit(uid) : null;
+      if (st && uSel) {
+        const clash = clashingContract(uSel, st, yearsIn.value);
+        if (clash)
           preview.appendChild(h('p.note-line.note-critical', [icon('warn'),
-            ` تنبيه: يوجد عقد قائم على الوحدة حتى ${shortDate(overlap.end)} — تأكد أن هذا تجديد أو صحّح التواريخ.`]));
+            ` تنبيه: على الوحدة عقد من ${shortDate(clash.start)} إلى ${shortDate(clash.end)} يتداخل مع هذه المدة — إن كان تجديدًا فابدأ من اليوم التالي لانتهائه.`]));
+        else {
+          const sit = sittingClient(uSel);
+          if (sit) preview.appendChild(h('p.note-line.note-critical', [icon('warn'),
+            ` تنبيه: الوحدة مشغولة بعميل يسدِّد بلا عقد مسجَّل${sit && sit.name ? ' (' + sit.name + ')' : ''} — سجِّل عقده أو تأكد من إخلائها.`]));
+        }
       }
     }
-    [yearsIn, rentIn, incIn].forEach(el => el.addEventListener('input', refreshPreview));
+    [rentIn, incIn].forEach(el => el.addEventListener('input', refreshPreview));
+    yearsIn.addEventListener('change', refreshUnits);
     unitIn.addEventListener('change', refreshPreview);
     refreshUnits();
 
@@ -1323,11 +1372,11 @@
       h('div.form-grid', [
         field('العميل', tenantIn, 'اكتب حرفين من الاسم أو أرقامًا من الكود'),
         newTenantBox,
-        field('المشروع', projIn),
-        field('الوحدة — الشاغرة فقط', unitIn), unitHint,
-        h('label.radio-row', [showAllChk, h('span', 'عرض كل الوحدات (لتسجيل تجديد على وحدة عليها عقد)')]),
-        field('تاريخ البداية', startIn, 'النهاية تُحسب تلقائيًا — يستحيل عقد نهايته قبل بدايته'),
+        field('تاريخ البداية', startIn, 'النهاية تُحسب تلقائيًا — والمدة هي التي تحدد الوحدات المتاحة أدناه'),
         field('عدد السنوات', yearsIn),
+        field('المشروع', projIn),
+        field('الوحدة', unitIn), unitHint,
+        h('label.radio-row', [showAllChk, h('span', 'عرض كل الوحدات (لتسجيل تجديد على وحدة عليها عقد)')]),
         field('قيمة السنة الأولى', rentIn, 'أساس الحساب الحالي: ' + (s.rentBasis === 'monthly' ? 'شهري' : 'سنوي')),
         field('نسبة الزيادة السنوية ٪', incIn, 'النمط الملاحظ في عقودكم: 10٪'),
         field('يوم الاستحقاق في الشهر', dueDayIn, 'التأخير يُحسب من هذا اليوم'),
@@ -1345,11 +1394,20 @@
           if (!unitIn.value) { toast('اختر الوحدة — غيِّر المشروع أو علِّم «عرض كل الوحدات»', 'warning'); return; }
           if (!r0 || r0 <= 0 || !startIn.value) { toast('أكمل تاريخ البداية وقيمة سنة أولى موجبة', 'warning'); return; }
           if (Number(depIn.value) < 0 || Number(mntIn.value) < 0 || Number(incIn.value) < 0) { toast('لا تُقبل قيم سالبة', 'warning'); return; }
+          // عقدان متداخلان على وحدة واحدة يجعلان أشهر التداخل تُحسب على الأقدم وحده — نمنعه صراحةً
+          const uSel = Store.unit(unitIn.value);
+          const clash = uSel ? clashingContract(uSel, startIn.value, yearsIn.value) : null;
+          if (clash) {
+            const dayAfter = Store.iso(new Date(Store.d(clash.end).getTime() + 86400000));
+            toast(`لا يمكن حفظ عقدين متداخلين على الوحدة — العقد القائم حتى ${shortDate(clash.end)}. لو تجديد فاجعل البداية ${shortDate(dayAfter)}`, 'warning');
+            startIn.value = dayAfter; refreshUnits();
+            return;
+          }
           let tenantId = tenantVal;
           if (tenantId === '__new') {
             const nm = ntName.value.trim();
             if (!nm) { toast('أدخل اسم العميل الجديد', 'warning'); return; }
-            const code = ntCode.value.replace(/\s+/g, '');
+            const code = Store.foldCode(ntCode.value);
             if (code) {
               const dup = Store.tenantByCode(code);
               if (dup) { toast('هذا الكود مسجَّل بالفعل للعميل: ' + dup.name, 'warning'); return; }
@@ -1474,7 +1532,7 @@
     const saveBtn = h('button.btn.btn-primary', {
       onclick: () => {
         if (!nameIn.value.trim()) { toast('أدخل الاسم', 'warning'); return; }
-        const code = codeIn.value.replace(/\s+/g, '');
+        const code = Store.foldCode(codeIn.value);
         if (code) {
           const dup = Store.tenantByCode(code);
           if (dup && (!t || dup.id !== t.id)) { toast('هذا الكود مسجَّل بالفعل للعميل: ' + dup.name, 'warning'); return; }
@@ -2487,10 +2545,7 @@
     'الاسم كما في البطاقة أو السجل': 'The name as on the ID card or registry',
     'الرقم القومي (14 رقمًا) — أو السجل التجاري للشركات': 'National ID (14 digits) — or commercial registry for companies',
     'المشروع': 'Project',
-    'الوحدة — الشاغرة فقط': 'Unit — vacant only',
     'عرض كل الوحدات (لتسجيل تجديد على وحدة عليها عقد)': 'Show all units (to record a renewal on an occupied unit)',
-    'لا وحدات شاغرة في هذا المشروع بهذا التاريخ — علِّم «عرض كل الوحدات» إن كان تجديدًا':
-      'No vacant units in this project on this date — tick “Show all units” if this is a renewal',
     'كود العميل': 'Client code',
     'كود الوحدة': 'Unit code',
     'الكود (الرقم القومي)': 'Code (national ID)',
@@ -2511,8 +2566,15 @@
       'Client (by name or national ID) → project → a vacant unit → start date and first-year rent — the year schedule is generated',
   });
   I18N.addPatterns([
-    [/^(\d+) من (\d+) وحدة شاغرة في تاريخ البداية المختار$/, function (m) { return m[1] + ' of ' + m[2] + ' units are vacant on the chosen start date'; }],
-    [/^كل وحدات المشروع \((\d+)\) — التي عليها عقد معلَّمة بجوار اسمها$/, function (m) { return 'All project units (' + m[1] + ') — occupied ones are marked next to their name'; }],
+    [/^(\d+) من (\d+) وحدة متاحة في المدة المطلوبة$/, function (m) { return m[1] + ' of ' + m[2] + ' units are available for the requested term'; }],
+    [/^كل وحدات المشروع \((\d+)\) — غير المتاحة معلَّم سببها بجوار اسمها$/, function (m) { return 'All project units (' + m[1] + ') — unavailable ones show the reason next to their name'; }],
+    [/^«(.+)» لم تعد متاحة بهذه المدة — اختر وحدة أخرى$/, function (m) { return '“' + I18N.tt(m[1]) + '” is no longer available for this term — choose another unit'; }],
+    [/^هذا الكود مسجَّل بالفعل للعميل: (.+)$/, function (m) { return 'This code already belongs to client: ' + I18N.tt(m[1]); }],
+    [/^لا يمكن حفظ عقدين متداخلين على الوحدة — العقد القائم حتى (.+)\. لو تجديد فاجعل البداية (.+)$/,
+      function (m) { return 'Two overlapping contracts cannot be saved on one unit — the existing one runs to ' + m[1] + '. If this is a renewal, start it on ' + m[2]; }],
   ]);
-  I18N.addTokens([[/— عليها عقد قائم/g, '— has an active contract']]);
+  I18N.addTokens([
+    [/— عليها عقد حتى /g, '— occupied until '],
+    [/— عليها عميل بلا عقد مسجَّل/g, '— occupied by a client with no registered contract'],
+  ]);
 })();

@@ -13,7 +13,7 @@
   };
   var MONTH_RE = 'يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر';
 
-  /* خريطة الأسماء: مباني/ملاك/مناطق/عميلين/وحدات/أدوار — تُرتَّب الأطول أولًا */
+  /* خريطة الأسماء: مباني/ملاك/مناطق/عملاء/وحدات/أدوار — تُرتَّب الأطول أولًا */
   var NAMES = [
     // كشوف وملاك ومناطق
     ['بيان عبدالمنعم سكرية', 'Abdelmoneim Sokareya Statement'],
@@ -463,7 +463,7 @@
     'لا وحدات ضمن الترشيح الحالي': 'No units match the current filter',
     'لا وحدات ضمن الترشيح': 'No units match the filter',
     'لا عقود ضمن الترشيح': 'No contracts match the filter',
-    'لا عميلين ضمن الترشيح': 'No clients match the filter',
+    'لا عملاء ضمن الترشيح': 'No clients match the filter',
     'لا ملاحظات ضمن هذا الترشيح': 'No notes match this filter',
     'لا انتهاءات خلال 12 شهرًا': 'No expiries within 12 months',
     'لا مستحقات غير مسدَّدة لهذا الشهر ضمن الترشيح': 'No unpaid dues this month within the filter',
@@ -534,7 +534,14 @@
     'تُضاف للاستحقاق الشهري تلقائيًا': 'Added to the monthly dues automatically',
     'البند الرابع — اختياري': 'Clause 4 — optional',
     'أدخل قيمة السنة الأولى لتوليد الجدول.': 'Enter the year-1 value to generate the schedule.',
-    'أكمل الوحدة والبداية وقيمة سنة أولى موجبة': 'Complete the unit, the start, and a positive year-1 value',
+    'أكمل تاريخ البداية وقيمة سنة أولى موجبة': 'Complete the start date and a positive year-1 value',
+    'اختر العميل أولًا — أو سجِّل عميلًا جديدًا من نفس القائمة': 'Choose the client first — or register a new one from the same list',
+    'اختر الوحدة — غيِّر المشروع أو علِّم «عرض كل الوحدات»': 'Choose the unit — switch project or tick “Show all units”',
+    'النهاية تُحسب تلقائيًا — والمدة هي التي تحدد الوحدات المتاحة أدناه':
+      'The end date is computed automatically — and the term is what decides which units are available below',
+    'لا وحدات مسجَّلة في هذا المشروع — أضِفها من شاشة الوحدات أولًا': 'No units registered in this project — add them from the Units screen first',
+    'لا وحدة متاحة في هذا المشروع بهذه المدة — علِّم «عرض كل الوحدات» إن كان تجديدًا':
+      'No unit is available in this project for this term — tick “Show all units” if this is a renewal',
     'لا تُقبل قيم سالبة': 'Negative values are not accepted',
     'أدخل اسم العميل الجديد': 'Enter the new client’s name',
     'سُجِّل العقد وبدأ حساب الاستحقاق فورًا': 'Contract recorded — dues computation started instantly',

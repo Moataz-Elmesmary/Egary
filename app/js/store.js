@@ -99,16 +99,25 @@
     while (used.has('P' + n)) n++;
     return 'P' + n;
   }
+  /* توحيد شكل الكود قبل المقارنة: الأرقام العربية والهندية سواء، وبلا مسافات —
+     وإلا سُجِّل الرقم القومي نفسه لعميلَين لمجرد اختلاف شكل الأرقام */
+  const CODE_DIGITS = {
+    '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+    '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+  };
+  function foldCode(s) {
+    return String(s == null ? '' : s).replace(/[٠-٩۰-۹]/g, d => CODE_DIGITS[d] || d).replace(/\s+/g, '');
+  }
   function tenantByCode(code) {
-    const c = String(code || '').trim();
-    return c ? STATE.tenants.find(t => (t.code || '') === c) || null : null;
+    const c = foldCode(code);
+    return c ? STATE.tenants.find(t => foldCode(t.code) === c) || null : null;
   }
   function save() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) { /* تخزين ممتلئ */ }
   }
   function commit() { save(); listeners.forEach(fn => fn()); }
   function subscribe(fn) { listeners.push(fn); }
-  function resetData() { STATE = freshFromSeed(); commit(); }
+  function resetData() { STATE = freshFromSeed(); ensureCodes(); commit(); }
 
   /* سجل الحركة — كل عملية إدخال تُسجَّل بوقتها */
   function logAct(txt) {
@@ -544,7 +553,7 @@
     return alarms;
   }
 
-  /* التزام المستأجرين من الدفعات الموثَّقة: نقاط = نسبة السداد في الميعاد */
+  /* التزام العملاء من الدفعات الموثَّقة: نقاط = نسبة السداد في الميعاد */
   function complianceBuckets(uset) {
     const grace = STATE.settings.graceDays;
     const perTenant = [];
@@ -591,7 +600,7 @@
     return { score, parts: { collectScore: Math.round(collectScore), occScore: Math.round(occScore), unknownPenalty: Math.round(unknownPenalty), agingPenalty: Math.round(agingPenalty), expiringPenalty: Math.round(expiringPenalty) }, income12 };
   }
 
-  /* تركّز المخاطر: أكبر مستأجر كنسبة من دخل الشهر */
+  /* تركّز المخاطر: أكبر عميل كنسبة من دخل الشهر */
   function topTenantShare(period, uset) {
     const by = {};
     for (const u of unitsIn(uset)) {
@@ -692,11 +701,14 @@
   }
 
   function addTenant(rec) {
-    const t = { id: genId('T'), name: rec.name, code: (rec.code || '').trim() || null, kind: rec.kind || 'فرد', phone: rec.phone || '', note: rec.note || '' };
+    const t = { id: genId('T'), name: rec.name, code: foldCode(rec.code) || null, kind: rec.kind || 'فرد', phone: rec.phone || '', note: rec.note || '' };
     STATE.tenants.push(t); commit(); return t;
   }
   function updateTenant(id, patch) {
-    const t = tenant(id); if (t) { Object.assign(t, patch); commit(); }
+    const t = tenant(id);
+    if (!t) return;
+    if ('code' in patch) patch = { ...patch, code: foldCode(patch.code) || null };
+    Object.assign(t, patch); commit();
   }
   function addUnit(rec) {
     const u = { id: genId('U'), buildingId: rec.buildingId, code: nextUnitCode(rec.buildingId), name: rec.name, type: rec.type || 'غير محدد', floor: rec.floor || '', note: rec.note || '' };
@@ -721,7 +733,7 @@
     STATE.payments = STATE.payments.filter(p => !demoU.has(p.unitId));
     STATE.marks = STATE.marks.filter(m => !demoU.has(m.unitId));
     STATE.complaints = STATE.complaints.filter(k => !demoU.has(k.unitId));
-    // مستأجرو المباني التوضيحية فقط (غير المرتبطين بعقود باقية)
+    // عملاء المباني التوضيحية فقط (غير المرتبطين بعقود باقية)
     STATE.tenants = STATE.tenants.filter(t =>
       !demoT.has(t.id) || STATE.contracts.some(c => c.tenantId === t.id));
     logAct('حذف البيانات التوضيحية');
@@ -788,7 +800,7 @@
     projectStats, allProjectsStats, vacancyInfo, inOutForecast,
     consecutiveLateAlarms, complianceBuckets, healthScore,
     topTenantShare, annualByProject, unitIsEarning,
-    tenantByCode,
+    tenantByCode, foldCode,
     // إدخال
     addPayment, addPaymentsBulk, deletePayment, setMark, addContract, addTenant, updateTenant,
     addUnit, addBuilding, removeDemoData, addComplaint, closeComplaint,

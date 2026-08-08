@@ -766,7 +766,7 @@ button { font-family: inherit; }
 }
 .nav-docs:hover { background: var(--accent-weak); border-style: solid; }
 
-/* أفاتار المستأجرين */
+/* أفاتار العملاء */
 .tenant-cell { display: inline-flex; align-items: center; gap: 9px; font-weight: 600; }
 .avatar {
   width: 30px; height: 30px; border-radius: 99px; flex-shrink: 0;
@@ -973,7 +973,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
   .matrix-wrap { max-height: none; overflow: visible; }
 }
 
-/* ===== ملف المستأجر ===== */
+/* ===== ملف العميل ===== */
 .tp-name { margin: 0 0 10px; font-size: 18px; font-weight: 800; }
 .tp-unit { display: flex; flex-direction: column; gap: 2px; margin: 0 0 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .tp-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 10px 0 14px; font-size: 13.5px; align-items: baseline; }
