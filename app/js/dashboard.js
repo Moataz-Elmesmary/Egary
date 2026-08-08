@@ -355,7 +355,7 @@
         h('span.chip.chip-critical', alarms.length + ' حالة')]),
       h('ul.alarm-list', alarms.map(a => {
         const row = h('li.alarm-row', {
-          onclick: () => Views.openCellDrawer(a.unit, a.periods[a.periods.length - 1], asOf),
+          onclick: () => a.tenant ? Views.openTenantDrawer(a.tenant) : Views.openCellDrawer(a.unit, a.periods[a.periods.length - 1], asOf),
         }, [
           h('span.alarm-who', [h('b', a.tenant ? a.tenant.name : '—'), h('span.exp-proj', ` — ${a.unit.name} (${bName(a.unit.buildingId)})`)]),
           h('span.alarm-months', `${a.months} أشهر متتالية`),
@@ -426,7 +426,9 @@
           h('p.hero-line', [h('span.hero-num.count-up', money(rev.total, { bare: true })), h('span.hero-unit', ' ج.م'),
             rev.anyEstimated ? statusChip('unknown', 'فيه قيم تقديرية') : null]),
           Charts.revenueChart(rev.series),
-          h('div.io-wrap', [h('h4.io-title', 'حركة الوحدات (دخول/خروج) وأثرها'), ioStrip]),
+          h('div.io-wrap', [h('h4.io-title', 'حركة الوحدات (دخول/خروج) وأثرها'),
+            h('p.step-hint', '«داخلة» = وحدة يبدأ عقدها ذلك الشهر فيُضاف إيجارها إلى الدخل، و«خارجة» = وحدة ينتهي عقدها دون تجديد فيسقط إيجارها. «الأثر» = نسبة تغيّر دخل الشهر عن الشهر السابق بسبب ذلك.'),
+            ioStrip]),
         ])),
         sectionCard('عقود تنتهي خلال 90 يومًا — للإعلان أو التجديد', expiringList),
       ]),
@@ -461,6 +463,8 @@
     'التزام المستأجرين': 'Tenant punctuality',
     'الدخل المتوقع 12 شهر (من العقود — التأمينات غير محسوبة)': 'Expected income, 12 months (from contracts — deposits excluded)',
     'حركة الوحدات (دخول/خروج) وأثرها': 'Move-ins / move-outs and their impact',
+    '«داخلة» = وحدة يبدأ عقدها ذلك الشهر فيُضاف إيجارها إلى الدخل، و«خارجة» = وحدة ينتهي عقدها دون تجديد فيسقط إيجارها. «الأثر» = نسبة تغيّر دخل الشهر عن الشهر السابق بسبب ذلك.':
+      '“Moving in” = a unit whose contract starts that month, adding its rent to income. “Moving out” = a unit whose contract ends unrenewed, dropping its rent. “Impact” = the resulting % change in that month’s income vs the month before.',
     'حركة الوحدات: داخل / خارج': 'Unit movement: in / out',
     'عقود تنتهي خلال 90 يومًا — للإعلان أو التجديد': 'Contracts ending within 90 days — advertise or renew',
     'لا عقود تنتهي خلال 90 يومًا': 'No contracts ending within 90 days',
@@ -624,7 +628,7 @@
     'شاغرة منذ': 'Vacant since', 'خسارة/شهر': 'Loss/mo', 'أساس الحساب': 'Calculation basis',
     'الفاقد حتى الآن': 'Lost so far', 'لم تؤجَّر من قبل': 'Never rented', 'لا أساس متاح': 'No basis available',
     'آخر إيجار للوحدة': 'The unit’s own last rent', 'متوسط النوع المماثل': 'Average of similar type',
-    'إجمالي الخسارة الشهرية: ': 'Total monthly loss: ', 'افتح الوحدات الشاغرة': 'Open vacant units',
+    'إجمالي الخسارة الشهرية:': 'Total monthly loss:', 'افتح الوحدات الشاغرة': 'Open vacant units',
     'مبالغ لم يُحسم أمرها': 'Unresolved amounts',
     'كل بند منها له سؤال جاهز للمالك في «مراجعات مطلوبة» — إجابته تضع المبلغ في مكانه الصحيح: سداد يُوثَّق أو متأخرات تُسجَّل.':
       'Each item has a ready question for the owner under Reviews Needed — the answer files the amount where it belongs: a documented payment or recorded arrears.',

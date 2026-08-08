@@ -17,16 +17,19 @@ Egary ingests each paper as an independent **statement**, keeps every ambiguity 
 ## Features
 
 - **Top-down Dashboard** — portfolio strip (projects / units / rented / vacant / to-collect / collected / a 0-100 **health score**), per-project cards with rented-vs-vacant bars and vacancy loss, a red **two-consecutive-unpaid-months alarm**, move-in/move-out forecast with income impact %, contracts-ending-in-90-days action list, aged arrears, and a direct *"Who has not paid?"* list. Every card clicks through to the exact filtered view.
-- **Collection Matrix** — the paper grid, alive. Two modes: *record payments* (click a cell → full payment with amount, date, method, receipt) and *transcribe paper* (click cycles ✓ → ✗ → blank). Bulk-collect an entire month in one dialog.
+- **Collection Sheet** — the paper grid, alive. Two modes: *record payments* (click a cell → full payment with amount, date, method, receipt) and *transcribe paper* (click cycles ✓ → ✗ → blank). Bulk-collect an entire month in one dialog.
 - **Statement Intake** — a 3-step wizard that turns any incoming paper into a working statement: owner → rows (unit + tenant + contract with auto-generated year schedule) → month marks.
 - **Insights** — auto-written findings (arrears concentration, revenue cliff, vacancy loss estimate, best/worst statement), 12-month collection trend, top debtors, tenant punctuality scores, rent averages by unit type.
 - **Contracts timeline** — a priority-sorted Gantt: ended-without-renewal first, "X days left" badges, renewal chains, monthly rent inside each bar.
 - **Data Quality** — every contradiction in the source paper becomes a tracked question with the literal source text, the interpretation taken, and a recorded owner resolution.
 - **Complaints log** with category, cost, and who bears it.
+- **Tenant profiles** — click any tenant (or an alarm row) for their full file: units and contracts, **last recorded payment**, total arrears, and a month-by-month payment ledger where every row opens the matching collection-sheet cell.
+- **Search with live suggestions** — typing in the global search shows matching tenants / units / projects / types / floors as clickable keywords that filter instantly.
+- **Login with roles** — an animated sign-in page (interactive particle web, rotating globe, 3D-tilt card) with three editable client-side users: manager, staff (no settings), and view-only (no data entry). Organizational gating, not real security — that arrives with the backend.
 - **Fully bilingual** — Arabic RTL and complete English LTR, switchable live (`EN` button or `?lang=en`).
 - **Dark mode** — full theme including the charts (`🌙` button or `?theme=dark`).
 - **Mobile responsive**, keyboard accessible, Arabic-normalized search (hamza/ta-marbuta/Hindi digits) across tenants, units, owners, phones, and receipt numbers.
-- **CSV exports** (arrears, matrix, contracts, payments) that open cleanly in Excel.
+- **CSV exports** (arrears, collection sheet, contracts, payments) that open cleanly in Excel.
 
 <p align="center">
   <img src="docs/screens/english.png" alt="English version" width="440">
@@ -41,7 +44,9 @@ No build, no server, no dependencies:
 open app/index.html        # or just double-click it
 ```
 
-Works from `file://` or any static host. To share with a non-technical person, send them the single self-contained `Egary.html`.
+Works from `file://` or any static host. To share with a non-technical person, send them the single self-contained `Egary.html` (login-free by design).
+
+Default users (edit them at the top of the first `<script>` in `app/login.html`): `moataz` / `egary@2026` (manager), `office` / `office@2026` (staff), `zaer` / `1234` (view-only).
 
 ### Deploy
 

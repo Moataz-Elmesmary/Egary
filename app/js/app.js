@@ -27,9 +27,32 @@
     });
   }
 
+  /* المستخدم الحالي من صفحة الدخول — الأدوار تحدد الشاشات الظاهرة */
+  function currentUser() {
+    try { return JSON.parse(sessionStorage.getItem('egary-user') || 'null'); } catch (e) { return null; }
+  }
+  function allowedNav() {
+    const u = currentUser();
+    if (u && u.role === 'viewer') return NAV.filter(n => n.id !== 'intake' && n.id !== 'settings');
+    if (u && u.role === 'staff') return NAV.filter(n => n.id !== 'settings');
+    return NAV;
+  }
+
   function route() {
     const id = (location.hash || '#dashboard').slice(1).split('/')[0];
-    return NAV.some(n => n.id === id) ? id : 'dashboard';
+    if (allowedNav().some(n => n.id === id)) return id;
+    if (NAV.some(n => n.id === id)) {
+      // شاشة موجودة لكن دور المستخدم لا يسمح بها — نوضّح بدل التجاهل الصامت
+      try { history.replaceState(null, '', '#dashboard'); } catch (e) {}
+      UI.toast('هذه الشاشة غير متاحة لدورك الحالي', 'warning');
+    }
+    return 'dashboard';
+  }
+
+  /* هل يُسمح للمستخدم الحالي بالإدخال والتعديل؟ (مشاهدة فقط = لا) */
+  function canEdit() {
+    const u = currentUser();
+    return !u || u.role !== 'viewer';
   }
 
   /* المرشِّحات العامة (السلايسرز) — تسري على كل شاشات مشاريعك */
@@ -117,7 +140,7 @@
           h('div.brand-sub', BRAND.sub),
         ]),
       ]),
-      h('ul.nav', NAV.map(n => h('li', h('a.nav-link' + (n.id === cur ? '.on' : ''), { href: '#' + n.id }, [
+      h('ul.nav', allowedNav().map(n => h('li', h('a.nav-link' + (n.id === cur ? '.on' : ''), { href: '#' + n.id }, [
         navIcon(n.path),
         h('span.nav-label', n.label),
         n.id === 'quality' && openIssues ? h('span.nav-badge', String(openIssues)) : null,
@@ -146,6 +169,14 @@
     const langBtn = h('button.btn.btn-ghost.top-toggle-lang', {
       onclick: () => { I18N.setLang(I18N.lang === 'ar' ? 'en' : 'ar'); render(); },
     }, I18N.lang === 'ar' ? 'EN' : 'ع');
+    const usr = currentUser();
+    const userChip = usr ? h('span.user-chip', [
+      h('span.user-name', usr.name || usr.u),
+      usr.roleLabel ? h('span.user-role', usr.roleLabel) : null,
+      h('button.btn.btn-ghost.user-out', {
+        onclick: () => { try { sessionStorage.removeItem('egary-user'); } catch (e) {} location.replace('login.html'); },
+      }, 'خروج'),
+    ]) : null;
     const header = h('header.topbar', [
       h('div.topbar-title', [
         NAV.find(n => n.id === cur).label,
@@ -153,8 +184,9 @@
       ]),
       h('div.topbar-side', [
         h('span.topbar-date', `اليوم: ${UI.dateLabel(Store.iso(t))}`),
+        userChip,
         langBtn, themeBtn,
-        quickAdd(),
+        usr && usr.role === 'viewer' ? null : quickAdd(),
       ]),
     ]);
 
@@ -200,9 +232,15 @@
   }
 
   window.App = {
-    render,
+    render, canEdit,
     filters: { b: '', ty: '', tn: '', st: '', q: '' },
   };
+
+  I18N.extend({
+    'خروج': 'Sign out',
+    'مدير': 'Manager', 'موظف': 'Staff', 'مشاهدة فقط': 'View only',
+    'معتز': 'Moataz', 'موظف المكتب': 'Office staff', 'زائر': 'Guest',
+  });
 
   document.addEventListener('DOMContentLoaded', () => {
     try {
@@ -214,7 +252,7 @@
       const usp = new URLSearchParams(location.search);
       if (usp.get('theme')) document.documentElement.dataset.theme = usp.get('theme');
       if (usp.get('lang')) I18N.setLang(usp.get('lang'));
-      if (usp.get('shot')) document.documentElement.dataset.shot = '1';
+      if (usp.has('shot')) document.documentElement.dataset.shot = '1';
     } catch (e) {}
     Store.load();
     Store.subscribe(render);

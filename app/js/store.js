@@ -155,7 +155,9 @@
     const cs = contractsOverlappingMonth(unitId, period);
     const c = cs[0] || null;
     const due = c ? dueForMonth(c, period) : null;
-    const pays = paymentsFor(unitId, period);
+    // دفعة مختومة بعقد متداخل آخر لا تُحسب على عقد هذا الشهر — لكل عقد دفعاته
+    const pays = paymentsFor(unitId, period)
+      .filter(p => !p.contractId || !c || p.contractId === c.id || !cs.some(cc => cc.id === p.contractId));
     const entered = pays.reduce((s, p) => s + (p.amount || 0), 0);
     const mark = markFor(unitId, period);
     const dueDate = dueDateOf(c, period);

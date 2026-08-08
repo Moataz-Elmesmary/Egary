@@ -150,13 +150,71 @@
       { value: 'vacant', label: 'شاغرة' },
       { value: 'arrears', label: 'عليها متأخرات' },
     ], f.st);
-    const qIn = input({ type: 'search', placeholder: 'ابحث عن وحدة أو مستأجر…', value: f.q || '' });
+    const qIn = input({ type: 'search', placeholder: 'ابحث عن وحدة أو مستأجر…', value: f.q || '',
+      role: 'combobox', 'aria-expanded': 'false', 'aria-autocomplete': 'list' });
     bSel.addEventListener('change', () => { f.b = bSel.value; App.render(); });
     tySel.addEventListener('change', () => { f.ty = tySel.value; App.render(); });
     tnSel.addEventListener('change', () => { f.tn = tnSel.value; App.render(); });
     stSel.addEventListener('change', () => { f.st = stSel.value; App.render(); });
+
+    /* اقتراحات فورية أثناء الكتابة: كلمات مفتاحية جاهزة يضغطها فتفلتر */
+    const sugList = h('div.sug-list', { role: 'listbox', hidden: true });
+    function sugPool() {
+      // raw = النص العربي المخزَّن (هو ما يُفلتَر به)، label = المعروض بلغة الواجهة
+      const en = I18N.lang === 'en';
+      const mk = (raw, cat) => ({ raw, label: en ? I18N.tt(raw) : raw, cat });
+      const pool = [];
+      for (const tn of Store.state.tenants) pool.push(mk(tn.name, 'مستأجر'));
+      for (const u of Store.state.units) pool.push(mk(u.name, 'وحدة'));
+      for (const b of Store.state.buildings) pool.push(mk(b.name, 'مشروع'));
+      for (const ty of new Set(Store.state.units.map(u => u.type).filter(Boolean))) pool.push(mk(ty, 'نوع'));
+      for (const fl of new Set(Store.state.units.map(u => u.floor).filter(Boolean))) pool.push(mk(fl, 'دور'));
+      return pool;
+    }
+    let sugIdx = -1;
+    function renderSugs() {
+      const q = qIn.value.trim();
+      sugIdx = -1;
+      sugList.innerHTML = '';
+      if (!q) { sugList.hidden = true; qIn.setAttribute('aria-expanded', 'false'); return; }
+      const hits = sugPool().filter(s => UI.arMatch(s.label, q) || UI.arMatch(s.raw, q)).slice(0, 8);
+      if (!hits.length) { sugList.hidden = true; qIn.setAttribute('aria-expanded', 'false'); return; }
+      for (const s of hits) {
+        const item = h('button.sug-item', { type: 'button', role: 'option' }, [
+          h('span', s.label), h('span.sug-cat', s.cat),
+        ]);
+        item.addEventListener('mousedown', e => {
+          e.preventDefault();
+          // الفلترة دائمًا بالنص العربي المخزَّن — المعروض قد يكون ترجمة
+          qIn.value = s.label; f.q = s.raw;
+          sugList.hidden = true; qIn.setAttribute('aria-expanded', 'false');
+          App.render();
+        });
+        sugList.appendChild(item);
+      }
+      I18N.translateNode(sugList);
+      sugList.hidden = false; qIn.setAttribute('aria-expanded', 'true');
+    }
+    qIn.addEventListener('keydown', e => {
+      if (sugList.hidden) return;
+      const items = [...sugList.children];
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        sugIdx = (sugIdx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+        items.forEach((el, i) => el.classList.toggle('sug-active', i === sugIdx));
+      } else if (e.key === 'Enter' && sugIdx >= 0) {
+        e.preventDefault();
+        items[sugIdx].dispatchEvent(new window.Event('mousedown'));
+      } else if (e.key === 'Escape') {
+        sugList.hidden = true; qIn.setAttribute('aria-expanded', 'false');
+      }
+    });
+    qIn.addEventListener('blur', () => { setTimeout(() => { sugList.hidden = true; qIn.setAttribute('aria-expanded', 'false'); }, 150); });
     let qT;
-    qIn.addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(() => { f.q = qIn.value; App.render(); }, 250); });
+    qIn.addEventListener('input', () => {
+      renderSugs();
+      clearTimeout(qT); qT = setTimeout(() => { f.q = qIn.value; App.render(); }, 250);
+    });
     const n = filteredUnits(asOf).length;
     function refreshSlicerCount(el) {
       const c = el.querySelector('.slicer-count');
@@ -165,7 +223,7 @@
     }
     Views.refreshSlicerCount = refreshSlicerCount;
     return h('div.slicers', [
-      h('span.slicer-item.slicer-q', qIn),
+      h('span.slicer-item.slicer-q', [qIn, sugList]),
       h('span.slicer-item', bSel),
       h('span.slicer-item', tySel),
       h('span.slicer-item', tnSel),
@@ -502,7 +560,7 @@
                     chipOf(r.ci),
                   ]),
                 ])))),
-              rows.length > 10 ? h('p.note-line', ` و${rows.length - 10} صفوف أخرى — كاملة في المصفوفة.`) : null,
+              rows.length > 10 ? h('p.note-line', ` و${rows.length - 10} صفوف أخرى — كاملة في جدول التحصيل.`) : null,
               h('p.unpaid-total', [`الإجمالي غير المحصَّل: `, h('b.val-critical', money(total)),
                 rows.some(r => r.amount == null) ? ' + بنود بقيمة مجهولة' : '']),
             ])
@@ -627,6 +685,7 @@
             return html + (VS.tafrigh ? '<br><i>وضع نقل الورقة: الضغط يقلّب ✓/✗/مسح</i>' : '<br><i>اضغط للتفاصيل والتسجيل</i>');
           });
           const open = () => {
+            if (!App.canEdit()) { toast('الدخول الحالي للمشاهدة فقط — التسجيل غير متاح', 'warning'); return; }
             if (VS.tafrigh) {
               if (ci.payments.length) { toast('الشهر عليه دفعات مسجَّلة — أطفئ وضع نقل الورقة لتعديلها', 'warning'); return; }
               const cur = ci.mark ? ci.mark.mark : null;
@@ -675,7 +734,7 @@
           onclick: () => { VS.tafrigh = true; App.render(); },
         }, [icon('check'), ' نقل ورقة قديمة — الضغطة تقلّب ✓ ← ✗ ← فارغ']),
       ]),
-      h('button.btn.btn-primary', { onclick: () => openBulkDrawer() }, [icon('bolt'), ' سداد جماعي لشهر كامل']),
+      App.canEdit() ? h('button.btn.btn-primary', { onclick: () => openBulkDrawer() }, [icon('bolt'), ' سداد جماعي لشهر كامل']) : null,
     ]);
 
     /* كشف بلا صفوف: العلامات بتتعلّم على صفوف الورقة — وجّه المستخدم بدل شبكة فارغة */
@@ -688,7 +747,7 @@
           h('p.empty-sub', fb
             ? 'علامات ✓/✗ بتتعلّم على صفوف الورقة (وحدة + مستأجر + عقد). أضف صفوف الورقة الأول، وبعدين ارجع هنا فرّغ العلامات.'
             : 'وسّع الترشيح من السلايسرز فوق، أو امسح البحث.'),
-          fb ? h('button.btn.btn-primary', {
+          fb && App.canEdit() ? h('button.btn.btn-primary', {
             onclick: () => { VS.wizardBid = fb.id; location.hash = '#intake'; },
           }, [icon('plus'), ` أضف صفوف مشروع «${fb.name}»`]) : null,
         ])
@@ -891,7 +950,7 @@
       rows.push([bLabel(u.buildingId), u.name, tid ? tenantLabel(tid) : '—',
         ...periods.map(p => (CELL_DEFS[Store.cellInfo(u.id, p, asOf).status] || CELL_DEFS.none).label)]);
     }
-    Store.download(`مصفوفة-التحصيل-${year}.csv`, Store.toCSV(rows));
+    Store.download(`جدول-التحصيل-${year}.csv`, Store.toCSV(rows));
   }
 
   /* ========================================================
@@ -970,7 +1029,7 @@
 
     return h('div.view', [
       pageHead('الوحدات', 'الحالة محسوبة من العقود، لا تُكتب يدويًا.', [
-        h('button.btn.btn-primary', { onclick: openAddUnit }, [icon('plus'), ' وحدة جديدة']),
+        App.canEdit() ? h('button.btn.btn-primary', { onclick: openAddUnit }, [icon('plus'), ' وحدة جديدة']) : null,
       ]),
       demoBanner(),
       sections.length ? h('div', sections) : emptyState('لا وحدات ضمن الترشيح'),
@@ -1117,7 +1176,7 @@
     return h('div.view', [
       pageHead('العقود', 'التجديد عقد جديد مربوط بسابقه — لا تعديل على القديم، فيبقى التاريخ كاملًا.', [
         h('button.btn.btn-ghost', { onclick: exportContracts }, [icon('download'), ' تصدير CSV']),
-        h('button.btn.btn-primary', { onclick: () => openAddContract() }, [icon('plus'), ' عقد جديد']),
+        App.canEdit() ? h('button.btn.btn-primary', { onclick: () => openAddContract() }, [icon('plus'), ' عقد جديد']) : null,
       ]),
       basisBanner(),
       demoBanner(),
@@ -1275,8 +1334,10 @@
       const orphanUnits = Object.entries(ORPHAN_TENANT).filter(([, tid]) => tid === t.id).map(([uid]) => uid).filter(uid => uset.has(uid));
       const unitIds = [...new Set([...cs.map(c => c.unitId), ...orphanUnits])];
       const unitsNames = unitIds.map(unitLabel).join(' · ') || '—';
-      const balance = ar.rows.filter(r => unitIds.includes(r.unitId)).reduce((s, r) => s + r.amount, 0);
-      const unknown = ar.unknowns.filter(r => unitIds.includes(r.unitId)).length;
+      // المتأخرات تُنسب لصاحب العقد في ذلك الشهر — لا لكل من استأجر الوحدة يومًا
+      const mine = r => unitIds.includes(r.unitId) && (r.contract ? r.contract.tenantId === t.id : ORPHAN_TENANT[r.unitId] === t.id);
+      const balance = ar.rows.filter(mine).reduce((s, r) => s + r.amount, 0);
+      const unknown = ar.unknowns.filter(mine).length;
       const initials = t.name.split(/\s+/).slice(0, 2).map(w => w[0]).join('');
       const avTone = ['av-a', 'av-b', 'av-c', 'av-d', 'av-e'][[...t.name].reduce((s, ch) => s + ch.charCodeAt(0), 0) % 5];
       return keyClickable(h('tr.row-click', { onclick: () => openTenantDrawer(t) }, [
@@ -1289,8 +1350,8 @@
       ]));
     });
     return h('div.view', [
-      pageHead('المستأجرون', 'أرصدة المتأخرات محسوبة من المصفوفة مباشرة.', [
-        h('button.btn.btn-primary', { onclick: () => openTenantDrawer(null) }, [icon('plus'), ' مستأجر جديد']),
+      pageHead('المستأجرون', 'أرصدة المتأخرات محسوبة من جدول التحصيل مباشرة.', [
+        App.canEdit() ? h('button.btn.btn-primary', { onclick: () => openTenantDrawer(null) }, [icon('plus'), ' مستأجر جديد']) : null,
       ]),
       demoBanner(),
       h('div.table-wrap', h('table.table', [
@@ -1300,25 +1361,172 @@
     ]);
   }
 
+  function tenantUnitIds(t) {
+    const cs = Store.state.contracts.filter(c => c.tenantId === t.id);
+    const orphans = Object.entries(ORPHAN_TENANT).filter(([, tid]) => tid === t.id).map(([uid]) => uid);
+    return [...new Set([...cs.map(c => c.unitId), ...orphans])];
+  }
+
+  /* سجل سداد المستأجر شهرًا بشهر — أشهر عقوده هو فقط، لا أشهر مستأجر سابق على نفس الوحدة */
+  function tenantLedger(t, asOf) {
+    const nowP = Store.periodOf(asOf);
+    const cov = Store.state.meta.importCoverage;
+    const out = [];
+    for (const uid of tenantUnitIds(t)) {
+      const u = Store.unit(uid);
+      const ucs = Store.unitContracts(uid);
+      let from = cov.from;
+      if (u && u.buildingId !== cov.buildingId && ucs.length) from = Store.periodOf(Store.d(ucs[0].start));
+      if (Store.cmpPeriod(from, cov.from) < 0) from = cov.from;
+      for (let p = from; Store.cmpPeriod(p, nowP) <= 0; p = Store.addMonths(p, 1)) {
+        const ci = Store.cellInfo(uid, p, asOf);
+        if (ci.status === 'none' || ci.status === 'history' || ci.status === 'upcoming') continue;
+        const mine = ci.contract ? ci.contract.tenantId === t.id : ORPHAN_TENANT[uid] === t.id;
+        if (!mine) continue;
+        out.push(ci);
+      }
+    }
+    out.sort((a, b) => Store.cmpPeriod(b.period, a.period));
+    return out;
+  }
+
+  function payStatusChip(ci) {
+    switch (ci.status) {
+      case 'paid': return statusChip('good', 'سُدِّد');
+      case 'paid_late': return statusChip('warning', 'سُدِّد متأخرًا');
+      case 'paid_imported': return statusChip('good', '✓ من ورقة المالك');
+      case 'orphan_paid': return statusChip('neutral', 'سداد بلا عقد مسجّل');
+      case 'partial': return statusChip('warning', 'سداد جزئي');
+      case 'unknown': return statusChip('unknown', 'يحتاج تأكيدًا');
+      case 'due': return statusChip('neutral', 'مستحق هذا الشهر');
+      case 'late': return statusChip('critical', ci.unknownAmount ? 'متأخر — القيمة غير معروفة' : 'متأخر');
+      default: return statusChip('neutral', '—');
+    }
+  }
+
   function openTenantDrawer(t) {
     const isNew = !t;
     const nameIn = input({ type: 'text', value: t ? t.name : '', placeholder: 'الاسم' });
     const kindIn = select({}, ['فرد', 'شركة', 'غير محدد'].map(x => ({ value: x, label: x })), t ? (t.kind || 'فرد') : 'فرد');
     const phoneIn = input({ type: 'tel', value: t ? t.phone : '', placeholder: '01xxxxxxxxx' });
     const noteIn = input({ type: 'text', value: t ? t.note : '' });
-    openDrawer(isNew ? 'مستأجر جديد' : 'بيانات المستأجر', [h('div.form-grid', [
+    const formGrid = h('div.form-grid', [
       field('الاسم', nameIn), field('النوع', kindIn),
       field('الهاتف', phoneIn, 'لازم للتنبيهات لاحقًا (واتساب)'), field('ملاحظات', noteIn),
-    ])], [
-      h('button.btn.btn-primary', {
+    ]);
+    const saveBtn = h('button.btn.btn-primary', {
+      onclick: () => {
+        if (!nameIn.value.trim()) { toast('أدخل الاسم', 'warning'); return; }
+        const patch = { name: nameIn.value.trim(), kind: kindIn.value, phone: phoneIn.value, note: noteIn.value };
+        if (isNew) Store.addTenant(patch); else Store.updateTenant(t.id, patch);
+        closeDrawer(); toast('حُفظ');
+      },
+    }, isNew ? 'حفظ' : 'حفظ البيانات');
+
+    if (isNew) {
+      openDrawer('مستأجر جديد', [formGrid], [saveBtn, h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إلغاء')]);
+      return;
+    }
+
+    const asOf = Store.today();
+    const ledger = tenantLedger(t, asOf);
+    const unitIds = tenantUnitIds(t);
+    const multiUnit = unitIds.length > 1;
+    const grace = Store.state.settings.graceDays;
+
+    /* الوحدات والعقود */
+    const unitLines = unitIds.map(uid => {
+      const u = Store.unit(uid);
+      const cs = Store.unitContracts(uid).filter(c => c.tenantId === t.id);
+      const last = cs[cs.length - 1] || null;
+      let info;
+      if (last) {
+        const y = last.years.find(yy => Store.d(yy.from) <= asOf && asOf <= Store.d(yy.to)) || last.years[last.years.length - 1];
+        const ended = Store.d(last.end) < asOf;
+        info = [
+          h('span', 'عقد من'), ' ', h('span', shortDate(last.start)), ' ', h('span', 'إلى'), ' ', h('span', shortDate(last.end)),
+          ' · ', h('span', 'الإيجار الحالي'), ' ', h('b', money(y.rent + (last.maintenance || 0))),
+          ended ? h('span.val-critical', ' · منتهٍ') : null,
+        ];
+      } else {
+        info = [h('span', 'سداد بلا عقد مسجّل')];
+      }
+      return h('div.tp-unit', [
+        h('b', (u ? u.name : uid) + ' — ' + (u ? bLabel(u.buildingId) : '')),
+        h('span.exp-proj', info),
+      ]);
+    });
+
+    /* آخر سداد + المتأخرات — دفعات عقوده هو فقط */
+    const myCids = new Set(Store.state.contracts.filter(c => c.tenantId === t.id).map(c => c.id));
+    const allPays = ledger.flatMap(ci => ci.payments
+      .filter(p => !p.contractId || myCids.has(p.contractId))
+      .map(p => ({ ...p, period: ci.period })));
+    const lastPay = allPays.filter(p => p.date).sort((a, b) => (a.date < b.date ? 1 : -1))[0] || null;
+    const lastTick = ledger.find(ci => ci.status === 'paid_imported') || null;
+    const arrCells = ledger.filter(ci =>
+      (ci.status === 'late' && !ci.unknownAmount && ci.due) ||
+      (ci.status === 'partial' && ci.overdueDays > grace && ci.due));
+    const arrTotal = arrCells.reduce((s, ci) => s + Math.max(0, ci.due.amount - ci.paid), 0);
+    const unkCount = ledger.filter(ci => (ci.status === 'late' && ci.unknownAmount) || ci.status === 'unknown').length;
+
+    const lastPayNode = lastPay
+      ? h('span', [h('b', money(lastPay.amount)), ' — ', shortDate(lastPay.date), ' · ', h('span', 'عن شهر'), ' ', h('span', Store.periodLabel(lastPay.period, true))])
+      : lastTick
+        ? h('span', [h('span', 'لا مدفوعات مسجَّلة بمبلغ وتاريخ'), ' — ', h('span', 'آخر شهر مؤشَّر ✓ في ورقة المالك:'), ' ', h('span', Store.periodLabel(lastTick.period, true))])
+        : h('span.val-critical', 'لا سداد مسجَّل لهذا المستأجر إطلاقًا');
+
+    const arrNode = arrCells.length
+      ? h('span.val-critical', [h('b', money(arrTotal)), ' — ', h('span', pluralMonths(arrCells.length)), unkCount ? h('span', [' + ', h('span', pluralMonths(unkCount)), ' ', h('span', 'بقيمة مجهولة')]) : null])
+      : unkCount
+        ? h('span.val-warning', [h('span', pluralMonths(unkCount)), ' ', h('span', 'بقيمة مجهولة')])
+        : h('span', 'لا شيء');
+
+    const facts = h('div.tp-facts', [
+      h('span.k', 'الهاتف'), h('span', t.phone || 'غير مسجّل'),
+      h('span.k', 'آخر سداد مسجَّل'), lastPayNode,
+      h('span.k', 'إجمالي المتأخرات'), arrNode,
+    ]);
+
+    /* السجل شهرًا بشهر */
+    const rows = ledger.map(ci => {
+      const u = Store.unit(ci.unitId);
+      const payDate = ci.paidDate || ci.payments.map(p => p.date).filter(Boolean).sort().pop() || null;
+      return keyClickable(h('tr.row-click', {
+        onclick: () => { closeDrawer(); openCellDrawer(u, ci.period, asOf); },
+      }, [
+        h('td', Store.periodLabel(ci.period, true)),
+        multiUnit ? h('td', u ? u.name : '—') : null,
+        h('td', ci.due ? money(ci.due.amount, { bare: true }) : '—'),
+        h('td', ci.paid ? money(ci.paid, { bare: true }) : '0'),
+        h('td', payDate ? shortDate(payDate) : '—'),
+        h('td', payStatusChip(ci)),
+      ]));
+    });
+
+    openDrawer('ملف المستأجر', [
+      h('h3.tp-name', t.name),
+      ...unitLines,
+      facts,
+      h('h4.tp-sub', 'سجل السداد شهرًا بشهر'),
+      h('p.step-hint', 'أشهر هذا المستأجر فقط، الأحدث أولًا — كل سطر يفتح خلية الشهر نفسها للتفصيل أو تسجيل دفعة.'),
+      h('div.mini-scroll', h('table.table.table-mini', [
+        h('thead', h('tr', [h('th', 'الشهر'), multiUnit ? h('th', 'الوحدة') : null, h('th', 'المستحق'), h('th', 'المسدَّد'), h('th', 'تاريخ السداد'), h('th', 'الحالة')])),
+        h('tbody', rows.length ? rows : h('tr', h('td', { colspan: multiUnit ? 6 : 5 }, 'لا أشهر مسجَّلة بعد'))),
+      ])),
+      h('h4.tp-sub', 'تعديل البيانات'),
+      formGrid,
+    ], [
+      App.canEdit() ? h('button.btn.btn-primary', {
         onclick: () => {
-          if (!nameIn.value.trim()) { toast('أدخل الاسم', 'warning'); return; }
-          const patch = { name: nameIn.value.trim(), kind: kindIn.value, phone: phoneIn.value, note: noteIn.value };
-          if (isNew) Store.addTenant(patch); else Store.updateTenant(t.id, patch);
-          closeDrawer(); toast('حُفظ');
+          closeDrawer();
+          const u0 = Store.unit(unitIds[0]);
+          App.filters = { b: u0 ? u0.buildingId : '', ty: '', tn: t.id, st: '', q: '' };
+          location.hash = '#matrix'; App.render();
         },
-      }, 'حفظ'),
-      h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إلغاء'),
+      }, 'تسجيل دفعة في جدول التحصيل') : null,
+      App.canEdit() ? saveBtn : null,
+      h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إغلاق'),
     ]);
   }
 
@@ -1366,7 +1574,7 @@
 
     return h('div.view', [
       pageHead('الشكاوى والصيانة', 'سجل الكشف الفعلي يبدأ من اليوم — بالتصنيف والتكلفة ومن يتحمّلها.', [
-        h('button.btn.btn-primary', { onclick: openAddComplaint }, [icon('plus'), ' شكوى جديدة']),
+        App.canEdit() ? h('button.btn.btn-primary', { onclick: openAddComplaint }, [icon('plus'), ' شكوى جديدة']) : null,
       ]),
       demoBanner(),
       tiles,
@@ -1550,7 +1758,7 @@
       ])),
       sectionCard('تصدير التقارير (CSV يفتح في Excel)', h('div.btn-row', [
         h('button.btn.btn-ghost', { onclick: exportArrears }, [icon('download'), ' المتأخرات']),
-        h('button.btn.btn-ghost', { onclick: () => exportMatrix(VS.matrixYear) }, [icon('download'), ' مصفوفة ' + VS.matrixYear]),
+        h('button.btn.btn-ghost', { onclick: () => exportMatrix(VS.matrixYear) }, [icon('download'), ' جدول ' + VS.matrixYear]),
         h('button.btn.btn-ghost', { onclick: exportContracts }, [icon('download'), ' العقود']),
         h('button.btn.btn-ghost', { onclick: exportPayments }, [icon('download'), ' الدفعات المسجَّلة']),
       ])),
@@ -1736,7 +1944,7 @@
       statTile({ label: 'الكشوف', value: String(Store.state.buildings.length), ic: 'doc', tone: 'accent', sub: 'كل كشف ورقي = كيان مستقل بمؤشراته' }),
       statTile({ label: 'الوحدات', value: String(filteredUnits(asOf).length), ic: 'home', tone: 'good' }),
       statTile({ label: 'عقود نشطة', value: String(occ.occupied.length), ic: 'doc', tone: 'violet' }),
-      statTile({ label: 'دفعات موثَّقة', value: String(Store.state.payments.filter(p => uset.has(p.unitId)).length), ic: 'money', tone: 'accent', sub: 'بمبلغ وتاريخ وإيصال — كشف سكرية كله علامات يحتاج تأكيدًاة حتى الآن' }),
+      statTile({ label: 'دفعات موثَّقة', value: String(Store.state.payments.filter(p => uset.has(p.unitId)).length), ic: 'money', tone: 'accent', sub: 'بمبلغ وتاريخ وإيصال — كشف سكرية كله علامات تحتاج تأكيدًا حتى الآن' }),
     ]);
 
     /* ---------- تحليل العقود (من نموذج العقد الفعلي وبياناته) ---------- */
@@ -2063,11 +2271,11 @@
     /* خريطة العملية الكاملة */
     const FLOW = [
       ['1. استلام الورقة', 'بيان ورقي من مالك عقار (زي «بيان عبدالمنعم سكرية») + نموذج عقد. الورقة = كشف مستقل في المنظومة.'],
-      ['2. تفريغ الكشف', 'شاشة «إدخال كشف جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من المصفوفة بوضع نقل الورقة. الخانة الفارغة تُسجَّل «يحتاج تأكيد» — الفراغ معلومة.'],
+      ['2. تفريغ الكشف', 'شاشة «إدخال كشف جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من جدول التحصيل بوضع نقل الورقة. الخانة الفارغة تُسجَّل «يحتاج تأكيد» — الفراغ معلومة.'],
       ['3. مراجعة الجودة', 'كل تناقض أو نقص يتسجّل تلقائيًا في «جودة البيانات» بنص المصدر الحرفي. تقعد مع المالك جلسة واحدة تقفل الأسئلة (تليفونات، تأمينات، قيم ناقصة، فراغات = سداد ولا تأخير؟).'],
-      ['4. التشغيل اليومي', 'التحصيل الجديد يتسجّل دفعة كاملة (مبلغ+تاريخ+طريقة+إيصال) من خلية المصفوفة أو بالسداد الجماعي. عقد جديد/تجديد من زر «+ إدخال». شكوى تتسجّل بتصنيفها وتكلفتها.'],
+      ['4. التشغيل اليومي', 'التحصيل الجديد يتسجّل دفعة كاملة (مبلغ+تاريخ+طريقة+إيصال) من خلية جدول التحصيل أو بالسداد الجماعي. عقد جديد/تجديد من زر «+ إدخال». شكوى تتسجّل بتصنيفها وتكلفتها.'],
       ['5. المتابعة بالاستثناء', 'مش بتراجع 1000 وحدة — بتفتح «من لم يسدِّد؟» والتنبيهات والتحليلات: بيوروك بس اللي محتاج قرار (متأخر، عقد بينتهي، فجوة توثيق).'],
-      ['6. التقارير والقرار', 'تصدير CSV للمالك (متأخرات/مصفوفة/عقود/دفعات) + التحليلات للقرارات: مين نطارده، إمتى نجدد، فين الفاقد.'],
+      ['6. التقارير والقرار', 'تصدير CSV للمالك (متأخرات/جدول التحصيل/عقود/دفعات) + التحليلات للقرارات: مين نطارده، إمتى نجدد، فين الفاقد.'],
     ];
     const flowNode = h('div.flow', FLOW.map(([t, d], i) =>
       h('div.flow-step', [h('span.flow-num', String(i + 1)), h('div', [h('b.flow-t', t.replace(/^\d+\. /, '')), h('p.flow-d', d)])])));
@@ -2117,13 +2325,13 @@
       { name: 'المتأخرات', what: 'فلوس مستحقة وثابت عدم سدادها', source: '✗ الورقة + الشهور المتجاوزة للسماح بلا سداد', calc: 'Σ (مستحق − مسدَّد) لكل شهر×وحدة متأخر — والمجهول القيمة (سكرية) يُعد منفصلًا ولا يُخلَط', example: `${money(ar.total)} + ${ar.unknowns.length} أشهر مجهولة` },
       { name: 'يحتاج تأكيدًا', what: 'خانات فارغة داخل تغطية الورقة — سداد أم تأخير؟ غير معروف', source: 'الفراغات في شبكة شهور الورقة', calc: 'Σ استحقاق الشهور الفارغة داخل التغطية — يُعرض كنطاق عدم يقين مش كمتأخرات', example: `${money(ar.undocumentedTotal)} (تقوى: يناير–مارس)` },
       { name: 'الإشغال / التجديدات / التأمينات', what: 'وحدات بعقد نشط اليوم · عقود تنتهي ≤90 يوم بلا لاحق · مجموع التأمينات المحتجزة', source: 'تواريخ العقود + خانات التأمين', calc: 'مقارنات تواريخ مباشرة — «منتهٍ بلا تجديد» يعني آخر عقد للوحدة انتهى ومفيش عقد مربوط به', example: '42 انتهى 2026/7/30 بلا تجديد ⇒ تنبيه أحمر' },
-      { name: 'حالة المباني (الواجهات)', what: 'كل وحدة مربع بلون حالتها في شهر التقرير — نظرة واحدة تعرف منها مين واقف فين', source: 'محرك الحالات لكل وحدة×الشهر', calc: 'نفس ألوان المصفوفة: أخضر محصَّل، كهرماني جزئي/متأخر السداد، أحمر متأخر، مقلّم يحتاج تأكيدًا', example: 'صف سكرية أحمر كامل — 6 أشهر ✗' },
+      { name: 'حالة المباني (الواجهات)', what: 'كل وحدة مربع بلون حالتها في شهر التقرير — نظرة واحدة تعرف منها مين واقف فين', source: 'محرك الحالات لكل وحدة×الشهر', calc: 'نفس ألوان جدول التحصيل: أخضر محصَّل، كهرماني جزئي/متأخر السداد، أحمر متأخر، مقلّم يحتاج تأكيدًا', example: 'صف سكرية أحمر كامل — 6 أشهر ✗' },
       { name: 'من لم يسدِّد؟', what: 'الإجابة المباشرة لسؤالك: أسماء ومبالغ الشهر المختار، مرتّبة بالأكبر', source: 'حالات الشهر المختار', calc: 'كل وحدة حالتها متأخر/جزئي/يحتاج تأكيدًا/في السماح + المتبقي عليها — الضغط يفتح خلية التسجيل', example: 'يوليو: 9 وحدات لم تسدِّد بإجمالي 453,254' },
       { name: 'التحصيل الشهري (رسم)', what: 'العمود الفاتح = المستحق، الغامق = المحصَّل — الفرق بينهما هو الفجوة', source: 'إجماليات كل شهر', calc: 'آخر 12 شهرًا حتى شهر التقرير + «؟» تحت الشهور التي فيها سداد يحتاج تأكيدًا + زر «عرض كجدول»', example: 'يوليو: عمود فاتح كامل بلا تعبئة = 0٪' },
       { name: 'أعمار المتأخرات', what: 'قد إيه المتأخرات قديمة — الأقدم أصعب تحصيلًا', source: 'عمر كل شهر متأخر باليوم', calc: 'شرائح 1–30 / 31–60 / 61–90 / +90 من يوم الاستحقاق', example: `أقدم شريحة حاليًا: ${money(ar.buckets.b90p, { bare: true })} فوق 90 يومًا` },
     ]);
 
-    const matrixDocs = docSection('مصفوفة التحصيل — لغة الخلايا', 'هي نفسها ورقتك، بس كل رمز وراه بيانات:', [
+    const matrixDocs = docSection('جدول التحصيل — لغة الخلايا', 'هي نفسها ورقتك، بس كل رمز وراه بيانات:', [
       { name: '✓ أخضر غامق / ✓ منقّط / ✓ كهرماني', what: 'مدفوع موثَّق (بمبلغ وتاريخ) / مدفوع من الورقة بلا تفاصيل / مدفوع بعد ميعاده', source: 'الدفعات المدخلة أو علامات الورقة', calc: 'المنقّط بيفضل «يحتاج توثيق» لحد ما تسجّل مبلغه وتاريخه الفعليين من خليته', example: '' },
       { name: '½ / ✗ / ؟ / • / – / ·', what: 'جزئي / متأخر / يحتاج تأكيدًا / مستحق في السماح / خارج مدة العقد / قبل تغطية الورقة', source: 'محرك الحالات', calc: '«≈» جنب الرمز = القيمة تقديرية (+10٪ غير مدوَّنة في الورقة)', example: '' },
       { name: 'وضعا العمل', what: '«تسجيل دفعات»: الضغطة تفتح دفعة كاملة · «تفريغ ورقة»: الضغطة تقلّب ✓/✗/فارغ', source: '—', calc: 'التفريغ للتاريخ القديم من الورق، والدفعات للتشغيل اليومي', example: '' },
@@ -2161,4 +2369,33 @@
     openCellDrawer, openUnitDrawer,
     filteredUnits, fset,
   };
+
+  /* ترجمة ملف المستأجر واقتراحات البحث */
+  I18N.extend({
+    'ملف المستأجر': 'Tenant profile',
+    'حفظ البيانات': 'Save details',
+    'تعديل البيانات': 'Edit details',
+    'آخر سداد مسجَّل': 'Last recorded payment',
+    'عن شهر': 'for',
+    'لا مدفوعات مسجَّلة بمبلغ وتاريخ': 'No payments recorded with an amount and date',
+    'آخر شهر مؤشَّر ✓ في ورقة المالك:': 'last month ticked ✓ on the owner’s paper:',
+    'لا سداد مسجَّل لهذا المستأجر إطلاقًا': 'No payment recorded for this tenant at all',
+    'إجمالي المتأخرات': 'Total arrears',
+    'بقيمة مجهولة': 'of unknown value',
+    'لا شيء': 'None',
+    'سجل السداد شهرًا بشهر': 'Payment history, month by month',
+    'أشهر هذا المستأجر فقط، الأحدث أولًا — كل سطر يفتح خلية الشهر نفسها للتفصيل أو تسجيل دفعة.':
+      'This tenant’s months only, newest first — each row opens that month’s cell to inspect or record a payment.',
+    'الشهر': 'Month', 'الوحدة': 'Unit', 'المستحق': 'Due', 'المسدَّد': 'Paid',
+    'تاريخ السداد': 'Payment date', 'الحالة': 'Status',
+    'لا أشهر مسجَّلة بعد': 'No months recorded yet',
+    'سُدِّد': 'Paid', 'سُدِّد متأخرًا': 'Paid late', '✓ من ورقة المالك': '✓ from the owner’s paper',
+    'سداد بلا عقد مسجّل': 'Payment without a registered contract',
+    'سداد جزئي': 'Partial payment', 'مستحق هذا الشهر': 'Due this month',
+    'متأخر — القيمة غير معروفة': 'Late — amount unknown', 'متأخر': 'Late',
+    'عقد من': 'Contract from', 'إلى': 'to', 'الإيجار الحالي': 'current rent', 'منتهٍ': 'ended',
+    'تسجيل دفعة في جدول التحصيل': 'Record a payment in the collection sheet',
+    'الهاتف': 'Phone', 'غير مسجّل': 'not recorded',
+    'مستأجر': 'Tenant', 'وحدة': 'Unit', 'مشروع': 'Project', 'نوع': 'Type', 'دور': 'Floor',
+  });
 })();

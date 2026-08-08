@@ -157,7 +157,7 @@
     'نفس جدول الورقة — كل خلية تفتح دفعة كاملة: مبلغ وتاريخ وطريقة وإيصال.':
       'The paper grid, alive — each cell opens a full payment: amount, date, method, receipt.',
     'الحالة محسوبة من العقود، لا تُكتب يدويًا.': 'State is computed from contracts, never typed.',
-    'أرصدة المتأخرات محسوبة من المصفوفة مباشرة.': 'Arrears balances come straight from the matrix.',
+    'أرصدة المتأخرات محسوبة من جدول التحصيل مباشرة.': 'Arrears balances come straight from the collection sheet.',
     'سجل الكشف الفعلي يبدأ من اليوم — بالتصنيف والتكلفة ومن يتحمّلها.':
       'The real log starts today — category, cost, and who bears it.',
     'شكاوى مفتوحة': 'Open complaints', 'متوسط زمن الإغلاق': 'Avg. time to close',

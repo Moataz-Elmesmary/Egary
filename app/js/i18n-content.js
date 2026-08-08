@@ -255,16 +255,16 @@
     'التقارير والقرار': 'Reports & decisions',
     'بيان ورقي من مالك عقار (زي «بيان عبدالمنعم سكرية») + نموذج عقد. الورقة = كشف مستقل في المنظومة.':
       'A paper statement from a property owner (like the “Abdelmoneim Sokareya Statement”) + a contract form. Each paper = an independent statement in the suite.',
-    'شاشة «إدخال كشف جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من المصفوفة بوضع نقل الورقة. الخانة الفارغة تُسجَّل «يحتاج تأكيد» — الفراغ معلومة.':
-      'The “New Statement Intake” screen: owner details → the paper’s rows with its exact columns (client name / unit / from / values 1-2-3 / notes) → ✓/✗ marks from the matrix in Transcribe mode. Empty cells register as “Needs confirmation” — a blank is information.',
+    'شاشة «إدخال كشف جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من جدول التحصيل بوضع نقل الورقة. الخانة الفارغة تُسجَّل «يحتاج تأكيد» — الفراغ معلومة.':
+      'The “New Statement Intake” screen: owner details → the paper’s rows with its exact columns (client name / unit / from / values 1-2-3 / notes) → ✓/✗ marks from the collection sheet in Transcribe mode. Empty cells register as “Needs confirmation” — a blank is information.',
     'كل تناقض أو نقص يتسجّل تلقائيًا في «جودة البيانات» بنص المصدر الحرفي. تقعد مع المالك جلسة واحدة تقفل الأسئلة (تليفونات، تأمينات، قيم ناقصة، فراغات = سداد ولا تأخير؟).':
       'Every contradiction or gap is logged automatically in “Data Quality” with the source’s verbatim text. One sitting with the owner closes the questions (phones, deposits, missing values, blanks = paid or late?).',
-    'التحصيل الجديد يتسجّل دفعة كاملة (مبلغ+تاريخ+طريقة+إيصال) من خلية المصفوفة أو بالسداد الجماعي. عقد جديد/تجديد من زر «+ إدخال». شكوى تتسجّل بتصنيفها وتكلفتها.':
-      'New collections are logged as full payments (amount + date + method + receipt) from a matrix cell or via bulk collection. A new contract/renewal via the “+ Add” button. Complaints are logged with category and cost.',
+    'التحصيل الجديد يتسجّل دفعة كاملة (مبلغ+تاريخ+طريقة+إيصال) من خلية جدول التحصيل أو بالسداد الجماعي. عقد جديد/تجديد من زر «+ إدخال». شكوى تتسجّل بتصنيفها وتكلفتها.':
+      'New collections are logged as full payments (amount + date + method + receipt) from a collection sheet cell or via bulk collection. A new contract/renewal via the “+ Add” button. Complaints are logged with category and cost.',
     'مش بتراجع 1000 وحدة — بتفتح «من لم يسدِّد؟» والتنبيهات والتحليلات: بيوروك بس اللي محتاج قرار (متأخر، عقد بينتهي، فجوة توثيق).':
       'You don’t review 1,000 units — you open “Who has not paid?”, the alerts, and Insights: they show only what needs a decision (a late payer, an expiring contract, a documentation gap).',
-    'تصدير CSV للمالك (متأخرات/مصفوفة/عقود/دفعات) + التحليلات للقرارات: مين نطارده، إمتى نجدد، فين الفاقد.':
-      'CSV exports for the owner (arrears / matrix / contracts / payments) + Insights for decisions: whom to chase, when to renew, where the loss is.',
+    'تصدير CSV للمالك (متأخرات/جدول التحصيل/عقود/دفعات) + التحليلات للقرارات: مين نطارده، إمتى نجدد، فين الفاقد.':
+      'CSV exports for the owner (arrears / collection sheet / contracts / payments) + Insights for decisions: whom to chase, when to renew, where the loss is.',
     /* ---------- دليل الشرح: سلسلة الاشتقاق ---------- */
     'من الورقة إلى الإنسايتس — سلسلة الاشتقاق كاملة': 'From paper to insights — the full derivation chain',
     'إزاي «مجرد إكسيل» بيطلّع كل الأرقام دي؟ كل مؤشر في المنظومة نتيجة 3 حقائق من الورقة + قاعدة حساب معلنة:':
@@ -369,8 +369,8 @@
     'كل وحدة مربع بلون حالتها في شهر التقرير — نظرة واحدة تعرف منها مين واقف فين':
       'Each unit is a square colored by its report-month state — one glance shows where every unit stands',
     'محرك الحالات لكل وحدة×الشهر': 'The state engine per unit × month',
-    'نفس ألوان المصفوفة: أخضر محصَّل، كهرماني جزئي/متأخر السداد، أحمر متأخر، مقلّم يحتاج تأكيدًا':
-      'Same matrix colors: green collected, amber partial/paid-late, red late, striped undocumented',
+    'نفس ألوان جدول التحصيل: أخضر محصَّل، كهرماني جزئي/متأخر السداد، أحمر متأخر، مقلّم يحتاج تأكيدًا':
+      'Same collection sheet colors: green collected, amber partial/paid-late, red late, striped undocumented',
     'صف سكرية أحمر كامل — 6 أشهر ✗': 'The Sokareya row is solid red — 6 months of ✗',
     'من لم يسدِّد؟': 'Who has not paid?',
     'الإجابة المباشرة لسؤالك: أسماء ومبالغ الشهر المختار، مرتّبة بالأكبر':
@@ -390,7 +390,7 @@
     'قد إيه المتأخرات قديمة — الأقدم أصعب تحصيلًا': 'How old the arrears are — the older, the harder to collect',
     'عمر كل شهر متأخر باليوم': 'Each late month’s age in days',
     'شرائح 1–30 / 31–60 / 61–90 / +90 من يوم الاستحقاق': 'Buckets 1–30 / 31–60 / 61–90 / 90+ from the due day',
-    'مصفوفة التحصيل — لغة الخلايا': 'Collection Matrix — the language of the cells',
+    'جدول التحصيل — لغة الخلايا': 'The collection sheet — the language of the cells',
     'هي نفسها ورقتك، بس كل رمز وراه بيانات:': 'It is the same paper you already know — but every symbol is backed by data:',
     '✓ أخضر غامق / ✓ منقّط / ✓ كهرماني': '✓ solid green / ✓ dotted / ✓ amber',
     'مدفوع موثَّق (بمبلغ وتاريخ) / مدفوع من الورقة بلا تفاصيل / مدفوع بعد ميعاده':
@@ -564,8 +564,8 @@
     'اسم المبنى / الكشف': 'Building / statement name',
     'المنطقة — اختياري': 'District — optional',
     'أدخل اسم المبنى': 'Enter the building name',
-    'أُضيف المبنى — أضف وحداته من شاشة الوحدات ثم عقوده، أو فرّغ كشفه من المصفوفة بوضع نقل الورقة':
-      'Building added — add its units from the Units screen then its contracts, or transcribe its statement from the matrix in Transcribe mode',
+    'أُضيف المبنى — أضف وحداته من شاشة الوحدات ثم عقوده، أو فرّغ كشفه من جدول التحصيل بوضع نقل الورقة':
+      'Building added — add its units from the Units screen then its contracts, or transcribe its statement from the collection sheet in Transcribe mode',
     'عند بدء الاستخدام الفعلي:': 'When real operations begin:',
     'حذف المبنيين التوضيحيين وكل بياناتهما نهائيًا؟': 'Permanently delete the two sample buildings and all their data?',
     'حُذفت البيانات التوضيحية': 'Sample data deleted',
@@ -613,8 +613,8 @@
     'أُضيف الصف ناقصًا — سيظهر «بلا عقد مسجّل» حتى تُستكمل بياناته':
       'Row added incomplete — it will show “No contract on file” like the Demolition Garage row, to be completed once its data is known',
     'بلا عقد': 'No contract',
-    'افتح المصفوفة بوضع نقل الورقة: كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فارغ — بسرعة الورقة نفسها. الخانة اللي الورقة ساكتة عنها سيبها فارغة وسيعلّمها النظام «يحتاج تأكيدًا».':
-      'Open the matrix in Transcribe mode: each click cycles a cell ✓ → ✗ → blank — as fast as the paper itself. Leave blank whatever the paper is silent about; the system flags it “Needs confirmation”.',
+    'افتح جدول التحصيل بوضع نقل الورقة: كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فارغ — بسرعة الورقة نفسها. الخانة اللي الورقة ساكتة عنها سيبها فارغة وسيعلّمها النظام «يحتاج تأكيدًا».':
+      'Open the collection sheet in Transcribe mode: each click cycles a cell ✓ → ✗ → blank — as fast as the paper itself. Leave blank whatever the paper is silent about; the system flags it “Needs confirmation”.',
     'العلامات بتتعلّم على صفوف الورقة — أضف الصفوف في الخطوة 2 الأول وبعدها الزر هيظهر هنا.':
       'Marks attach to the paper’s rows — add the rows in Step 2 first, and the button will appear here.',
     /* ---------- التحليلات ---------- */
@@ -625,8 +625,8 @@
     'محسوب من متوسط إيجار النوع المماثل — كل شهر تأخير في التأجير أو التجديد يكلّف هذا الرقم.':
       'Computed from the average rent of the same type — every month of leasing or renewal delay costs this figure.',
     'كل كشف ورقي = كيان مستقل بمؤشراته': 'Every paper statement = an independent entity with its own KPIs',
-    'بمبلغ وتاريخ وإيصال — كشف سكرية كله علامات يحتاج تأكيدًاة حتى الآن':
-      'With amount, date & receipt — the Sokareya statement is still all undocumented marks',
+    'بمبلغ وتاريخ وإيصال — كشف سكرية كله علامات تحتاج تأكيدًا حتى الآن':
+      'With amount, date & receipt — the Sokareya statement is still all marks needing confirmation',
     'تحليل العقود — من نموذج العقد الفعلي وبياناته': 'Contract analysis — from the actual contract form and its data',
     'متوسط مدة العقد': 'Average contract term',
     'الزيادة السنوية السائدة': 'Prevailing annual increase',
@@ -704,7 +704,7 @@
       return m[1] + ' unit-months · plus ' + months(m[2]) + ' of unknown value';
     }],
     [/^((?:\d+ أشهر|\d+ شهرًا|شهر واحد|شهرين)) بقيمة مجهولة$/, function (m) { return months(m[1]) + ' of unknown value'; }],
-    [/^و(\d+) صفوف أخرى — كاملة في المصفوفة\.$/, function (m) { return 'plus ' + m[1] + ' more rows — the full list is in the matrix.'; }],
+    [/^و(\d+) صفوف أخرى — كاملة في جدول التحصيل\.$/, function (m) { return 'plus ' + m[1] + ' more rows — the full list is in the collection sheet.'; }],
     [/^غير مشمول: (\d+) أشهر بقيمة مجهولة \(بلا عقد مسجّل\)\.$/, function (m) {
       return 'Not included: ' + m[1] + ' months of unknown value (no contract on file).';
     }],
@@ -785,7 +785,7 @@
     [/^العقد: (.+)$/, function (m) { return 'Contract: ' + en(m[1]); }],
     [/^مفتوحة \((\d+)\)$/, function (m) { return 'Open (' + m[1] + ')'; }],
     [/^— التغطية (.+) حتى (.+)\.$/, function (m) { return '— Coverage ' + en(m[1]) + ' to ' + en(m[2]) + '.'; }],
-    [/^مصفوفة (\d{4})$/, function (m) { return m[1] + ' matrix'; }],
+    [/^جدول (\d{4})$/, function (m) { return m[1] + ' sheet'; }],
     /* دليل الشرح — الأمثلة الحية */
     [/^الميزان 1 — مايو 2026: 19 يومًا بسعر 45,100→49,610 و12 يومًا بالسنة الثالثة = ([\d,]+) ج\.م$/, function (m) {
       return 'Mezzanine 1 — May 2026: 19 days at 45,100→49,610 and 12 days on year 3 = ' + m[1] + ' EGP';
