@@ -665,9 +665,21 @@
       h('th.mx-arr-h', 'متأخرات'),
     ]);
 
+    /* الجدول = وحدات × 12 شهرًا، فعند المئات يُعرض جزء ويُكمَّل بزر */
+    const MX_LIMIT = 40;
+    const mxCapped = !VS.matrixAll && us.length > MX_LIMIT;
+    const mxIds = mxCapped ? new Set(us.slice(0, MX_LIMIT).map(u => u.id)) : null;
+    const unitsByBmx = new Map();
+    for (const u of us) {
+      if (mxCapped && !mxIds.has(u.id)) continue;
+      let arr = unitsByBmx.get(u.buildingId);
+      if (!arr) { arr = []; unitsByBmx.set(u.buildingId, arr); }
+      arr.push(u);
+    }
+
     const bodyRows = [];
     for (const b of Store.state.buildings) {
-      const bus = us.filter(u => u.buildingId === b.id);
+      const bus = unitsByBmx.get(b.id) || [];
       if (!bus.length) continue;
       bodyRows.push(h('tr.mx-bhead', h('td', { colspan: 14 }, [
         h('b', b.name), ' ', b.demo ? h('span.chip.chip-neutral', 'تجريبي') : h('span.chip.chip-unknown', 'مشروع فعلي'),
@@ -785,6 +797,13 @@
         legend(),
       ]) : null,
       us.length ? h('div.matrix-wrap', h('table.matrix', [h('thead', head), h('tbody', [...bodyRows, totRow])])) : null,
+      mxCapped ? h('p.note-line', [
+        `معروض ${MX_LIMIT} وحدة من ${us.length} — صف الإجمالي أسفل الجدول محسوب على كل الوحدات المرشَّحة. رشِّح بمشروع للعمل على كشف واحد. `,
+        h('button.btn.btn-ghost', { onclick: () => { VS.matrixAll = true; App.render(); } }, `اعرض كل الوحدات (${us.length})`),
+      ]) : null,
+      !mxCapped && VS.matrixAll && us.length > MX_LIMIT ? h('button.btn.btn-ghost', {
+        onclick: () => { VS.matrixAll = false; App.render(); },
+      }, 'اعرض أول 40 فقط') : null,
     ]);
   }
 
@@ -987,10 +1006,33 @@
     const us = filteredUnits(asOf);
     const uset = new Set(us.map(u => u.id));
     const ar = Store.arrears(asOf, uset);
+    // تجميعات مسبقة بمرور واحد — البطاقة الواحدة لا تعيد مسح كل البيانات
+    const arrByUnit = new Map(), unkByUnit = new Map(), issuesByUnit = new Map(), unitsByB2 = new Map();
+    for (const r of ar.rows) arrByUnit.set(r.unitId, (arrByUnit.get(r.unitId) || 0) + r.amount);
+    for (const r of ar.unknowns) unkByUnit.set(r.unitId, (unkByUnit.get(r.unitId) || 0) + 1);
+    for (const q of Store.state.issues) {
+      if (q.status !== 'open') continue;
+      const uid = q.refType === 'unit' ? q.refId
+        : (q.refType === 'contract' && q.refId ? (Store.contract(q.refId) || {}).unitId : null);
+      if (!uid) continue;
+      issuesByUnit.set(uid, (issuesByUnit.get(uid) || 0) + 1);
+    }
+    for (const u of us) {
+      let arr = unitsByB2.get(u.buildingId);
+      if (!arr) { arr = []; unitsByB2.set(u.buildingId, arr); }
+      arr.push(u);
+    }
+    const vacRows = new Map(Store.vacancyInfo(asOf, uset).rows.map(r => [r.unit.id, r]));
+
+    /* عند مئات الوحدات لا تُرسم كلها دفعة واحدة — تُعرض دفعة أولى وزر يكمل */
+    const UNIT_LIMIT = 60;
+    const capped = !VS.unitsAll && us.length > UNIT_LIMIT;
+    const shownIds = capped ? new Set(us.slice(0, UNIT_LIMIT).map(u => u.id)) : null;
 
     const sections = [];
     for (const b of Store.state.buildings) {
-      const bus = us.filter(u => u.buildingId === b.id);
+      let bus = unitsByB2.get(b.id) || [];
+      if (capped) bus = bus.filter(u => shownIds.has(u.id));
       if (!bus.length) continue;
       sections.push(h('div.bsec-head', [
         h('h3.bsec-title', b.name),
@@ -1000,11 +1042,9 @@
       sections.push(h('div.cards-grid', bus.map(u => {
         const act = Store.activeContractOn(u.id, asOf);
         const last = act || Store.unitContracts(u.id).slice(-1)[0] || null;
-        const unitArrears = ar.rows.filter(r => r.unitId === u.id).reduce((s, r) => s + r.amount, 0);
-        const unknownArr = ar.unknowns.filter(r => r.unitId === u.id).length;
-        const issues = Store.state.issues.filter(q => q.status === 'open' &&
-          ((q.refType === 'unit' && q.refId === u.id) ||
-           (q.refType === 'contract' && q.refId && (Store.contract(q.refId) || {}).unitId === u.id)));
+        const unitArrears = arrByUnit.get(u.id) || 0;
+        const unknownArr = unkByUnit.get(u.id) || 0;
+        const issuesN = issuesByUnit.get(u.id) || 0;
         let rentNow = null;
         if (act) {
           const y = act.years.find(y => Store.d(y.from) <= asOf && asOf <= Store.d(y.to)) || act.years[act.years.length - 1];
@@ -1027,7 +1067,7 @@
             ...(function () {
               // وحدة مش داخلة فلوس: منذ متى شاغرة وحجم خسارتها
               if (Store.unitIsEarning(u, Store.periodOf(asOf), asOf)) return [];
-              const vrow = Store.vacancyInfo(asOf, new Set([u.id])).rows[0];
+              const vrow = vacRows.get(u.id);
               if (!vrow) return [];
               return [
                 vrow.months != null ? h('div.fact', [h('span.fact-k', 'شاغرة منذ'), h('span.fact-v.val-warning', pluralMonths(Math.round(vrow.months)))]) : null,
@@ -1037,7 +1077,7 @@
               ];
             })(),
           ]),
-          issues.length ? h('div.unit-flags', [icon('warn'), ` ${issues.length} ملاحظة جودة مفتوحة`]) : null,
+          issuesN ? h('div.unit-flags', [icon('warn'), ` ${issuesN} ملاحظة جودة مفتوحة`]) : null,
         ]));
       })));
     }
@@ -1048,6 +1088,13 @@
       ]),
       demoBanner(),
       sections.length ? h('div', sections) : emptyState('لا وحدات ضمن الترشيح'),
+      capped ? h('p.note-line', [
+        `معروض ${UNIT_LIMIT} وحدة من ${us.length} — رشِّح بمشروع أو حالة أو ابحث بالكود للوصول لما تريد بسرعة. `,
+        h('button.btn.btn-ghost', { onclick: () => { VS.unitsAll = true; App.render(); } }, `اعرض كل الوحدات (${us.length})`),
+      ]) : null,
+      !capped && VS.unitsAll && us.length > UNIT_LIMIT ? h('button.btn.btn-ghost', {
+        onclick: () => { VS.unitsAll = false; App.render(); },
+      }, 'اعرض أول 60 فقط') : null,
     ]);
   }
 
@@ -2287,9 +2334,17 @@
       }));
     }
     // مقارنة الكشوف
+    // مجموعات وحدات المشاريع تُبنى في مرور واحد لا مرورًا لكل مشروع
+    const unitsByB = new Map();
+    for (const u of Store.state.units) {
+      if (!uset.has(u.id)) continue;
+      let s2 = unitsByB.get(u.buildingId);
+      if (!s2) { s2 = new Set(); unitsByB.set(u.buildingId, s2); }
+      s2.add(u.id);
+    }
     const bRates = Store.state.buildings.map(b => {
-      const bset = new Set(Store.state.units.filter(u => u.buildingId === b.id && uset.has(u.id)).map(u => u.id));
-      if (!bset.size) return null;
+      const bset = unitsByB.get(b.id);
+      if (!bset || !bset.size) return null;
       const t = Store.monthTotals(m, asOf, bset);
       return t.due > 0 ? { b, rate: t.rate } : null;
     }).filter(Boolean).sort((a, b) => b.rate - a.rate);
@@ -2353,11 +2408,19 @@
     /* ---------- التزام السداد بالعميل (من الدفعات الموثقة فقط) ---------- */
     const grace = Store.state.settings.graceDays;
     const compliance = [];
+    // تجميع دفعات كل عميل في مرور واحد — بدلًا من مسح كل الدفعات والعقود لكل عميل
+    const cTenant = new Map(Store.state.contracts.map(c => [c.id, c.tenantId]));
+    const paysByTenant = new Map();
+    for (const p of Store.state.payments) {
+      if (!p.date || !uset.has(p.unitId)) continue;
+      const tid = cTenant.get(p.contractId);
+      if (!tid) continue;
+      let arr = paysByTenant.get(tid);
+      if (!arr) { arr = []; paysByTenant.set(tid, arr); }
+      arr.push(p);
+    }
     for (const t of Store.state.tenants) {
-      const pays = Store.state.payments.filter(p => {
-        if (!p.date || !uset.has(p.unitId)) return false;
-        return Store.state.contracts.some(c => c.id === p.contractId && c.tenantId === t.id);
-      });
+      const pays = paysByTenant.get(t.id) || [];
       if (pays.length < 3) continue;
       let onTime = 0;
       for (const p of pays) {
@@ -2391,11 +2454,20 @@
         return { label: unitLabel(uid), v, sub: tid ? tenantLabel(tid) : null };
       });
 
+    const docPays = Store.state.payments.filter(p => uset.has(p.unitId)).length;
+    const tickOnly = Store.state.marks.filter(mk => mk.mark === 'paid' && uset.has(mk.unitId)
+      && !Store.state.payments.some(p => p.unitId === mk.unitId && p.period === mk.period)).length;
     const quick = h('div.tiles', [
-      statTile({ label: 'الكشوف', value: String(Store.state.buildings.length), ic: 'doc', tone: 'accent', sub: 'كل كشف ورقي = كيان مستقل بمؤشراته' }),
+      statTile({ label: 'المشاريع', value: String(Store.state.buildings.length), ic: 'doc', tone: 'accent', sub: 'كل ورقة مالك = مشروع مستقل بمؤشراته' }),
       statTile({ label: 'الوحدات', value: String(filteredUnits(asOf).length), ic: 'home', tone: 'good' }),
       statTile({ label: 'عقود نشطة', value: String(occ.occupied.length), ic: 'doc', tone: 'violet' }),
-      statTile({ label: 'دفعات موثَّقة', value: String(Store.state.payments.filter(p => uset.has(p.unitId)).length), ic: 'money', tone: 'accent', sub: 'بمبلغ وتاريخ وإيصال — كشف سكرية كله علامات تحتاج تأكيدًا حتى الآن' }),
+      statTile({
+        label: 'دفعات موثَّقة',
+        value: String(docPays), ic: 'money', tone: 'accent',
+        sub: tickOnly
+          ? `دفعات لها مبلغ وتاريخ ورقم إيصال — مقابل ${tickOnly} شهرًا مصدره علامة ✓ في ورقة المالك بلا مبلغ ولا تاريخ`
+          : 'دفعات لها مبلغ وتاريخ ورقم إيصال — لا شهور معتمدة على علامة ورقة وحدها',
+      }),
     ]);
 
     /* ---------- تحليل العقود (من نموذج العقد الفعلي وبياناته) ---------- */
@@ -2427,7 +2499,9 @@
       statTile({ label: 'الزيادة السنوية السائدة', value: incMode == null ? '—' : incMode + '٪', ic: 'trend', tone: 'good', sub: 'من قيم السنوات المدوَّنة فعلًا — تُستخدم افتراضًا للعقود الجديدة' }),
       statTile({
         label: 'عقود نشطة بتأمين مسجّل', value: `${withDep} من ${activeCs.length}`, ic: 'shield', tone: withDep < activeCs.length ? 'warning' : 'good',
-        sub: 'البند الخامس: التأمين «بواقع شهر» — الناقص فجوة توثيق',
+        sub: withDep < activeCs.length
+          ? `${activeCs.length - withDep} عقدًا بلا مبلغ تأمين مسجَّل — البند الخامس يوجب تأمينًا بواقع شهر، فاسأل المالك عن قيمته وسجِّلها`
+          : 'كل عقد نشط له مبلغ تأمين مسجَّل — مطابق للبند الخامس',
       }),
       statTile({
         label: 'بصيانة / خاضعة للضريبة', value: `${withMnt} · ${withVat}`, ic: 'doc', tone: 'violet',
@@ -2776,7 +2850,7 @@
       ['2. تفريغ الكشف', 'شاشة «إضافة مشروع جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من جدول التحصيل بوضع نقل الورقة. الخانة الفارغة تُسجَّل «يحتاج تأكيد» — الفراغ معلومة.'],
       ['3. مراجعة الجودة', 'كل تناقض أو نقص يتسجّل تلقائيًا في «مراجعات مطلوبة» بنص المصدر الحرفي. تقعد مع المالك جلسة واحدة تقفل الأسئلة (تليفونات، تأمينات، قيم ناقصة، فراغات = سداد ولا تأخير؟).'],
       ['4. التشغيل اليومي', 'التحصيل الجديد يتسجّل دفعة كاملة (مبلغ+تاريخ+طريقة+إيصال) من خلية جدول التحصيل أو بالسداد الجماعي. عقد جديد/تجديد من زر «+ إدخال». شكوى تتسجّل بتصنيفها وتكلفتها.'],
-      ['5. المتابعة بالاستثناء', 'مش بتراجع 1000 وحدة — بتفتح «من لم يسدِّد؟» والتنبيهات والتحليلات: بيوروك بس اللي محتاج قرار (متأخر، عقد بينتهي، فجوة توثيق).'],
+      ['5. المتابعة بالاستثناء', 'مش بتراجع 1000 وحدة — بتفتح «من لم يسدِّد؟» والتنبيهات والتحليلات: بيوروك بس اللي محتاج قرار (متأخر، عقد بينتهي، أو شهر يحتاج تأكيدًا).'],
       ['6. التقارير والقرار', 'التقرير الشامل (Excel) للمالك — ثماني أوراق منسَّقة، وبجانبه تصديرات CSV مفردة + التحليلات للقرارات: مين نطارده، إمتى نجدد، فين الفاقد.'],
     ];
     const flowNode = h('div.flow', FLOW.map(([t, d], i) =>
@@ -3111,6 +3185,12 @@
     'قائمة المستخدمين في أول ملف صفحة الدخول': 'The user list at the top of the sign-in page file',
     'اسم الداخل ودوره يظهران أعلى الشاشة مع زر خروج، والشاشات والأزرار غير المتاحة لدوره تختفي. تنظيم استخدام داخل المكتب لا حماية أمنية — القفل الفعلي مع نسخة الخادم':
       'The signed-in name and role appear at the top with a sign-out button, and screens or buttons their role cannot use disappear. This organises office usage; it is not real security — the actual lock comes with the server version',
+    'كل ورقة مالك = مشروع مستقل بمؤشراته': 'Every owner’s paper = an independent project with its own indicators',
+    'كل عقد نشط له مبلغ تأمين مسجَّل — مطابق للبند الخامس': 'Every active contract has a recorded deposit — matching clause five',
+    'دفعات لها مبلغ وتاريخ ورقم إيصال — لا شهور معتمدة على علامة ورقة وحدها':
+      'Payments with an amount, a date and a receipt number — no month rests on a paper tick alone',
+    'مش بتراجع 1000 وحدة — بتفتح «من لم يسدِّد؟» والتنبيهات والتحليلات: بيوروك بس اللي محتاج قرار (متأخر، عقد بينتهي، أو شهر يحتاج تأكيدًا).':
+      'You don’t review 1,000 units — you open “Who has not paid?”, the alerts and Insights: they show only what needs a decision (a late payer, an expiring contract, or a month needing confirmation).',
     'تقرير شامل للمالك': 'A full report for the owner',
     'الإعدادات ← «التقرير الشامل (Excel)»': 'Settings → “Full report (Excel)”',
     'ملف Excel واحد بأوراق منسَّقة: المشاريع والعقود والعملاء والمتأخرات والتحصيل والدفعات والشواغر والمراجعات':
@@ -3122,6 +3202,19 @@
     [/^«(.+)» لم تعد متاحة بهذه المدة — اختر وحدة أخرى$/, function (m) { return '“' + I18N.tt(m[1]) + '” is no longer available for this term — choose another unit'; }],
     [/^عملاء مسجَّلون بلا عقود بعد \((\d+)\)$/, function (m) { return 'Clients registered with no contract yet (' + m[1] + ')'; }],
     [/^قيمة السنة (\d+)$/, function (m) { return 'Year ' + m[1] + ' value'; }],
+    [/^(\d+) عقدًا بلا مبلغ تأمين مسجَّل — البند الخامس يوجب تأمينًا بواقع شهر، فاسأل المالك عن قيمته وسجِّلها$/,
+      function (m) { return m[1] + ' contracts have no recorded deposit — clause five requires one month’s deposit, so ask the owner for the amount and record it'; }],
+    [/^دفعات لها مبلغ وتاريخ ورقم إيصال — مقابل (\d+) شهرًا مصدره علامة ✓ في ورقة المالك بلا مبلغ ولا تاريخ$/,
+      function (m) { return 'Payments with an amount, a date and a receipt number — against ' + m[1] + ' months resting on a ✓ tick on the owner’s paper with no amount or date'; }],
+    /* قوائم مقصوصة عند الحجم الكبير */
+    [/^معروض (\d+) مشروعًا من (\d+) — الأكثر احتياجًا للمتابعة أولًا\. $/,
+      function (m) { return 'Showing ' + m[1] + ' of ' + m[2] + ' projects — those needing attention first. '; }],
+    [/^اعرض كل المشاريع \((\d+)\)$/, function (m) { return 'Show all projects (' + m[1] + ')'; }],
+    [/^معروض (\d+) وحدة من (\d+) — رشِّح بمشروع أو حالة أو ابحث بالكود للوصول لما تريد بسرعة\. $/,
+      function (m) { return 'Showing ' + m[1] + ' of ' + m[2] + ' units — filter by project or status, or search by code, to get there faster. '; }],
+    [/^معروض (\d+) وحدة من (\d+) — صف الإجمالي أسفل الجدول محسوب على كل الوحدات المرشَّحة\. رشِّح بمشروع للعمل على كشف واحد\. $/,
+      function (m) { return 'Showing ' + m[1] + ' of ' + m[2] + ' units — the totals row below covers every filtered unit. Filter by project to work on one statement. '; }],
+    [/^اعرض كل الوحدات \((\d+)\)$/, function (m) { return 'Show all units (' + m[1] + ')'; }],
     /* أمثلة دليل الشرح المحسوبة من البيانات */
     [/^تقييمك الآن (\d+) من 100$/, function (m) { return 'Your score right now is ' + m[1] + ' out of 100'; }],
     [/^الشهر المعروض الآن: (.+)$/, function (m) { return 'Currently showing: ' + I18N.tt(m[1]); }],

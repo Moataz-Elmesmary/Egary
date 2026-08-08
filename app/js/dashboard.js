@@ -46,6 +46,7 @@
   }
 
   let dashMonth = null;
+  const showAllProjects = { on: false };
 
   function viewDashboardV3() {
     const asOf = Store.today();
@@ -69,7 +70,6 @@
     const deps = Store.depositsHeld(uset).reduce((s, x) => s + x.amount, 0);
     const rented = us.filter(u => Store.unitIsEarning(u, m, asOf)).length;
     const projects = Store.state.buildings.filter(b => !F.b || b.id === F.b);
-    const pstats = projects.map(b => Store.projectStats(b.id, m, asOf));
 
     /* ---------- 0) سطر مشاريعك: الصورة من فوق ---------- */
     const hero = h('div.hero-strip', [
@@ -123,8 +123,24 @@
     }
     hero.querySelectorAll('.hero-item[onclick], .hero-item').forEach(el => { if (el.onclick) keyClickable(el); });
 
-    /* ---------- 1) المشاريع: البطاقة الأم لكل مشروع ---------- */
-    const projCards = pstats.map(ps => {
+    /* ---------- 1) المشاريع: البطاقة الأم لكل مشروع ----------
+       عند عشرات أو مئات المشاريع لا تُرسم كلها دفعة واحدة: تُعرض التي تحتاج
+       انتباهًا أولًا (الأكثر متأخرات ثم الأقل تحصيلًا) وزر يعرض الباقي. */
+    const PROJ_LIMIT = 12;
+    // الترتيب بمتأخرات كل مشروع من مرور واحد على المتأخرات — ثم تُحسب إحصاءات
+    // المعروض فقط، فلا ندفع ثمن مئات المشاريع لنعرض اثني عشر
+    const unitB = new Map(Store.state.units.map(u => [u.id, u.buildingId]));
+    const arrByB = new Map();
+    for (const r of ar.rows) {
+      const bid = unitB.get(r.unitId);
+      if (bid) arrByB.set(bid, (arrByB.get(bid) || 0) + r.amount);
+    }
+    const showAll = showAllProjects.on || projects.length <= PROJ_LIMIT;
+    const shownProjects = showAll ? projects
+      : [...projects].sort((a, b2) => (arrByB.get(b2.id) || 0) - (arrByB.get(a.id) || 0)).slice(0, PROJ_LIMIT);
+    const shownStats = shownProjects.map(b => Store.projectStats(b.id, m, asOf));
+    const hiddenProjects = projects.length - shownStats.length;
+    const projCards = shownStats.map(ps => {
       const b = ps.building;
       const rPct = ps.unitsTotal ? ps.rented / ps.unitsTotal : 0;
       const card = h('div.proj-card' + (F.b === b.id ? '.proj-on' : ''), {
@@ -428,7 +444,17 @@
       alarmCard,
       tiles,
       sectionCard('المشاريع — اختر مشروعًا لتركيز جميع الأرقام عليه',
-        h('div.proj-grid', projCards),
+        h('div', [
+          h('div.proj-grid', projCards),
+          hiddenProjects > 0 ? h('p.note-line', [
+            `معروض ${shownStats.length} مشروعًا من ${projects.length} — الأكثر احتياجًا للمتابعة أولًا. `,
+            h('button.btn.btn-ghost', { onclick: () => { showAllProjects.on = true; App.render(); } }, `اعرض كل المشاريع (${projects.length})`),
+          ]) : null,
+          showAllProjects.on && projects.length > PROJ_LIMIT ? h('button.btn.btn-ghost', {
+            onclick: () => { showAllProjects.on = false; App.render(); },
+          }, 'اعرض الأهم فقط') : null,
+          !F.b && projects.length > 1 ? h('p.field-hint', 'ابحث بكود المشروع أو اسمه في خانة البحث فوق للوصول لأي مشروع فورًا.') : null,
+        ]),
         F.b ? h('button.btn.btn-ghost', { onclick: () => go('#dashboard', {}) }, 'عرض كل المشاريع') : null),
       h('div.grid-2', [
         sectionCard('الدخل المتوقع 12 شهر (من العقود — التأمينات غير محسوبة)', h('div', [
@@ -472,6 +498,11 @@
     'التزام العملاء': 'Client punctuality',
     'الدخل المتوقع 12 شهر (من العقود — التأمينات غير محسوبة)': 'Expected income, 12 months (from contracts — deposits excluded)',
     'حركة الوحدات (دخول/خروج) وأثرها': 'Move-ins / move-outs and their impact',
+    'ابحث بكود المشروع أو اسمه في خانة البحث فوق للوصول لأي مشروع فورًا.':
+      'Search by project code or name in the box above to reach any project instantly.',
+    'اعرض الأهم فقط': 'Show only the most important',
+    'اعرض أول 60 فقط': 'Show only the first 60',
+    'اعرض أول 40 فقط': 'Show only the first 40',
     ' — جارٍ': ' — in progress',
     'لا تقرير عن شهر لم يبدأ بعد': 'No report for a month that has not started yet',
     'يغيِّر: تحصيل الشهر، «من لم يسدِّد؟»، وإيجارات المشاريع — وبقية المؤشرات محسوبة دائمًا حتى اليوم.':

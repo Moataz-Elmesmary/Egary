@@ -1018,6 +1018,32 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
 .years-table tr.yr-manual td { background: var(--warning-wash); }
 :root[data-theme="dark"] .years-table tr.yr-manual td { background: rgba(250, 178, 25, 0.10); }
 .btn-sm { padding: 3px 10px; font-size: 12px; }
+/* ===== شريط البحث والمرشِّحات: ثابت أعلى الشاشة وبترتيب لا يتزحزح ===== */
+.slicers {
+  position: sticky; top: 0; z-index: 55;
+  display: grid;
+  grid-template-columns: minmax(220px, 1.6fr) repeat(4, minmax(120px, 1fr)) auto auto;
+  align-items: center; gap: 8px; flex-wrap: nowrap;
+  backdrop-filter: blur(8px);
+}
+.slicers > .slicer-item { min-width: 0; }
+.slicers > .slicer-item .input,
+.slicers > .slicer-item .combo,
+.slicers > .slicer-item .combo-input { width: 100%; min-width: 0; }
+.slicer-q .input { min-width: 0; }
+.slicer-count { margin-inline-start: 0; text-align: end; }
+.slicers .btn { white-space: nowrap; }
+/* الترشيح النشط يلتصق تحت الشريط فلا يقفز المحتوى */
+.fchips { position: sticky; top: 56px; z-index: 54; }
+@media (max-width: 1100px) {
+  .slicers { grid-template-columns: minmax(180px, 1.4fr) repeat(2, minmax(110px, 1fr)); grid-auto-rows: auto; }
+  .slicer-count { grid-column: 1 / -1; text-align: start; }
+}
+@media (max-width: 640px) {
+  .slicers { position: static; grid-template-columns: 1fr 1fr; }
+  .slicers > .slicer-item:first-child { grid-column: 1 / -1; }
+  .fchips { position: static; }
+}
 </style>
 </head>
 <body>
@@ -1560,7 +1586,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
   function save() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) { /* تخزين ممتلئ */ }
   }
-  function commit() { save(); listeners.forEach(fn => fn()); }
+  function commit() { IDX = null; CELL_CACHE = new Map(); CELL_SIG = -1; save(); listeners.forEach(fn => fn()); }
   function subscribe(fn) { listeners.push(fn); }
   function resetData() { STATE = freshFromSeed(); ensureCodes(); commit(); }
 
@@ -1570,24 +1596,56 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     if (STATE.log.length > 60) STATE.log.pop();
   }
 
-  /* ---------- فهارس ---------- */
-  function building(id) { return STATE.buildings.find(b => b.id === id) || null; }
-  function unit(id) { return STATE.units.find(u => u.id === id) || null; }
-  function tenant(id) { return STATE.tenants.find(t => t.id === id) || null; }
-  function contract(id) { return STATE.contracts.find(c => c.id === id) || null; }
+  /* ---------- فهارس ----------
+     بدونها كل قراءة تمشي على المصفوفات كلها، فتتضاعف التكلفة مع كل مشروع جديد.
+     تُبنى مرة وتُبطَل عند أي تعديل (commit) أو عند تغيّر أعداد السجلات. */
+  let IDX = null;
+  function idxSig() {
+    return STATE.units.length + STATE.contracts.length * 7 + STATE.payments.length * 13
+      + STATE.marks.length * 17 + STATE.tenants.length * 23 + STATE.buildings.length * 29;
+  }
+  function idx() {
+    if (IDX && IDX.sig === idxSig()) return IDX;
+    const byB = new Map(), byU = new Map(), byT = new Map(), byC = new Map();
+    const csByUnit = new Map(), payByCell = new Map(), markByCell = new Map(), nextByPrev = new Map();
+    for (const b of STATE.buildings) byB.set(b.id, b);
+    for (const u of STATE.units) byU.set(u.id, u);
+    for (const t of STATE.tenants) byT.set(t.id, t);
+    for (const c of STATE.contracts) {
+      byC.set(c.id, c);
+      let arr = csByUnit.get(c.unitId);
+      if (!arr) { arr = []; csByUnit.set(c.unitId, arr); }
+      arr.push(c);
+      if (c.prevId) nextByPrev.set(c.prevId, c);
+    }
+    for (const arr of csByUnit.values()) arr.sort((a, b) => (a.start < b.start ? -1 : 1));
+    for (const p of STATE.payments) {
+      const k = p.unitId + '|' + p.period;
+      let arr = payByCell.get(k);
+      if (!arr) { arr = []; payByCell.set(k, arr); }
+      arr.push(p);
+    }
+    for (const mk of STATE.marks) markByCell.set(mk.unitId + '|' + mk.period, mk);
+    IDX = { sig: idxSig(), byB, byU, byT, byC, csByUnit, payByCell, markByCell, nextByPrev, empty: [] };
+    return IDX;
+  }
+  function building(id) { return idx().byB.get(id) || null; }
+  function unit(id) { return idx().byU.get(id) || null; }
+  function tenant(id) { return idx().byT.get(id) || null; }
+  function contract(id) { return idx().byC.get(id) || null; }
   function unitContracts(unitId) {
-    return STATE.contracts.filter(c => c.unitId === unitId)
-      .sort((a, b) => a.start < b.start ? -1 : 1);
+    const i = idx();
+    return i.csByUnit.get(unitId) || i.empty;
   }
-  function nextContract(c) {
-    return STATE.contracts.find(x => x.prevId === c.id) || null;
-  }
+  function nextContract(c) { return idx().nextByPrev.get(c.id) || null; }
   function activeContractOn(unitId, date) {
     return unitContracts(unitId).find(c => d(c.start) <= date && date <= d(c.end)) || null;
   }
   function contractsOverlappingMonth(unitId, period) {
+    const cs = unitContracts(unitId);
+    if (!cs.length) return [];
     const f = monthFirst(period), l = monthLast(period);
-    return unitContracts(unitId).filter(c => d(c.start) <= l && d(c.end) >= f);
+    return cs.filter(c => d(c.start) <= l && d(c.end) >= f);
   }
   function unitsIn(uset) {
     return uset ? STATE.units.filter(u => uset.has(u.id)) : STATE.units;
@@ -1630,15 +1688,29 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
 
   /* ---------- سداد شهر لوحدة ---------- */
   function paymentsFor(unitId, period) {
-    return STATE.payments.filter(p => p.unitId === unitId && p.period === period);
+    const i = idx();
+    return i.payByCell.get(unitId + '|' + period) || i.empty;
   }
   function markFor(unitId, period) {
-    return STATE.marks.find(m => m.unitId === unitId && m.period === period) || null;
+    return idx().markByCell.get(unitId + '|' + period) || null;
   }
 
-  /* الحالة المركّبة لشهر × وحدة — قلب النظام كله */
+  /* الحالة المركّبة لشهر × وحدة — قلب النظام كله.
+     تُستدعى آلاف المرات في الرسمة الواحدة (متأخرات، إجماليات، ألارم، تقييم…)
+     ونتيجتها ثابتة ما دامت البيانات لم تتغير، فتُحفظ في ذاكرة تُبطَل مع الفهرس. */
+  let CELL_CACHE = new Map(), CELL_SIG = -1;
   function cellInfo(unitId, period, asOf) {
     asOf = asOf || today();
+    const i = idx();
+    if (CELL_SIG !== i.sig) { CELL_CACHE = new Map(); CELL_SIG = i.sig; }
+    const key = unitId + '|' + period + '|' + asOf.getTime();
+    const hit = CELL_CACHE.get(key);
+    if (hit) return hit;
+    const res = computeCell(unitId, period, asOf);
+    CELL_CACHE.set(key, res);
+    return res;
+  }
+  function computeCell(unitId, period, asOf) {
     const cov = STATE.meta.importCoverage;
     const u = unit(unitId);
     const cs = contractsOverlappingMonth(unitId, period);
@@ -2002,12 +2074,18 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
   function complianceBuckets(uset) {
     const grace = STATE.settings.graceDays;
     const perTenant = [];
+    // تجميع الدفعات على العملاء في مرور واحد — لا مسحًا كاملًا لكل عميل
+    const paysByTenant = new Map();
+    for (const p of STATE.payments) {
+      if (!p.date || (uset && !uset.has(p.unitId))) continue;
+      const c = contract(p.contractId);
+      if (!c) continue;
+      let arr = paysByTenant.get(c.tenantId);
+      if (!arr) { arr = []; paysByTenant.set(c.tenantId, arr); }
+      arr.push(p);
+    }
     for (const t of STATE.tenants) {
-      const pays = STATE.payments.filter(p => {
-        if (!p.date || (uset && !uset.has(p.unitId))) return false;
-        const c = contract(p.contractId);
-        return c && c.tenantId === t.id;
-      });
+      const pays = paysByTenant.get(t.id) || [];
       if (pays.length < 3) continue;
       let onTime = 0;
       for (const p of pays) {
@@ -2033,7 +2111,6 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     const occ = occupancy(asOf, uset);
     const ar = arrears(asOf, uset);
     const ren = renewals(90, asOf, uset);
-    const income12 = contractedRevenue(periodOf(asOf), 12, uset).total || 1;
     const collectScore = (mt.rate == null ? 0.5 : mt.rate) * 40;
     const occScore = (occ.total ? occ.occupied.length / occ.total : 0) * 25;
     const unknownPenalty = Math.min(15, ((mt.unknownDue + ar.undocumentedTotal) / Math.max(1, mt.due + mt.unknownDue)) * 15);
@@ -2042,7 +2119,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     const expiringPenalty = Math.min(10, expiringShare * 2.5);
     const score = Math.round(Math.max(0, Math.min(100,
       collectScore + occScore + (15 - unknownPenalty) + (10 - agingPenalty) + (10 - expiringPenalty))));
-    return { score, parts: { collectScore: Math.round(collectScore), occScore: Math.round(occScore), unknownPenalty: Math.round(unknownPenalty), agingPenalty: Math.round(agingPenalty), expiringPenalty: Math.round(expiringPenalty) }, income12 };
+    return { score, parts: { collectScore: Math.round(collectScore), occScore: Math.round(occScore), unknownPenalty: Math.round(unknownPenalty), agingPenalty: Math.round(agingPenalty), expiringPenalty: Math.round(expiringPenalty) } };
   }
 
   /* تركّز المخاطر: أكبر عميل كنسبة من دخل الشهر */
@@ -5157,9 +5234,21 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       h('th.mx-arr-h', 'متأخرات'),
     ]);
 
+    /* الجدول = وحدات × 12 شهرًا، فعند المئات يُعرض جزء ويُكمَّل بزر */
+    const MX_LIMIT = 40;
+    const mxCapped = !VS.matrixAll && us.length > MX_LIMIT;
+    const mxIds = mxCapped ? new Set(us.slice(0, MX_LIMIT).map(u => u.id)) : null;
+    const unitsByBmx = new Map();
+    for (const u of us) {
+      if (mxCapped && !mxIds.has(u.id)) continue;
+      let arr = unitsByBmx.get(u.buildingId);
+      if (!arr) { arr = []; unitsByBmx.set(u.buildingId, arr); }
+      arr.push(u);
+    }
+
     const bodyRows = [];
     for (const b of Store.state.buildings) {
-      const bus = us.filter(u => u.buildingId === b.id);
+      const bus = unitsByBmx.get(b.id) || [];
       if (!bus.length) continue;
       bodyRows.push(h('tr.mx-bhead', h('td', { colspan: 14 }, [
         h('b', b.name), ' ', b.demo ? h('span.chip.chip-neutral', 'تجريبي') : h('span.chip.chip-unknown', 'مشروع فعلي'),
@@ -5277,6 +5366,13 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
         legend(),
       ]) : null,
       us.length ? h('div.matrix-wrap', h('table.matrix', [h('thead', head), h('tbody', [...bodyRows, totRow])])) : null,
+      mxCapped ? h('p.note-line', [
+        `معروض ${MX_LIMIT} وحدة من ${us.length} — صف الإجمالي أسفل الجدول محسوب على كل الوحدات المرشَّحة. رشِّح بمشروع للعمل على كشف واحد. `,
+        h('button.btn.btn-ghost', { onclick: () => { VS.matrixAll = true; App.render(); } }, `اعرض كل الوحدات (${us.length})`),
+      ]) : null,
+      !mxCapped && VS.matrixAll && us.length > MX_LIMIT ? h('button.btn.btn-ghost', {
+        onclick: () => { VS.matrixAll = false; App.render(); },
+      }, 'اعرض أول 40 فقط') : null,
     ]);
   }
 
@@ -5479,10 +5575,33 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     const us = filteredUnits(asOf);
     const uset = new Set(us.map(u => u.id));
     const ar = Store.arrears(asOf, uset);
+    // تجميعات مسبقة بمرور واحد — البطاقة الواحدة لا تعيد مسح كل البيانات
+    const arrByUnit = new Map(), unkByUnit = new Map(), issuesByUnit = new Map(), unitsByB2 = new Map();
+    for (const r of ar.rows) arrByUnit.set(r.unitId, (arrByUnit.get(r.unitId) || 0) + r.amount);
+    for (const r of ar.unknowns) unkByUnit.set(r.unitId, (unkByUnit.get(r.unitId) || 0) + 1);
+    for (const q of Store.state.issues) {
+      if (q.status !== 'open') continue;
+      const uid = q.refType === 'unit' ? q.refId
+        : (q.refType === 'contract' && q.refId ? (Store.contract(q.refId) || {}).unitId : null);
+      if (!uid) continue;
+      issuesByUnit.set(uid, (issuesByUnit.get(uid) || 0) + 1);
+    }
+    for (const u of us) {
+      let arr = unitsByB2.get(u.buildingId);
+      if (!arr) { arr = []; unitsByB2.set(u.buildingId, arr); }
+      arr.push(u);
+    }
+    const vacRows = new Map(Store.vacancyInfo(asOf, uset).rows.map(r => [r.unit.id, r]));
+
+    /* عند مئات الوحدات لا تُرسم كلها دفعة واحدة — تُعرض دفعة أولى وزر يكمل */
+    const UNIT_LIMIT = 60;
+    const capped = !VS.unitsAll && us.length > UNIT_LIMIT;
+    const shownIds = capped ? new Set(us.slice(0, UNIT_LIMIT).map(u => u.id)) : null;
 
     const sections = [];
     for (const b of Store.state.buildings) {
-      const bus = us.filter(u => u.buildingId === b.id);
+      let bus = unitsByB2.get(b.id) || [];
+      if (capped) bus = bus.filter(u => shownIds.has(u.id));
       if (!bus.length) continue;
       sections.push(h('div.bsec-head', [
         h('h3.bsec-title', b.name),
@@ -5492,11 +5611,9 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       sections.push(h('div.cards-grid', bus.map(u => {
         const act = Store.activeContractOn(u.id, asOf);
         const last = act || Store.unitContracts(u.id).slice(-1)[0] || null;
-        const unitArrears = ar.rows.filter(r => r.unitId === u.id).reduce((s, r) => s + r.amount, 0);
-        const unknownArr = ar.unknowns.filter(r => r.unitId === u.id).length;
-        const issues = Store.state.issues.filter(q => q.status === 'open' &&
-          ((q.refType === 'unit' && q.refId === u.id) ||
-           (q.refType === 'contract' && q.refId && (Store.contract(q.refId) || {}).unitId === u.id)));
+        const unitArrears = arrByUnit.get(u.id) || 0;
+        const unknownArr = unkByUnit.get(u.id) || 0;
+        const issuesN = issuesByUnit.get(u.id) || 0;
         let rentNow = null;
         if (act) {
           const y = act.years.find(y => Store.d(y.from) <= asOf && asOf <= Store.d(y.to)) || act.years[act.years.length - 1];
@@ -5519,7 +5636,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
             ...(function () {
               // وحدة مش داخلة فلوس: منذ متى شاغرة وحجم خسارتها
               if (Store.unitIsEarning(u, Store.periodOf(asOf), asOf)) return [];
-              const vrow = Store.vacancyInfo(asOf, new Set([u.id])).rows[0];
+              const vrow = vacRows.get(u.id);
               if (!vrow) return [];
               return [
                 vrow.months != null ? h('div.fact', [h('span.fact-k', 'شاغرة منذ'), h('span.fact-v.val-warning', pluralMonths(Math.round(vrow.months)))]) : null,
@@ -5529,7 +5646,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
               ];
             })(),
           ]),
-          issues.length ? h('div.unit-flags', [icon('warn'), ` ${issues.length} ملاحظة جودة مفتوحة`]) : null,
+          issuesN ? h('div.unit-flags', [icon('warn'), ` ${issuesN} ملاحظة جودة مفتوحة`]) : null,
         ]));
       })));
     }
@@ -5540,6 +5657,13 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       ]),
       demoBanner(),
       sections.length ? h('div', sections) : emptyState('لا وحدات ضمن الترشيح'),
+      capped ? h('p.note-line', [
+        `معروض ${UNIT_LIMIT} وحدة من ${us.length} — رشِّح بمشروع أو حالة أو ابحث بالكود للوصول لما تريد بسرعة. `,
+        h('button.btn.btn-ghost', { onclick: () => { VS.unitsAll = true; App.render(); } }, `اعرض كل الوحدات (${us.length})`),
+      ]) : null,
+      !capped && VS.unitsAll && us.length > UNIT_LIMIT ? h('button.btn.btn-ghost', {
+        onclick: () => { VS.unitsAll = false; App.render(); },
+      }, 'اعرض أول 60 فقط') : null,
     ]);
   }
 
@@ -6779,9 +6903,17 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       }));
     }
     // مقارنة الكشوف
+    // مجموعات وحدات المشاريع تُبنى في مرور واحد لا مرورًا لكل مشروع
+    const unitsByB = new Map();
+    for (const u of Store.state.units) {
+      if (!uset.has(u.id)) continue;
+      let s2 = unitsByB.get(u.buildingId);
+      if (!s2) { s2 = new Set(); unitsByB.set(u.buildingId, s2); }
+      s2.add(u.id);
+    }
     const bRates = Store.state.buildings.map(b => {
-      const bset = new Set(Store.state.units.filter(u => u.buildingId === b.id && uset.has(u.id)).map(u => u.id));
-      if (!bset.size) return null;
+      const bset = unitsByB.get(b.id);
+      if (!bset || !bset.size) return null;
       const t = Store.monthTotals(m, asOf, bset);
       return t.due > 0 ? { b, rate: t.rate } : null;
     }).filter(Boolean).sort((a, b) => b.rate - a.rate);
@@ -6845,11 +6977,19 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     /* ---------- التزام السداد بالعميل (من الدفعات الموثقة فقط) ---------- */
     const grace = Store.state.settings.graceDays;
     const compliance = [];
+    // تجميع دفعات كل عميل في مرور واحد — بدلًا من مسح كل الدفعات والعقود لكل عميل
+    const cTenant = new Map(Store.state.contracts.map(c => [c.id, c.tenantId]));
+    const paysByTenant = new Map();
+    for (const p of Store.state.payments) {
+      if (!p.date || !uset.has(p.unitId)) continue;
+      const tid = cTenant.get(p.contractId);
+      if (!tid) continue;
+      let arr = paysByTenant.get(tid);
+      if (!arr) { arr = []; paysByTenant.set(tid, arr); }
+      arr.push(p);
+    }
     for (const t of Store.state.tenants) {
-      const pays = Store.state.payments.filter(p => {
-        if (!p.date || !uset.has(p.unitId)) return false;
-        return Store.state.contracts.some(c => c.id === p.contractId && c.tenantId === t.id);
-      });
+      const pays = paysByTenant.get(t.id) || [];
       if (pays.length < 3) continue;
       let onTime = 0;
       for (const p of pays) {
@@ -6883,11 +7023,20 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
         return { label: unitLabel(uid), v, sub: tid ? tenantLabel(tid) : null };
       });
 
+    const docPays = Store.state.payments.filter(p => uset.has(p.unitId)).length;
+    const tickOnly = Store.state.marks.filter(mk => mk.mark === 'paid' && uset.has(mk.unitId)
+      && !Store.state.payments.some(p => p.unitId === mk.unitId && p.period === mk.period)).length;
     const quick = h('div.tiles', [
-      statTile({ label: 'الكشوف', value: String(Store.state.buildings.length), ic: 'doc', tone: 'accent', sub: 'كل كشف ورقي = كيان مستقل بمؤشراته' }),
+      statTile({ label: 'المشاريع', value: String(Store.state.buildings.length), ic: 'doc', tone: 'accent', sub: 'كل ورقة مالك = مشروع مستقل بمؤشراته' }),
       statTile({ label: 'الوحدات', value: String(filteredUnits(asOf).length), ic: 'home', tone: 'good' }),
       statTile({ label: 'عقود نشطة', value: String(occ.occupied.length), ic: 'doc', tone: 'violet' }),
-      statTile({ label: 'دفعات موثَّقة', value: String(Store.state.payments.filter(p => uset.has(p.unitId)).length), ic: 'money', tone: 'accent', sub: 'بمبلغ وتاريخ وإيصال — كشف سكرية كله علامات تحتاج تأكيدًا حتى الآن' }),
+      statTile({
+        label: 'دفعات موثَّقة',
+        value: String(docPays), ic: 'money', tone: 'accent',
+        sub: tickOnly
+          ? `دفعات لها مبلغ وتاريخ ورقم إيصال — مقابل ${tickOnly} شهرًا مصدره علامة ✓ في ورقة المالك بلا مبلغ ولا تاريخ`
+          : 'دفعات لها مبلغ وتاريخ ورقم إيصال — لا شهور معتمدة على علامة ورقة وحدها',
+      }),
     ]);
 
     /* ---------- تحليل العقود (من نموذج العقد الفعلي وبياناته) ---------- */
@@ -6919,7 +7068,9 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       statTile({ label: 'الزيادة السنوية السائدة', value: incMode == null ? '—' : incMode + '٪', ic: 'trend', tone: 'good', sub: 'من قيم السنوات المدوَّنة فعلًا — تُستخدم افتراضًا للعقود الجديدة' }),
       statTile({
         label: 'عقود نشطة بتأمين مسجّل', value: `${withDep} من ${activeCs.length}`, ic: 'shield', tone: withDep < activeCs.length ? 'warning' : 'good',
-        sub: 'البند الخامس: التأمين «بواقع شهر» — الناقص فجوة توثيق',
+        sub: withDep < activeCs.length
+          ? `${activeCs.length - withDep} عقدًا بلا مبلغ تأمين مسجَّل — البند الخامس يوجب تأمينًا بواقع شهر، فاسأل المالك عن قيمته وسجِّلها`
+          : 'كل عقد نشط له مبلغ تأمين مسجَّل — مطابق للبند الخامس',
       }),
       statTile({
         label: 'بصيانة / خاضعة للضريبة', value: `${withMnt} · ${withVat}`, ic: 'doc', tone: 'violet',
@@ -7268,7 +7419,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       ['2. تفريغ الكشف', 'شاشة «إضافة مشروع جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من جدول التحصيل بوضع نقل الورقة. الخانة الفارغة تُسجَّل «يحتاج تأكيد» — الفراغ معلومة.'],
       ['3. مراجعة الجودة', 'كل تناقض أو نقص يتسجّل تلقائيًا في «مراجعات مطلوبة» بنص المصدر الحرفي. تقعد مع المالك جلسة واحدة تقفل الأسئلة (تليفونات، تأمينات، قيم ناقصة، فراغات = سداد ولا تأخير؟).'],
       ['4. التشغيل اليومي', 'التحصيل الجديد يتسجّل دفعة كاملة (مبلغ+تاريخ+طريقة+إيصال) من خلية جدول التحصيل أو بالسداد الجماعي. عقد جديد/تجديد من زر «+ إدخال». شكوى تتسجّل بتصنيفها وتكلفتها.'],
-      ['5. المتابعة بالاستثناء', 'مش بتراجع 1000 وحدة — بتفتح «من لم يسدِّد؟» والتنبيهات والتحليلات: بيوروك بس اللي محتاج قرار (متأخر، عقد بينتهي، فجوة توثيق).'],
+      ['5. المتابعة بالاستثناء', 'مش بتراجع 1000 وحدة — بتفتح «من لم يسدِّد؟» والتنبيهات والتحليلات: بيوروك بس اللي محتاج قرار (متأخر، عقد بينتهي، أو شهر يحتاج تأكيدًا).'],
       ['6. التقارير والقرار', 'التقرير الشامل (Excel) للمالك — ثماني أوراق منسَّقة، وبجانبه تصديرات CSV مفردة + التحليلات للقرارات: مين نطارده، إمتى نجدد، فين الفاقد.'],
     ];
     const flowNode = h('div.flow', FLOW.map(([t, d], i) =>
@@ -7603,6 +7754,12 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'قائمة المستخدمين في أول ملف صفحة الدخول': 'The user list at the top of the sign-in page file',
     'اسم الداخل ودوره يظهران أعلى الشاشة مع زر خروج، والشاشات والأزرار غير المتاحة لدوره تختفي. تنظيم استخدام داخل المكتب لا حماية أمنية — القفل الفعلي مع نسخة الخادم':
       'The signed-in name and role appear at the top with a sign-out button, and screens or buttons their role cannot use disappear. This organises office usage; it is not real security — the actual lock comes with the server version',
+    'كل ورقة مالك = مشروع مستقل بمؤشراته': 'Every owner’s paper = an independent project with its own indicators',
+    'كل عقد نشط له مبلغ تأمين مسجَّل — مطابق للبند الخامس': 'Every active contract has a recorded deposit — matching clause five',
+    'دفعات لها مبلغ وتاريخ ورقم إيصال — لا شهور معتمدة على علامة ورقة وحدها':
+      'Payments with an amount, a date and a receipt number — no month rests on a paper tick alone',
+    'مش بتراجع 1000 وحدة — بتفتح «من لم يسدِّد؟» والتنبيهات والتحليلات: بيوروك بس اللي محتاج قرار (متأخر، عقد بينتهي، أو شهر يحتاج تأكيدًا).':
+      'You don’t review 1,000 units — you open “Who has not paid?”, the alerts and Insights: they show only what needs a decision (a late payer, an expiring contract, or a month needing confirmation).',
     'تقرير شامل للمالك': 'A full report for the owner',
     'الإعدادات ← «التقرير الشامل (Excel)»': 'Settings → “Full report (Excel)”',
     'ملف Excel واحد بأوراق منسَّقة: المشاريع والعقود والعملاء والمتأخرات والتحصيل والدفعات والشواغر والمراجعات':
@@ -7614,6 +7771,19 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     [/^«(.+)» لم تعد متاحة بهذه المدة — اختر وحدة أخرى$/, function (m) { return '“' + I18N.tt(m[1]) + '” is no longer available for this term — choose another unit'; }],
     [/^عملاء مسجَّلون بلا عقود بعد \((\d+)\)$/, function (m) { return 'Clients registered with no contract yet (' + m[1] + ')'; }],
     [/^قيمة السنة (\d+)$/, function (m) { return 'Year ' + m[1] + ' value'; }],
+    [/^(\d+) عقدًا بلا مبلغ تأمين مسجَّل — البند الخامس يوجب تأمينًا بواقع شهر، فاسأل المالك عن قيمته وسجِّلها$/,
+      function (m) { return m[1] + ' contracts have no recorded deposit — clause five requires one month’s deposit, so ask the owner for the amount and record it'; }],
+    [/^دفعات لها مبلغ وتاريخ ورقم إيصال — مقابل (\d+) شهرًا مصدره علامة ✓ في ورقة المالك بلا مبلغ ولا تاريخ$/,
+      function (m) { return 'Payments with an amount, a date and a receipt number — against ' + m[1] + ' months resting on a ✓ tick on the owner’s paper with no amount or date'; }],
+    /* قوائم مقصوصة عند الحجم الكبير */
+    [/^معروض (\d+) مشروعًا من (\d+) — الأكثر احتياجًا للمتابعة أولًا\. $/,
+      function (m) { return 'Showing ' + m[1] + ' of ' + m[2] + ' projects — those needing attention first. '; }],
+    [/^اعرض كل المشاريع \((\d+)\)$/, function (m) { return 'Show all projects (' + m[1] + ')'; }],
+    [/^معروض (\d+) وحدة من (\d+) — رشِّح بمشروع أو حالة أو ابحث بالكود للوصول لما تريد بسرعة\. $/,
+      function (m) { return 'Showing ' + m[1] + ' of ' + m[2] + ' units — filter by project or status, or search by code, to get there faster. '; }],
+    [/^معروض (\d+) وحدة من (\d+) — صف الإجمالي أسفل الجدول محسوب على كل الوحدات المرشَّحة\. رشِّح بمشروع للعمل على كشف واحد\. $/,
+      function (m) { return 'Showing ' + m[1] + ' of ' + m[2] + ' units — the totals row below covers every filtered unit. Filter by project to work on one statement. '; }],
+    [/^اعرض كل الوحدات \((\d+)\)$/, function (m) { return 'Show all units (' + m[1] + ')'; }],
     /* أمثلة دليل الشرح المحسوبة من البيانات */
     [/^تقييمك الآن (\d+) من 100$/, function (m) { return 'Your score right now is ' + m[1] + ' out of 100'; }],
     [/^الشهر المعروض الآن: (.+)$/, function (m) { return 'Currently showing: ' + I18N.tt(m[1]); }],
@@ -7692,6 +7862,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
   }
 
   let dashMonth = null;
+  const showAllProjects = { on: false };
 
   function viewDashboardV3() {
     const asOf = Store.today();
@@ -7715,7 +7886,6 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     const deps = Store.depositsHeld(uset).reduce((s, x) => s + x.amount, 0);
     const rented = us.filter(u => Store.unitIsEarning(u, m, asOf)).length;
     const projects = Store.state.buildings.filter(b => !F.b || b.id === F.b);
-    const pstats = projects.map(b => Store.projectStats(b.id, m, asOf));
 
     /* ---------- 0) سطر مشاريعك: الصورة من فوق ---------- */
     const hero = h('div.hero-strip', [
@@ -7769,8 +7939,24 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     }
     hero.querySelectorAll('.hero-item[onclick], .hero-item').forEach(el => { if (el.onclick) keyClickable(el); });
 
-    /* ---------- 1) المشاريع: البطاقة الأم لكل مشروع ---------- */
-    const projCards = pstats.map(ps => {
+    /* ---------- 1) المشاريع: البطاقة الأم لكل مشروع ----------
+       عند عشرات أو مئات المشاريع لا تُرسم كلها دفعة واحدة: تُعرض التي تحتاج
+       انتباهًا أولًا (الأكثر متأخرات ثم الأقل تحصيلًا) وزر يعرض الباقي. */
+    const PROJ_LIMIT = 12;
+    // الترتيب بمتأخرات كل مشروع من مرور واحد على المتأخرات — ثم تُحسب إحصاءات
+    // المعروض فقط، فلا ندفع ثمن مئات المشاريع لنعرض اثني عشر
+    const unitB = new Map(Store.state.units.map(u => [u.id, u.buildingId]));
+    const arrByB = new Map();
+    for (const r of ar.rows) {
+      const bid = unitB.get(r.unitId);
+      if (bid) arrByB.set(bid, (arrByB.get(bid) || 0) + r.amount);
+    }
+    const showAll = showAllProjects.on || projects.length <= PROJ_LIMIT;
+    const shownProjects = showAll ? projects
+      : [...projects].sort((a, b2) => (arrByB.get(b2.id) || 0) - (arrByB.get(a.id) || 0)).slice(0, PROJ_LIMIT);
+    const shownStats = shownProjects.map(b => Store.projectStats(b.id, m, asOf));
+    const hiddenProjects = projects.length - shownStats.length;
+    const projCards = shownStats.map(ps => {
       const b = ps.building;
       const rPct = ps.unitsTotal ? ps.rented / ps.unitsTotal : 0;
       const card = h('div.proj-card' + (F.b === b.id ? '.proj-on' : ''), {
@@ -8074,7 +8260,17 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       alarmCard,
       tiles,
       sectionCard('المشاريع — اختر مشروعًا لتركيز جميع الأرقام عليه',
-        h('div.proj-grid', projCards),
+        h('div', [
+          h('div.proj-grid', projCards),
+          hiddenProjects > 0 ? h('p.note-line', [
+            `معروض ${shownStats.length} مشروعًا من ${projects.length} — الأكثر احتياجًا للمتابعة أولًا. `,
+            h('button.btn.btn-ghost', { onclick: () => { showAllProjects.on = true; App.render(); } }, `اعرض كل المشاريع (${projects.length})`),
+          ]) : null,
+          showAllProjects.on && projects.length > PROJ_LIMIT ? h('button.btn.btn-ghost', {
+            onclick: () => { showAllProjects.on = false; App.render(); },
+          }, 'اعرض الأهم فقط') : null,
+          !F.b && projects.length > 1 ? h('p.field-hint', 'ابحث بكود المشروع أو اسمه في خانة البحث فوق للوصول لأي مشروع فورًا.') : null,
+        ]),
         F.b ? h('button.btn.btn-ghost', { onclick: () => go('#dashboard', {}) }, 'عرض كل المشاريع') : null),
       h('div.grid-2', [
         sectionCard('الدخل المتوقع 12 شهر (من العقود — التأمينات غير محسوبة)', h('div', [
@@ -8118,6 +8314,11 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'التزام العملاء': 'Client punctuality',
     'الدخل المتوقع 12 شهر (من العقود — التأمينات غير محسوبة)': 'Expected income, 12 months (from contracts — deposits excluded)',
     'حركة الوحدات (دخول/خروج) وأثرها': 'Move-ins / move-outs and their impact',
+    'ابحث بكود المشروع أو اسمه في خانة البحث فوق للوصول لأي مشروع فورًا.':
+      'Search by project code or name in the box above to reach any project instantly.',
+    'اعرض الأهم فقط': 'Show only the most important',
+    'اعرض أول 60 فقط': 'Show only the first 60',
+    'اعرض أول 40 فقط': 'Show only the first 40',
     ' — جارٍ': ' — in progress',
     'لا تقرير عن شهر لم يبدأ بعد': 'No report for a month that has not started yet',
     'يغيِّر: تحصيل الشهر، «من لم يسدِّد؟»، وإيجارات المشاريع — وبقية المؤشرات محسوبة دائمًا حتى اليوم.':

@@ -115,7 +115,7 @@
   function save() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) { /* تخزين ممتلئ */ }
   }
-  function commit() { save(); listeners.forEach(fn => fn()); }
+  function commit() { IDX = null; CELL_CACHE = new Map(); CELL_SIG = -1; save(); listeners.forEach(fn => fn()); }
   function subscribe(fn) { listeners.push(fn); }
   function resetData() { STATE = freshFromSeed(); ensureCodes(); commit(); }
 
@@ -125,24 +125,56 @@
     if (STATE.log.length > 60) STATE.log.pop();
   }
 
-  /* ---------- فهارس ---------- */
-  function building(id) { return STATE.buildings.find(b => b.id === id) || null; }
-  function unit(id) { return STATE.units.find(u => u.id === id) || null; }
-  function tenant(id) { return STATE.tenants.find(t => t.id === id) || null; }
-  function contract(id) { return STATE.contracts.find(c => c.id === id) || null; }
+  /* ---------- فهارس ----------
+     بدونها كل قراءة تمشي على المصفوفات كلها، فتتضاعف التكلفة مع كل مشروع جديد.
+     تُبنى مرة وتُبطَل عند أي تعديل (commit) أو عند تغيّر أعداد السجلات. */
+  let IDX = null;
+  function idxSig() {
+    return STATE.units.length + STATE.contracts.length * 7 + STATE.payments.length * 13
+      + STATE.marks.length * 17 + STATE.tenants.length * 23 + STATE.buildings.length * 29;
+  }
+  function idx() {
+    if (IDX && IDX.sig === idxSig()) return IDX;
+    const byB = new Map(), byU = new Map(), byT = new Map(), byC = new Map();
+    const csByUnit = new Map(), payByCell = new Map(), markByCell = new Map(), nextByPrev = new Map();
+    for (const b of STATE.buildings) byB.set(b.id, b);
+    for (const u of STATE.units) byU.set(u.id, u);
+    for (const t of STATE.tenants) byT.set(t.id, t);
+    for (const c of STATE.contracts) {
+      byC.set(c.id, c);
+      let arr = csByUnit.get(c.unitId);
+      if (!arr) { arr = []; csByUnit.set(c.unitId, arr); }
+      arr.push(c);
+      if (c.prevId) nextByPrev.set(c.prevId, c);
+    }
+    for (const arr of csByUnit.values()) arr.sort((a, b) => (a.start < b.start ? -1 : 1));
+    for (const p of STATE.payments) {
+      const k = p.unitId + '|' + p.period;
+      let arr = payByCell.get(k);
+      if (!arr) { arr = []; payByCell.set(k, arr); }
+      arr.push(p);
+    }
+    for (const mk of STATE.marks) markByCell.set(mk.unitId + '|' + mk.period, mk);
+    IDX = { sig: idxSig(), byB, byU, byT, byC, csByUnit, payByCell, markByCell, nextByPrev, empty: [] };
+    return IDX;
+  }
+  function building(id) { return idx().byB.get(id) || null; }
+  function unit(id) { return idx().byU.get(id) || null; }
+  function tenant(id) { return idx().byT.get(id) || null; }
+  function contract(id) { return idx().byC.get(id) || null; }
   function unitContracts(unitId) {
-    return STATE.contracts.filter(c => c.unitId === unitId)
-      .sort((a, b) => a.start < b.start ? -1 : 1);
+    const i = idx();
+    return i.csByUnit.get(unitId) || i.empty;
   }
-  function nextContract(c) {
-    return STATE.contracts.find(x => x.prevId === c.id) || null;
-  }
+  function nextContract(c) { return idx().nextByPrev.get(c.id) || null; }
   function activeContractOn(unitId, date) {
     return unitContracts(unitId).find(c => d(c.start) <= date && date <= d(c.end)) || null;
   }
   function contractsOverlappingMonth(unitId, period) {
+    const cs = unitContracts(unitId);
+    if (!cs.length) return [];
     const f = monthFirst(period), l = monthLast(period);
-    return unitContracts(unitId).filter(c => d(c.start) <= l && d(c.end) >= f);
+    return cs.filter(c => d(c.start) <= l && d(c.end) >= f);
   }
   function unitsIn(uset) {
     return uset ? STATE.units.filter(u => uset.has(u.id)) : STATE.units;
@@ -185,15 +217,29 @@
 
   /* ---------- سداد شهر لوحدة ---------- */
   function paymentsFor(unitId, period) {
-    return STATE.payments.filter(p => p.unitId === unitId && p.period === period);
+    const i = idx();
+    return i.payByCell.get(unitId + '|' + period) || i.empty;
   }
   function markFor(unitId, period) {
-    return STATE.marks.find(m => m.unitId === unitId && m.period === period) || null;
+    return idx().markByCell.get(unitId + '|' + period) || null;
   }
 
-  /* الحالة المركّبة لشهر × وحدة — قلب النظام كله */
+  /* الحالة المركّبة لشهر × وحدة — قلب النظام كله.
+     تُستدعى آلاف المرات في الرسمة الواحدة (متأخرات، إجماليات، ألارم، تقييم…)
+     ونتيجتها ثابتة ما دامت البيانات لم تتغير، فتُحفظ في ذاكرة تُبطَل مع الفهرس. */
+  let CELL_CACHE = new Map(), CELL_SIG = -1;
   function cellInfo(unitId, period, asOf) {
     asOf = asOf || today();
+    const i = idx();
+    if (CELL_SIG !== i.sig) { CELL_CACHE = new Map(); CELL_SIG = i.sig; }
+    const key = unitId + '|' + period + '|' + asOf.getTime();
+    const hit = CELL_CACHE.get(key);
+    if (hit) return hit;
+    const res = computeCell(unitId, period, asOf);
+    CELL_CACHE.set(key, res);
+    return res;
+  }
+  function computeCell(unitId, period, asOf) {
     const cov = STATE.meta.importCoverage;
     const u = unit(unitId);
     const cs = contractsOverlappingMonth(unitId, period);
@@ -557,12 +603,18 @@
   function complianceBuckets(uset) {
     const grace = STATE.settings.graceDays;
     const perTenant = [];
+    // تجميع الدفعات على العملاء في مرور واحد — لا مسحًا كاملًا لكل عميل
+    const paysByTenant = new Map();
+    for (const p of STATE.payments) {
+      if (!p.date || (uset && !uset.has(p.unitId))) continue;
+      const c = contract(p.contractId);
+      if (!c) continue;
+      let arr = paysByTenant.get(c.tenantId);
+      if (!arr) { arr = []; paysByTenant.set(c.tenantId, arr); }
+      arr.push(p);
+    }
     for (const t of STATE.tenants) {
-      const pays = STATE.payments.filter(p => {
-        if (!p.date || (uset && !uset.has(p.unitId))) return false;
-        const c = contract(p.contractId);
-        return c && c.tenantId === t.id;
-      });
+      const pays = paysByTenant.get(t.id) || [];
       if (pays.length < 3) continue;
       let onTime = 0;
       for (const p of pays) {
@@ -588,7 +640,6 @@
     const occ = occupancy(asOf, uset);
     const ar = arrears(asOf, uset);
     const ren = renewals(90, asOf, uset);
-    const income12 = contractedRevenue(periodOf(asOf), 12, uset).total || 1;
     const collectScore = (mt.rate == null ? 0.5 : mt.rate) * 40;
     const occScore = (occ.total ? occ.occupied.length / occ.total : 0) * 25;
     const unknownPenalty = Math.min(15, ((mt.unknownDue + ar.undocumentedTotal) / Math.max(1, mt.due + mt.unknownDue)) * 15);
@@ -597,7 +648,7 @@
     const expiringPenalty = Math.min(10, expiringShare * 2.5);
     const score = Math.round(Math.max(0, Math.min(100,
       collectScore + occScore + (15 - unknownPenalty) + (10 - agingPenalty) + (10 - expiringPenalty))));
-    return { score, parts: { collectScore: Math.round(collectScore), occScore: Math.round(occScore), unknownPenalty: Math.round(unknownPenalty), agingPenalty: Math.round(agingPenalty), expiringPenalty: Math.round(expiringPenalty) }, income12 };
+    return { score, parts: { collectScore: Math.round(collectScore), occScore: Math.round(occScore), unknownPenalty: Math.round(unknownPenalty), agingPenalty: Math.round(agingPenalty), expiringPenalty: Math.round(expiringPenalty) } };
   }
 
   /* تركّز المخاطر: أكبر عميل كنسبة من دخل الشهر */
