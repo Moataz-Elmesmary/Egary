@@ -773,13 +773,48 @@
       return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
     }).join(',')).join('\r\n');
   }
-  function download(filename, text) {
-    const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+  function download(filename, text, mime) {
+    const blob = new Blob([text], { type: (mime || 'text/csv') + ';charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;
     document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  }
+
+  /* ملف Excel حقيقي بجداول منسَّقة وعناوين — يفتح مباشرة في Excel بترميز سليم.
+     sheets: [{name, title, note, head:[], rows:[[]], widths:[]}] */
+  function toExcel(sheets, docTitle) {
+    const esc = v => String(v == null ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const isNum = v => typeof v === 'number' && isFinite(v);
+    const sheetXml = sheets.map(sh => `
+  <x:ExcelWorksheet><x:Name>${esc(sh.name)}</x:Name><x:WorksheetOptions>
+    <x:DisplayRightToLeft/><x:FreezePanes/><x:FrozenNoSplit/>
+    <x:SplitHorizontal>${sh.note ? 3 : 2}</x:SplitHorizontal><x:TopRowBottomPane>${sh.note ? 3 : 2}</x:TopRowBottomPane>
+    <x:ActivePane>2</x:ActivePane><x:ProtectObjects>False</x:ProtectObjects>
+  </x:WorksheetOptions></x:ExcelWorksheet>`).join('');
+    const body = sheets.map(sh => `
+<table dir="rtl">
+  <tr><td class="t" colspan="${sh.head.length}">${esc(sh.title || sh.name)}</td></tr>
+  ${sh.note ? `<tr><td class="n" colspan="${sh.head.length}">${esc(sh.note)}</td></tr>` : ''}
+  <tr>${sh.head.map(x => `<th>${esc(x)}</th>`).join('')}</tr>
+  ${sh.rows.map(r => `<tr>${r.map(v => isNum(v)
+      ? `<td class="num">${v}</td>`
+      : `<td>${esc(v)}</td>`).join('')}</tr>`).join('\n  ')}
+</table>
+<br/>`).join('\n');
+    return `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">
+<title>${esc(docTitle || 'إيجاري')}</title>
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>${sheetXml}</x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+<style>
+ table{border-collapse:collapse;font-family:"Segoe UI",Tahoma,sans-serif;font-size:11pt}
+ td,th{border:0.5pt solid #cfcbdd;padding:5px 9px;vertical-align:middle}
+ th{background:#ede9fe;color:#3b1d80;font-weight:700;text-align:right}
+ td.t{background:#7c3aed;color:#fff;font-size:14pt;font-weight:700;text-align:right}
+ td.n{background:#f6f5fb;color:#4b4760;font-size:10pt;text-align:right}
+ td.num{text-align:left;mso-number-format:"#,##0"}
+</style></head><body>${body}</body></html>`;
   }
 
   /* ---------- الواجهة العامة ---------- */
@@ -806,6 +841,6 @@
     addUnit, addBuilding, removeDemoData, addComplaint, closeComplaint,
     setIssueStatus, updateSettings,
     // تصدير
-    toCSV, download,
+    toCSV, toExcel, download,
   };
 })();

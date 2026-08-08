@@ -1003,3 +1003,9 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
 :root[data-theme="dark"] .code-chip { color: var(--accent); background: rgba(167, 139, 250, 0.12); }
 .sug-code { color: var(--muted); font-size: 12px; direction: ltr; unicode-bidi: embed; }
 .new-client-box { grid-column: 1 / -1; border: 1px dashed var(--border); border-radius: 10px; padding: 10px 12px; display: grid; gap: 10px; }
+/* ===== أعمدة سنوات الورقة + جدول سنوات العقد ===== */
+.intake-years { display: contents; }
+.years-table td input { width: 100%; max-width: 160px; }
+.years-table tr.yr-manual td { background: var(--warning-wash); }
+:root[data-theme="dark"] .years-table tr.yr-manual td { background: rgba(250, 178, 25, 0.10); }
+.btn-sm { padding: 3px 10px; font-size: 12px; }

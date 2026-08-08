@@ -956,11 +956,12 @@
 
   function exportMatrix(year) {
     const periods = Array.from({ length: 12 }, (_, i) => year + '-' + String(i + 1).padStart(2, '0'));
-    const rows = [['المبنى', 'الوحدة', 'العميل', ...periods.map(p => Store.periodLabel(p, true))]];
+    const rows = [['كود الوحدة', 'المشروع', 'الوحدة', 'كود العميل', 'العميل', ...periods.map(p => Store.periodLabel(p, true))]];
     const asOf = Store.today();
     for (const u of filteredUnits(asOf)) {
       const tid = unitTenantIds(u).slice(-1)[0];
-      rows.push([bLabel(u.buildingId), u.name, tid ? tenantLabel(tid) : '—',
+      const t = tid ? Store.tenant(tid) : null;
+      rows.push([u.code || '', bLabel(u.buildingId), u.name, (t && t.code) || '', tid ? tenantLabel(tid) : '—',
         ...periods.map(p => (CELL_DEFS[Store.cellInfo(u.id, p, asOf).status] || CELL_DEFS.none).label)]);
     }
     Store.download(`جدول-التحصيل-${year}.csv`, Store.toCSV(rows));
@@ -1079,6 +1080,7 @@
         ]))),
       ]),
       c.deposit ? h('p.note-line', [icon('check'), ` تأمين محتجز: ${money(c.deposit.amount)}${c.deposit.note ? ' — ' + c.deposit.note : ''}`]) : null,
+      h('button.btn.btn-ghost.btn-sm', { onclick: () => ContractDoc.printContract(c) }, 'اطبع هذا العقد'),
     ]))));
     const issues = Store.state.issues.filter(q => q.status === 'open' &&
       ((q.refType === 'unit' && q.refId === u.id) ||
@@ -1185,6 +1187,10 @@
         h('td', c.deposit ? money(c.deposit.amount, { bare: true }) : '—'),
         h('td', contractStatusChip(c, asOf)),
         h('td', c.prevId ? 'تجديد' : '—'),
+        h('td', h('button.btn.btn-ghost.btn-sm', {
+          onclick: e => { e.stopPropagation(); ContractDoc.printContract(c); },
+          title: 'يفتح العقد مكتوبًا ببيانات النظام جاهزًا للطباعة',
+        }, 'اطبع العقد')),
       ]));
     });
 
@@ -1219,31 +1225,38 @@
       ])) : null,
       h('div.table-wrap', h('table.table', [
         h('thead', h('tr', [h('th', 'المبنى'), h('th', 'الوحدة'), h('th', 'العميل'), h('th', 'من'), h('th', 'إلى'),
-          h('th', 'قيمة السنة الجارية'), h('th', 'صيانة'), h('th', 'التأمين'), h('th', 'الحالة'), h('th', 'النوع')])),
-        h('tbody', rows.length ? rows : h('tr', h('td', { colspan: 10 }, emptyState('لا عقود ضمن الترشيح')))),
+          h('th', 'قيمة السنة الجارية'), h('th', 'صيانة'), h('th', 'التأمين'), h('th', 'الحالة'), h('th', 'النوع'), h('th', 'العقد')])),
+        h('tbody', rows.length ? rows : h('tr', h('td', { colspan: 11 }, emptyState('لا عقود ضمن الترشيح')))),
       ])),
     ]);
   }
 
   function exportContracts() {
-    const rows = [['المبنى', 'الوحدة', 'العميل', 'من', 'إلى', 'سنة 1', 'سنة 2', 'سنة 3', 'صيانة شهرية', 'ض.ق.م', 'التأمين', 'تجديد']];
+    // أعمدة السنوات تتمدد لأطول عقد فعلي — العقود تصل إلى عشر سنوات
+    const maxY = Store.state.contracts.reduce((m, c) => Math.max(m, (c.years || []).length), 1);
+    const yCols = Array.from({ length: maxY }, (_, i) => 'سنة ' + (i + 1));
+    const rows = [['كود المشروع', 'المشروع', 'كود الوحدة', 'الوحدة', 'كود العميل', 'العميل', 'من', 'إلى',
+      ...yCols, 'صيانة شهرية', 'ض.ق.م', 'التأمين', 'تجديد']];
     for (const c of Store.state.contracts) {
       const u = Store.unit(c.unitId);
-      rows.push([bLabel(u.buildingId), u.name, tenantLabel(c.tenantId), c.start, c.end,
-        c.years[0] ? c.years[0].rent : '', c.years[1] ? c.years[1].rent : '', c.years[2] ? c.years[2].rent : '',
+      const b = Store.building(u.buildingId) || {};
+      const t = Store.tenant(c.tenantId) || {};
+      rows.push([b.code || '', b.name || '', u.code || '', u.name, t.code || '', tenantLabel(c.tenantId), c.start, c.end,
+        ...Array.from({ length: maxY }, (_, i) => (c.years[i] ? c.years[i].rent : '')),
         c.maintenance || '', c.vat ? 'نعم' : 'لا', c.deposit ? c.deposit.amount : '', c.prevId ? 'نعم' : 'لا']);
     }
     Store.download('العقود.csv', Store.toCSV(rows));
   }
 
   /* معالج عقد جديد — الترتيب الطبيعي للمكتب: العميل ← المشروع ← وحداته الشاغرة فقط */
-  function openAddContract(presetUnitId) {
+  function openAddContract(presetUnitId, presetTenantId) {
     const s = Store.state.settings;
     const presetU = presetUnitId ? Store.unit(presetUnitId) : null;
+    const presetT = presetTenantId ? Store.tenant(presetTenantId) : null;
     const startIn = input({ type: 'date', value: Store.iso(Store.today()) });
 
     /* 1) العميل — بحث بالاسم أو الكود، أو تسجيل عميل جديد في نفس الخطوة */
-    let tenantVal = '';
+    let tenantVal = presetT ? presetT.id : '';
     const ntName = input({ type: 'text', placeholder: 'الاسم كما في البطاقة أو السجل' });
     const ntCode = input({ type: 'text', inputmode: 'numeric', placeholder: 'الرقم القومي (14 رقمًا) — أو السجل التجاري للشركات' });
     const ntPhone = input({ type: 'tel', placeholder: '01xxxxxxxxx' });
@@ -1259,7 +1272,7 @@
         ...[...Store.state.tenants].sort((a, b) => a.name.localeCompare(b.name, 'ar'))
           .map(t => ({ value: t.id, label: t.name + (t.code ? ' · ' + t.code : '') })),
       ],
-      value: '',
+      value: tenantVal,
       onPick: v => { tenantVal = v; newTenantBox.style.display = v === '__new' ? '' : 'none'; },
     });
 
@@ -1319,14 +1332,16 @@
           ? `كل وحدات المشروع (${all.length}) — غير المتاحة معلَّم سببها بجوار اسمها`
           : (free.length
             ? `${free.length} من ${all.length} وحدة متاحة في المدة المطلوبة`
-            : 'لا وحدة متاحة في هذا المشروع بهذه المدة — علِّم «عرض كل الوحدات» إن كان تجديدًا');
+            : 'لا وحدة متاحة في هذا المشروع بهذه المدة — علِّم «أظهر أيضًا الوحدات المشغولة» إن كان تجديدًا');
       if (lost) toast(`«${lost.name}» لم تعد متاحة بهذه المدة — اختر وحدة أخرى`, 'warning');
       refreshPreview();
     }
     projIn.addEventListener('change', refreshUnits);
     showAllChk.addEventListener('change', refreshUnits);
     startIn.addEventListener('input', refreshUnits);
-    const yearsIn = select({}, [1, 2, 3, 4, 5].map(n => ({ value: String(n), label: n + (n === 1 ? ' سنة' : ' سنوات') })), '1');
+    const yearsIn = select({}, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => ({
+      value: String(n), label: n === 1 ? 'سنة واحدة' : n === 2 ? 'سنتان' : n + (n <= 10 ? ' سنوات' : ' سنة'),
+    })), '1');
     const rentIn = input({ type: 'number', min: 0, step: 'any', placeholder: s.rentBasis === 'monthly' ? 'الإيجار الشهري للسنة الأولى' : 'الإيجار السنوي للسنة الأولى' });
     const incIn = input({ type: 'number', min: 0, max: 100, step: 'any', value: s.defaultIncreasePct });
     const dueDayIn = input({ type: 'number', min: 1, max: 28, value: 1 });
@@ -1335,20 +1350,48 @@
     const depIn = input({ type: 'number', min: 0, step: 'any', placeholder: 'اختياري' });
     const preview = h('div.years-preview');
 
+    /* جدول السنوات: يُملأ بالنسبة تلقائيًا، وأي سنة تكتبها بيدك تُحترم ولا تُدهس */
+    let yearVals = [], manual = [];
+    function recalcYears() {
+      const n = Number(yearsIn.value) || 1, r0 = Number(rentIn.value) || 0, inc = Number(incIn.value) / 100;
+      const out = [];
+      for (let i = 0; i < n; i++) {
+        if (i === 0) out.push(r0);
+        else if (manual[i] && yearVals[i] > 0) out.push(yearVals[i]);
+        else out.push(Math.round(out[i - 1] * (1 + inc)));
+      }
+      yearVals = out;
+      manual.length = n;
+    }
+
     function refreshPreview() {
       preview.innerHTML = '';
-      const n = Number(yearsIn.value), r0 = Number(rentIn.value), inc = Number(incIn.value) / 100;
-      if (!r0) { preview.appendChild(h('p.field-hint', 'أدخل قيمة السنة الأولى لتوليد الجدول.')); return; }
-      const rowsEl = [];
-      let r = r0;
-      for (let i = 0; i < n; i++) {
-        if (i > 0) r = Math.round(r * (1 + inc));
-        rowsEl.push(h('tr', [h('td', 'سنة ' + (i + 1)), h('td', money(r))]));
-      }
-      preview.appendChild(h('table.table.table-mini', [
-        h('thead', h('tr', [h('th', 'السنة'), h('th', 'القيمة (' + (s.rentBasis === 'monthly' ? 'شهري' : 'سنوي') + ')')])),
+      recalcYears();
+      const n = yearVals.length;
+      if (!yearVals[0]) { preview.appendChild(h('p.field-hint', 'أدخل قيمة السنة الأولى لتوليد الجدول.')); return; }
+      const anyManual = manual.some(Boolean);
+      const rowsEl = yearVals.map((v, i) => {
+        if (i === 0) return h('tr', [h('td', 'سنة 1'), h('td', money(v)), h('td', h('span.mut', 'من خانة قيمة السنة الأولى'))]);
+        const cell = input({ type: 'number', min: 0, step: 'any', value: v, 'aria-label': 'قيمة سنة ' + (i + 1) });
+        cell.addEventListener('input', () => {
+          const nv = Number(cell.value);
+          manual[i] = cell.value !== '' && nv > 0;
+          yearVals[i] = nv;
+          refreshPreview();
+        });
+        return h('tr' + (manual[i] ? '.yr-manual' : ''), [
+          h('td', 'سنة ' + (i + 1)), h('td', cell),
+          h('td', manual[i] ? h('span.chip.chip-warning', 'قيمة مكتوبة') : h('span.mut', 'بزيادة ' + (Number(incIn.value) || 0) + '٪')),
+        ]);
+      });
+      preview.appendChild(h('table.table.table-mini.years-table', [
+        h('thead', h('tr', [h('th', 'السنة'), h('th', 'القيمة (' + (s.rentBasis === 'monthly' ? 'شهري' : 'سنوي') + ')'), h('th', 'مصدرها')])),
         h('tbody', rowsEl),
       ]));
+      preview.appendChild(h('p.field-hint', 'اكتب قيمة أي سنة كما وردت في العقد ولن يعيد النظام حسابها — والسنوات التي تليها تُبنى عليها.'));
+      if (anyManual) preview.appendChild(h('button.btn.btn-ghost', {
+        onclick: () => { manual = []; refreshPreview(); },
+      }, 'أعِد حساب كل السنوات بالنسبة'));
       const uid = unitIn.value, st = startIn.value;
       const uSel = uid ? Store.unit(uid) : null;
       if (st && uSel) {
@@ -1376,7 +1419,8 @@
         field('عدد السنوات', yearsIn),
         field('المشروع', projIn),
         field('الوحدة', unitIn), unitHint,
-        h('label.radio-row', [showAllChk, h('span', 'عرض كل الوحدات (لتسجيل تجديد على وحدة عليها عقد)')]),
+        h('label.radio-row', [showAllChk, h('span', 'أظهر أيضًا الوحدات المشغولة')]),
+        h('p.field-hint', 'القائمة أعلاه تعرض الوحدات المتاحة في المدة المطلوبة فقط. علِّم هذا الخيار إن كنت تريد الاختيار من كل وحدات المشروع — مع سبب انشغال كل وحدة بجوار اسمها.'),
         field('قيمة السنة الأولى', rentIn, 'أساس الحساب الحالي: ' + (s.rentBasis === 'monthly' ? 'شهري' : 'سنوي')),
         field('نسبة الزيادة السنوية ٪', incIn, 'النمط الملاحظ في عقودكم: 10٪'),
         field('يوم الاستحقاق في الشهر', dueDayIn, 'التأخير يُحسب من هذا اليوم'),
@@ -1391,7 +1435,7 @@
         onclick: () => {
           const r0 = Number(rentIn.value);
           if (!tenantVal) { toast('اختر العميل أولًا — أو سجِّل عميلًا جديدًا من نفس القائمة', 'warning'); return; }
-          if (!unitIn.value) { toast('اختر الوحدة — غيِّر المشروع أو علِّم «عرض كل الوحدات»', 'warning'); return; }
+          if (!unitIn.value) { toast('اختر الوحدة — غيِّر المشروع أو علِّم «أظهر أيضًا الوحدات المشغولة»', 'warning'); return; }
           if (!r0 || r0 <= 0 || !startIn.value) { toast('أكمل تاريخ البداية وقيمة سنة أولى موجبة', 'warning'); return; }
           if (Number(depIn.value) < 0 || Number(mntIn.value) < 0 || Number(incIn.value) < 0) { toast('لا تُقبل قيم سالبة', 'warning'); return; }
           // عقدان متداخلان على وحدة واحدة يجعلان أشهر التداخل تُحسب على الأقدم وحده — نمنعه صراحةً
@@ -1414,9 +1458,9 @@
             }
             tenantId = Store.addTenant({ name: nm, code, phone: ntPhone.value.trim() }).id;
           }
-          const n = Number(yearsIn.value), inc = Number(incIn.value) / 100;
-          const years = []; let r = r0;
-          for (let i = 0; i < n; i++) { if (i > 0) r = Math.round(r * (1 + inc)); years.push({ rent: r }); }
+          recalcYears();
+          if (yearVals.some(v => !v || v <= 0)) { toast('أكمل قيمة كل سنة في جدول السنوات', 'warning'); return; }
+          const years = yearVals.map(v => ({ rent: v }));
           const prev = Store.unitContracts(unitIn.value).slice(-1)[0];
           Store.addContract({
             unitId: unitIn.value, tenantId, start: startIn.value, years,
@@ -1461,6 +1505,30 @@
         h('td', t.note || '—'),
       ]));
     });
+
+    /* عميل سُجِّل ولم يُوقَّع له عقد بعد لا يرتبط بأي وحدة، فلا يظهر في الجدول أعلاه —
+       يُعرَض هنا صراحةً حتى لا يبدو أن تسجيله ضاع، مع زر يفتح له عقدًا مباشرة */
+    const q = (F().q || '').trim();
+    const pending = Store.state.tenants
+      .filter(t => !tenantUnitIds(t).length)
+      .filter(t => !q || UI.arMatch([t.name, t.code || '', t.phone || ''].join(' '), q));
+    const pendingCard = pending.length ? sectionCard(`عملاء مسجَّلون بلا عقود بعد (${pending.length})`, h('div', [
+      h('p.step-hint', 'هؤلاء أدخلتَ بياناتهم ولم تُسجَّل لهم عقود، لذلك لا وحدات ولا متأخرات لهم. يظهرون هنا دائمًا مهما كان الترشيح.'),
+      h('div.mini-scroll', h('table.table.table-mini', [
+        h('thead', h('tr', [h('th', 'الاسم'), h('th', 'الكود (الرقم القومي)'), h('th', 'النوع'), h('th', 'الهاتف'), h('th', '')])),
+        h('tbody', pending.map(t => h('tr', [
+          h('td', h('b', t.name)),
+          h('td', t.code ? h('code.code-chip', t.code) : h('span.val-warning', 'غير مسجَّل')),
+          h('td', t.kind || '—'),
+          h('td', t.phone || h('span.val-warning', 'غير مسجّل')),
+          h('td', h('span.btn-row', [
+            h('button.btn.btn-ghost', { onclick: () => openTenantDrawer(t) }, 'بياناته'),
+            App.canEdit() ? h('button.btn.btn-primary', { onclick: () => openAddContract(null, t.id) }, 'سجِّل له عقدًا') : null,
+          ])),
+        ]))),
+      ])),
+    ])) : null;
+
     return h('div.view', [
       pageHead('العملاء', 'أرصدة المتأخرات محسوبة من جدول التحصيل مباشرة.', [
         App.canEdit() ? h('button.btn.btn-primary', { onclick: () => openTenantDrawer(null) }, [icon('plus'), ' عميل جديد']) : null,
@@ -1468,8 +1536,9 @@
       demoBanner(),
       h('div.table-wrap', h('table.table', [
         h('thead', h('tr', [h('th', 'الاسم'), h('th', 'الكود (الرقم القومي)'), h('th', 'النوع'), h('th', 'الوحدات'), h('th', 'الهاتف'), h('th', 'متأخرات'), h('th', 'ملاحظات')])),
-        h('tbody', rows.length ? rows : h('tr', h('td', { colspan: 7 }, emptyState('لا عملاء ضمن الترشيح')))),
+        h('tbody', rows.length ? rows : h('tr', h('td', { colspan: 7 }, emptyState('لا عملاء لهم عقود ضمن الترشيح')))),
       ])),
+      pendingCard,
     ]);
   }
 
@@ -1627,6 +1696,7 @@
 
     openDrawer('ملف العميل', [
       h('h3.tp-name', t.name),
+      unitIds.length ? null : h('p.note-line', 'لا عقود مسجَّلة لهذا العميل بعد — بياناته محفوظة، وسيظهر في الجدول الرئيسي بمجرد تسجيل أول عقد له.'),
       ...unitLines,
       facts,
       h('h4.tp-sub', 'سجل السداد شهرًا بشهر'),
@@ -1638,14 +1708,18 @@
       h('h4.tp-sub', 'تعديل البيانات'),
       formGrid,
     ], [
-      App.canEdit() ? h('button.btn.btn-primary', {
-        onclick: () => {
-          closeDrawer();
-          const u0 = Store.unit(unitIds[0]);
-          App.filters = { b: u0 ? u0.buildingId : '', ty: '', tn: t.id, st: '', q: '' };
-          location.hash = '#matrix'; App.render();
-        },
-      }, 'تسجيل دفعة في جدول التحصيل') : null,
+      App.canEdit() ? (unitIds.length
+        ? h('button.btn.btn-primary', {
+            onclick: () => {
+              closeDrawer();
+              const u0 = Store.unit(unitIds[0]);
+              App.filters = { b: u0 ? u0.buildingId : '', ty: '', tn: t.id, st: '', q: '' };
+              location.hash = '#matrix'; App.render();
+            },
+          }, 'تسجيل دفعة في جدول التحصيل')
+        : h('button.btn.btn-primary', {
+            onclick: () => { closeDrawer(); openAddContract(null, t.id); },
+          }, 'سجِّل له عقدًا')) : null,
       App.canEdit() ? saveBtn : null,
       h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إغلاق'),
     ]);
@@ -1820,17 +1894,154 @@
     const vatIn = input({ type: 'number', min: 0, max: 30, value: s.vatPct });
     vatIn.addEventListener('change', () => { Store.updateSettings({ vatPct: Number(vatIn.value) || 0 }); });
 
+    /* تقرير Excel شامل: أوراق مستقلة بعناوين وشروح — الأرقام أرقام لا نصوص */
+    function exportWorkbook() {
+      const asOf = Store.today();
+      const m = Store.periodOf(asOf);
+      const prevM = Store.addMonths(m, -1);
+      const ar = Store.arrears(asOf);
+      const vac = Store.vacancyInfo(asOf);
+      const uCode = id => (Store.unit(id) || {}).code || '';
+      const bOf = id => bLabel((Store.unit(id) || {}).buildingId);
+      const sheets = [];
+
+      // 1) ملخص المشاريع
+      sheets.push({
+        name: 'ملخص المشاريع',
+        title: `إيجاري — ملخص المشاريع حتى ${shortDate(Store.iso(asOf))}`,
+        note: `شهر التقرير: ${Store.periodLabel(prevM, true)} (آخر شهر مكتمل) · الأرقام محسوبة من العقود والدفعات المسجَّلة`,
+        head: ['كود المشروع', 'المشروع', 'المالك', 'عدد الوحدات', 'مؤجَّرة', 'شاغرة', 'إيجارات الشهر', 'المحصَّل', 'نسبة التحصيل %', 'المتأخرات', 'خسارة الشواغر شهريًا'],
+        rows: Store.state.buildings.map(b => {
+          const st = Store.projectStats(b.id, prevM, asOf);
+          const uset = new Set(Store.state.units.filter(u => u.buildingId === b.id).map(u => u.id));
+          const a = Store.arrears(asOf, uset);
+          const v = Store.vacancyInfo(asOf, uset);
+          return [b.code || '', b.name, b.owner || '—', st.units, st.rented, st.units - st.rented,
+            st.due || 0, st.collected || 0, st.rate == null ? '—' : Math.round(st.rate * 100),
+            a.total, v.totalMonthly || 0];
+        }),
+      });
+
+      // 2) العقود
+      const maxY = Store.state.contracts.reduce((mx, c) => Math.max(mx, (c.years || []).length), 1);
+      sheets.push({
+        name: 'العقود',
+        title: 'العقود المسجَّلة — بقيم كل سنة',
+        note: 'كل صف عقد مستقل؛ التجديد عقد جديد مربوط بسابقه ولا يُعدَّل القديم',
+        head: ['كود المشروع', 'المشروع', 'كود الوحدة', 'الوحدة', 'كود العميل', 'العميل', 'من', 'إلى', 'المدة (سنوات)',
+          ...Array.from({ length: maxY }, (_, i) => `قيمة سنة ${i + 1}`), 'الصيانة الشهرية', 'ض.ق.م', 'التأمين', 'الحالة', 'النوع'],
+        rows: Store.state.contracts.map(c => {
+          const u = Store.unit(c.unitId) || {}, b = Store.building(u.buildingId) || {}, t = Store.tenant(c.tenantId) || {};
+          const ended = Store.d(c.end) < asOf;
+          const started = Store.d(c.start) > asOf;
+          return [b.code || '', b.name || '', u.code || '', u.name || '', t.code || '', t.name || '',
+            c.start, c.end, (c.years || []).length,
+            ...Array.from({ length: maxY }, (_, i) => (c.years[i] ? c.years[i].rent : '')),
+            c.maintenance || 0, c.vat ? 'خاضع' : 'غير خاضع', c.deposit ? c.deposit.amount : 0,
+            started ? 'مستقبلي' : ended ? 'منتهٍ' : 'ساري', c.prevId ? 'تجديد' : 'جديد'];
+        }),
+      });
+
+      // 3) العملاء
+      sheets.push({
+        name: 'العملاء',
+        title: 'العملاء وأرصدتهم',
+        note: 'المتأخرات منسوبة لصاحب العقد في كل شهر — لا لكل من استأجر الوحدة سابقًا',
+        head: ['الاسم', 'الكود (الرقم القومي)', 'النوع', 'الهاتف', 'عدد الوحدات', 'الوحدات', 'المتأخرات', 'أشهر بقيمة مجهولة', 'ملاحظات'],
+        rows: Store.state.tenants.map(t => {
+          const ids = tenantUnitIds(t);
+          const mine = r => ids.includes(r.unitId) && (r.contract ? r.contract.tenantId === t.id : ORPHAN_TENANT[r.unitId] === t.id);
+          return [t.name, t.code || '', t.kind || '', t.phone || '', ids.length,
+            ids.map(id => (Store.unit(id) || {}).code || unitLabel(id)).join(' · ') || '—',
+            ar.rows.filter(mine).reduce((s2, r) => s2 + r.amount, 0),
+            ar.unknowns.filter(mine).length, t.note || ''];
+        }),
+      });
+
+      // 4) المتأخرات
+      sheets.push({
+        name: 'المتأخرات',
+        title: `المتأخرات المؤكدة حتى ${shortDate(Store.iso(asOf))}`,
+        note: `الإجمالي ${money(ar.total)} · بالإضافة إلى ${ar.unknowns.length} شهرًا بقيمة غير معروفة (بلا عقد مسجَّل)`,
+        head: ['كود الوحدة', 'المشروع', 'الوحدة', 'العميل', 'الشهر', 'المستحق', 'المسدَّد', 'المتبقي', 'أيام التأخير', 'الشريحة'],
+        rows: [
+          ...ar.rows.map(r => [uCode(r.unitId), bOf(r.unitId), unitLabel(r.unitId),
+            r.contract ? tenantLabel(r.contract.tenantId) : (ORPHAN_TENANT[r.unitId] ? tenantLabel(ORPHAN_TENANT[r.unitId]) : '—'),
+            Store.periodLabel(r.period, true), r.due ? r.due.amount : 0, r.paid, r.amount, r.overdueDays,
+            r.overdueDays <= 30 ? '1–30 يوم' : r.overdueDays <= 60 ? '31–60 يوم' : r.overdueDays <= 90 ? '61–90 يوم' : 'أكثر من 90 يوم']),
+          ...ar.unknowns.map(r => [uCode(r.unitId), bOf(r.unitId), unitLabel(r.unitId),
+            ORPHAN_TENANT[r.unitId] ? tenantLabel(ORPHAN_TENANT[r.unitId]) : '—',
+            Store.periodLabel(r.period, true), 'غير معروف', 0, 'غير معروف', r.overdueDays, 'بلا عقد مسجَّل']),
+        ],
+      });
+
+      // 5) جدول التحصيل للسنة
+      const year = VS.matrixYear;
+      const periods = Array.from({ length: 12 }, (_, i) => year + '-' + String(i + 1).padStart(2, '0'));
+      sheets.push({
+        name: 'جدول التحصيل ' + year,
+        title: `جدول التحصيل — سنة ${year}`,
+        note: 'حالة كل وحدة في كل شهر: سُدِّد / سُدِّد متأخرًا / جزئي / متأخر / يحتاج تأكيدًا / خارج العقد',
+        head: ['كود الوحدة', 'المشروع', 'الوحدة', 'العميل', ...periods.map(p => Store.periodLabel(p, true))],
+        rows: Store.state.units.map(u => {
+          const tid = unitTenantIds(u).slice(-1)[0];
+          return [u.code || '', bLabel(u.buildingId), u.name, tid ? tenantLabel(tid) : '—',
+            ...periods.map(p => (CELL_DEFS[Store.cellInfo(u.id, p, asOf).status] || CELL_DEFS.none).label)];
+        }),
+      });
+
+      // 6) الدفعات
+      sheets.push({
+        name: 'الدفعات',
+        title: 'الدفعات الموثَّقة (بمبلغ وتاريخ)',
+        note: 'لا تشمل علامات ✓ المنقولة من ورقة المالك — تلك بلا مبلغ ولا تاريخ',
+        head: ['كود الوحدة', 'المشروع', 'الوحدة', 'العميل', 'الشهر', 'المبلغ', 'تاريخ السداد', 'الطريقة', 'رقم الإيصال', 'ملاحظات'],
+        rows: Store.state.payments.map(p => {
+          const tid = unitTenantIds(Store.unit(p.unitId) || {}).slice(-1)[0];
+          return [uCode(p.unitId), bOf(p.unitId), unitLabel(p.unitId), tid ? tenantLabel(tid) : '—',
+            Store.periodLabel(p.period, true), p.amount, p.date || '', p.method || '', p.receiptNo || '', p.notes || ''];
+        }),
+      });
+
+      // 7) الوحدات الشاغرة
+      sheets.push({
+        name: 'الوحدات الشاغرة',
+        title: 'الوحدات الشاغرة وخسارتها',
+        note: 'الخسارة الشهرية تقدير معلن الأساس: آخر إيجار للوحدة نفسها، أو متوسط إيجار وحدات نوعها',
+        head: ['كود الوحدة', 'المشروع', 'الوحدة', 'النوع', 'شاغرة منذ', 'عدد الأشهر', 'خسارة شهرية تقديرية', 'أساس التقدير', 'الفاقد حتى الآن'],
+        rows: vac.rows.map(r => [r.unit.code || '', bLabel(r.unit.buildingId), r.unit.name, r.unit.type,
+          r.since ? shortDate(r.since) : 'لم تؤجَّر من قبل', r.months == null ? '' : r.months,
+          r.estMonthly || 0, r.src || '—', r.accumLoss || 0]),
+      });
+
+      // 8) مراجعات مطلوبة
+      sheets.push({
+        name: 'مراجعات مطلوبة',
+        title: 'بنود تحتاج ردَّ المالك',
+        note: 'كل بند: النص الحرفي من المصدر + التفسير المتَّبع + السؤال المطلوب حسمه',
+        head: ['الحالة', 'الخطورة', 'البند', 'التفصيل', 'المطلوب', 'رد المالك'],
+        rows: Store.state.issues.map(q => [q.status === 'open' ? 'مفتوح' : 'محسوم',
+          ({ critical: 'حرجة', high: 'عالية', medium: 'متوسطة', low: 'منخفضة' })[q.severity] || q.severity,
+          q.title, q.detail || '', q.action || '', q.resolution || '']),
+      });
+
+      Store.download(`إيجاري — التقرير الشامل ${Store.iso(asOf)}.xls`,
+        Store.toExcel(sheets, 'إيجاري — التقرير الشامل'), 'application/vnd.ms-excel');
+      toast('نُزِّل التقرير الشامل — افتحه بـ Excel');
+    }
+
     function exportArrears() {
       const ar = Store.arrears(Store.today());
-      const rows = [['المبنى', 'الوحدة', 'الشهر', 'المستحق', 'المسدَّد', 'المتبقي', 'أيام التأخير']];
-      for (const r of ar.rows) rows.push([bLabel(Store.unit(r.unitId).buildingId), unitLabel(r.unitId), Store.periodLabel(r.period, true),
+      const uCode = id => (Store.unit(id) || {}).code || '';
+      const rows = [['كود الوحدة', 'المشروع', 'الوحدة', 'الشهر', 'المستحق', 'المسدَّد', 'المتبقي', 'أيام التأخير']];
+      for (const r of ar.rows) rows.push([uCode(r.unitId), bLabel(Store.unit(r.unitId).buildingId), unitLabel(r.unitId), Store.periodLabel(r.period, true),
         r.due ? r.due.amount : '', r.paid, r.amount, r.overdueDays]);
-      for (const r of ar.unknowns) rows.push([bLabel(Store.unit(r.unitId).buildingId), unitLabel(r.unitId), Store.periodLabel(r.period, true), 'غير معروف', 0, 'غير معروف', r.overdueDays]);
+      for (const r of ar.unknowns) rows.push([uCode(r.unitId), bLabel(Store.unit(r.unitId).buildingId), unitLabel(r.unitId), Store.periodLabel(r.period, true), 'غير معروف', 0, 'غير معروف', r.overdueDays]);
       Store.download('المتأخرات.csv', Store.toCSV(rows));
     }
     function exportPayments() {
-      const rows = [['المبنى', 'الوحدة', 'الشهر', 'المبلغ', 'التاريخ', 'الطريقة', 'رقم الإيصال', 'ملاحظات']];
-      for (const p of Store.state.payments) rows.push([bLabel(Store.unit(p.unitId).buildingId), unitLabel(p.unitId), Store.periodLabel(p.period, true),
+      const rows = [['كود الوحدة', 'المشروع', 'الوحدة', 'الشهر', 'المبلغ', 'التاريخ', 'الطريقة', 'رقم الإيصال', 'ملاحظات']];
+      for (const p of Store.state.payments) rows.push([(Store.unit(p.unitId) || {}).code || '', bLabel(Store.unit(p.unitId).buildingId), unitLabel(p.unitId), Store.periodLabel(p.period, true),
         p.amount, p.date || '', p.method, p.receiptNo, p.notes]);
       Store.download('الدفعات-المسجلة.csv', Store.toCSV(rows));
     }
@@ -1877,11 +2088,18 @@
         field('نسبة الزيادة السنوية الافتراضية ٪', incIn, 'تُستخدم في توليد جدول سنوات العقود الجديدة'),
         field('نسبة ضريبة القيمة المضافة ٪', vatIn, 'تُطبق على العقود المُعلَّمة «خاضع» فقط'),
       ])),
-      sectionCard('تصدير التقارير (CSV يفتح في Excel)', h('div.btn-row', [
-        h('button.btn.btn-ghost', { onclick: exportArrears }, [icon('download'), ' المتأخرات']),
-        h('button.btn.btn-ghost', { onclick: () => exportMatrix(VS.matrixYear) }, [icon('download'), ' جدول ' + VS.matrixYear]),
-        h('button.btn.btn-ghost', { onclick: exportContracts }, [icon('download'), ' العقود']),
-        h('button.btn.btn-ghost', { onclick: exportPayments }, [icon('download'), ' الدفعات المسجَّلة']),
+      sectionCard('تصدير التقارير', h('div', [
+        h('p.step-hint', 'التقرير الشامل ملف Excel واحد بأوراق منفصلة منسَّقة وجاهزة للعرض على المالك. وبجانبه تصديرات مفردة بصيغة CSV لمن يريد بيانات خامًا.'),
+        h('div.btn-row', [
+          h('button.btn.btn-primary', { onclick: exportWorkbook }, [icon('download'), ' التقرير الشامل (Excel)']),
+        ]),
+        h('h4.drawer-sec', 'تصديرات مفردة (CSV)'),
+        h('div.btn-row', [
+          h('button.btn.btn-ghost', { onclick: exportArrears }, [icon('download'), ' المتأخرات']),
+          h('button.btn.btn-ghost', { onclick: () => exportMatrix(VS.matrixYear) }, [icon('download'), ' جدول ' + VS.matrixYear]),
+          h('button.btn.btn-ghost', { onclick: exportContracts }, [icon('download'), ' العقود']),
+          h('button.btn.btn-ghost', { onclick: exportPayments }, [icon('download'), ' الدفعات المسجَّلة']),
+        ]),
       ])),
       sectionCard('البيانات', h('div.settings-block', [
         h('p', ['مصدر الكشف الفعلي: ', h('b', Store.state.meta.sourceName), ` — التغطية ${Store.periodLabel(Store.state.meta.importCoverage.from, true)} حتى ${Store.periodLabel(Store.state.meta.importCoverage.to, true)}. `,
@@ -2233,31 +2451,44 @@
       const tyIn = input({ type: 'text', list: 'ij-types', placeholder: 'اكتب أي نوع…', value: '' });
       const dl = h('datalist#ij-types', existingTypes.map(t => h('option', { value: t })));
       const fromIn = input({ type: 'date' });
-      const r1In = input({ type: 'number', min: 0, placeholder: 'عمود «1»' });
-      const r2In = input({ type: 'number', min: 0, placeholder: 'عمود «2» — اختياري' });
-      const r3In = input({ type: 'number', min: 0, placeholder: 'عمود «3» — اختياري' });
+      /* أعمدة السنوات كما في الورقة — تبدأ بثلاثة وتتمدد لما تكون مدة العقد أطول (حتى عشر) */
+      const yearIns = [];
+      const yearsBox = h('div.intake-years');
+      const endPrev = h('span.field-hint');
+      const addYearBtn = h('button.btn.btn-ghost', { onclick: () => { addYearCol(); refreshEnd(); } }, '+ عمود سنة');
+      function addYearCol() {
+        if (yearIns.length >= 10) { toast('أقصى مدة عشر سنوات', 'warning'); return; }
+        const i = yearIns.length;
+        const el = input({ type: 'number', min: 0, placeholder: `عمود «${i + 1}»${i ? ' — اختياري' : ''}` });
+        el.addEventListener('input', refreshEnd);
+        yearIns.push(el);
+        yearsBox.appendChild(field('قيمة السنة ' + (i + 1), el));
+        addYearBtn.textContent = yearIns.length >= 10 ? 'اكتملت عشر سنوات' : '+ عمود سنة';
+        addYearBtn.disabled = yearIns.length >= 10;
+      }
+      for (let i = 0; i < 3; i++) addYearCol();
       const depIn = input({ type: 'number', min: 0, placeholder: 'إن ذُكر في الملاحظات' });
       const noteIn = input({ type: 'text', placeholder: 'عمود «ملاحظات» بنصّه' });
-      const endPrev = h('span.field-hint');
       function refreshEnd() {
-        const nY = [r1In, r2In, r3In].filter(x => Number(x.value) > 0).length;
+        const nY = yearIns.filter(x => Number(x.value) > 0).length;
         if (fromIn.value && nY) {
           const [y, mo, dd] = fromIn.value.split('-').map(Number);
           const end = new Date(Date.UTC(y + nY, mo - 1, dd)); end.setUTCDate(end.getUTCDate() - 1);
           endPrev.textContent = `النهاية تلقائيًا: ${shortDate(Store.iso(end))} (${nY} ${nY === 1 ? 'سنة' : 'سنوات'})`;
         } else endPrev.textContent = 'أدخل البداية وقيمة سنة واحدة على الأقل';
       }
-      [fromIn, r1In, r2In, r3In].forEach(x => x.addEventListener('input', refreshEnd));
+      fromIn.addEventListener('input', refreshEnd);
       refreshEnd();
       const fill10 = h('button.btn.btn-ghost', {
         onclick: () => {
-          const r1 = Number(r1In.value);
+          const r1 = Number(yearIns[0].value);
           if (!r1) { toast('أدخل قيمة السنة 1 أولًا', 'warning'); return; }
-          if (!r2In.value) r2In.value = Math.round(r1 * 1.1);
-          if (!r3In.value) r3In.value = Math.round(Number(r2In.value) * 1.1);
+          for (let i = 1; i < yearIns.length; i++) {
+            if (!yearIns[i].value) yearIns[i].value = Math.round(Number(yearIns[i - 1].value) * 1.1);
+          }
           refreshEnd();
         },
-      }, 'املأ 2 و3 بزيادة 10٪ (النمط السائد)');
+      }, 'املأ باقي السنوات بزيادة 10٪ (النمط السائد)');
 
       const bUnits = Store.state.units.filter(u => u.buildingId === bid);
       const rowsTable = bUnits.length
@@ -2282,14 +2513,15 @@
 
       step2 = sectionCard(`الخطوة 2 — صفوف الورقة (${bUnits.length})`, h('div', [
         dl,
-        h('p.step-hint', 'نفس أعمدة الورقة بالظبط: اسم العميل · الوحدة · من · قيم السنوات 1/2/3 (' +
-          (s.rentBasis === 'monthly' ? 'شهري' : 'سنوي') + ' — بنص البند الثالث في العقد) · ملاحظات. ما لم يُدوَّن في الورقة اتركه فارغًا — الفراغ معلومة لا خطأ.'),
+        h('p.step-hint', 'نفس أعمدة الورقة بالظبط: اسم العميل · الوحدة · من · قيم السنوات (' +
+          (s.rentBasis === 'monthly' ? 'شهري' : 'سنوي') + ' — بنص البند الثالث في العقد) · ملاحظات. ثلاثة أعمدة كما في ورقتك، وزِد أعمدة إن كان العقد أطول. ما لم يُدوَّن في الورقة اتركه فارغًا — الفراغ معلومة لا خطأ.'),
         h('div.intake-grid', [
           field('اسم العميل', tIn), field('الوحدة', uIn), field('النوع', tyIn, 'اكتب أي نوع جديد بحرّية'),
-          field('من (بداية العقد)', fromIn, ''), field('قيمة السنة 1', r1In),
-          field('قيمة السنة 2', r2In), field('قيمة السنة 3', r3In),
+          field('من (بداية العقد)', fromIn, ''),
           field('التأمين', depIn), field('ملاحظات', noteIn),
         ]),
+        h('div.intake-grid', yearsBox),
+        h('div.btn-row', [addYearBtn]),
         h('p.field-hint', endPrev),
         h('div.btn-row', [
           h('button.btn.btn-primary', {
@@ -2301,7 +2533,7 @@
                 type: tyIn.value.trim() || 'غير محدد',
                 note: noteIn.value.trim(),
               });
-              const years = [r1In, r2In, r3In].map(x => Number(x.value)).filter(v => v > 0).map(v => ({ rent: v }));
+              const years = yearIns.map(x => Number(x.value)).filter(v => v > 0).map(v => ({ rent: v }));
               if (tIn.value.trim() && fromIn.value && years.length) {
                 const tenant = Store.addTenant({ name: tIn.value.trim() });
                 Store.addContract({ unitId: unit.id, tenantId: tenant.id, start: fromIn.value, years, deposit: depIn.value || null });
@@ -2309,7 +2541,7 @@
               } else {
                 toast('أُضيف الصف ناقصًا — سيظهر «بلا عقد مسجّل» حتى تُستكمل بياناته');
               }
-              [tIn, uIn, r1In, r2In, r3In, depIn, noteIn].forEach(x => x.value = '');
+              [tIn, uIn, depIn, noteIn, ...yearIns].forEach(x => x.value = '');
               App.render();
             },
           }, [icon('plus'), ' أضف الصف']),
@@ -2367,7 +2599,9 @@
         ['مشروع جديد (ورقة كاملة)', '«إضافة مشروع جديد»', 'اسم المالك ← صفوف الورقة ← نقل علامات ✓/✗'],
         ['دفعة شهر واحد', 'جدول التحصيل', 'اضغط خلية الشهر ← المبلغ مُعبَّأ بالمتبقي ← احفظ'],
         ['سداد شهر كامل (دفعة واحدة للجميع)', 'جدول التحصيل ← «سداد جماعي»', 'حدِّد من سدَّدوا ← تاريخ وطريقة موحَّدان ← حفظ'],
-        ['عقد جديد أو تجديد', 'العقود ← «عقد جديد» أو زر «+ إدخال»', 'العميل (بالاسم أو الرقم القومي) ← المشروع ← وحدة شاغرة ← البداية وقيمة السنة الأولى — جدول السنوات يتولَّد'],
+        ['عقد جديد أو تجديد', 'العقود ← «عقد جديد» أو زر «+ إدخال»', 'العميل (بالاسم أو الرقم القومي) ← البداية والمدة (حتى 10 سنوات) ← المشروع ← وحدة متاحة ← قيمة السنة الأولى — وباقي السنوات تتولَّد بالنسبة أو تكتبها بيدك'],
+        ['طباعة العقد بعد تسجيله', 'العقود ← عمود «العقد» ← «اطبع العقد»', 'يُكتب العقد ببنوده من بيانات النظام ويفتح جاهزًا للطباعة أو الحفظ PDF'],
+        ['تقرير شامل للمالك', 'الإعدادات ← «التقرير الشامل (Excel)»', 'ملف Excel واحد بأوراق منسَّقة: المشاريع والعقود والعملاء والمتأخرات والتحصيل والدفعات والشواغر والمراجعات'],
         ['وحدة داخل مشروع قائم', 'الوحدات ← «وحدة جديدة»', 'اختر المشروع ← الاسم والنوع'],
         ['عميل أو تعديل بياناته', 'العملاء', 'اضغط الصف للتعديل أو «عميل جديد»'],
         ['شكوى صيانة', 'الشكاوى ← «شكوى جديدة»', 'الوحدة ← التصنيف والتكلفة ومن يتحمَّلها'],
@@ -2562,13 +2796,59 @@
     'يُولَّد تلقائيًا عند إضافة وحدة': 'Generated automatically when a unit is added',
     'الرقم القومي (14 رقمًا) أو السجل التجاري': 'National ID (14 digits) or commercial registry',
     'تُدخله عند تسجيل العميل — والنظام يمنع تكراره لعميلَين': 'You enter it when registering the client — the system prevents two clients sharing one code',
-    'العميل (بالاسم أو الرقم القومي) ← المشروع ← وحدة شاغرة ← البداية وقيمة السنة الأولى — جدول السنوات يتولَّد':
-      'Client (by name or national ID) → project → a vacant unit → start date and first-year rent — the year schedule is generated',
+    'العميل (بالاسم أو الرقم القومي) ← البداية والمدة (حتى 10 سنوات) ← المشروع ← وحدة متاحة ← قيمة السنة الأولى — وباقي السنوات تتولَّد بالنسبة أو تكتبها بيدك':
+      'Client (by name or national ID) → start date and term (up to 10 years) → project → an available unit → first-year rent — the remaining years are generated from the percentage or typed in by hand',
+    /* جدول السنوات المرن + الوحدات المشغولة + العملاء بلا عقود */
+    'أظهر أيضًا الوحدات المشغولة': 'Also show occupied units',
+    'القائمة أعلاه تعرض الوحدات المتاحة في المدة المطلوبة فقط. علِّم هذا الخيار إن كنت تريد الاختيار من كل وحدات المشروع — مع سبب انشغال كل وحدة بجوار اسمها.':
+      'The list above shows only units available for the requested term. Tick this to choose from every unit in the project — each occupied one shows why next to its name.',
+    'اختر الوحدة — غيِّر المشروع أو علِّم «أظهر أيضًا الوحدات المشغولة»': 'Choose the unit — switch project or tick “Also show occupied units”',
+    'لا وحدة متاحة في هذا المشروع بهذه المدة — علِّم «أظهر أيضًا الوحدات المشغولة» إن كان تجديدًا':
+      'No unit is available in this project for this term — tick “Also show occupied units” if this is a renewal',
+    'مصدرها': 'Source', 'قيمة مكتوبة': 'Typed in', 'من خانة قيمة السنة الأولى': 'From the first-year field',
+    'اكتب قيمة أي سنة كما وردت في العقد ولن يعيد النظام حسابها — والسنوات التي تليها تُبنى عليها.':
+      'Type any year’s value exactly as written in the contract and it will not be recomputed — the years after it build on it.',
+    'أعِد حساب كل السنوات بالنسبة': 'Recompute every year from the percentage',
+    'أكمل قيمة كل سنة في جدول السنوات': 'Complete every year’s value in the schedule',
+    'سنة واحدة': 'One year', 'سنتان': 'Two years',
+    'هؤلاء أدخلتَ بياناتهم ولم تُسجَّل لهم عقود، لذلك لا وحدات ولا متأخرات لهم. يظهرون هنا دائمًا مهما كان الترشيح.':
+      'You entered their details but no contract has been recorded for them, so they have no units and no arrears. They always appear here regardless of the filter.',
+    'سجِّل له عقدًا': 'Record a contract', 'بياناته': 'Details',
+    'لا عملاء لهم عقود ضمن الترشيح': 'No clients with contracts match the filter',
+    'لا عقود مسجَّلة لهذا العميل بعد — بياناته محفوظة، وسيظهر في الجدول الرئيسي بمجرد تسجيل أول عقد له.':
+      'No contracts recorded for this client yet — their details are saved, and they will appear in the main table as soon as a first contract is recorded.',
+    /* طباعة العقد والتصدير */
+    'اطبع العقد': 'Print contract', 'اطبع هذا العقد': 'Print this contract', 'العقد': 'Contract',
+    'يفتح العقد مكتوبًا ببيانات النظام جاهزًا للطباعة': 'Opens the contract written from the system’s data, ready to print',
+    'تصدير التقارير': 'Report exports',
+    'التقرير الشامل ملف Excel واحد بأوراق منفصلة منسَّقة وجاهزة للعرض على المالك. وبجانبه تصديرات مفردة بصيغة CSV لمن يريد بيانات خامًا.':
+      'The full report is a single Excel file with separate formatted sheets, ready to show the owner. Alongside it are individual CSV exports for raw data.',
+    'التقرير الشامل (Excel)': 'Full report (Excel)',
+    'تصديرات مفردة (CSV)': 'Individual exports (CSV)',
+    'نُزِّل التقرير الشامل — افتحه بـ Excel': 'Full report downloaded — open it in Excel',
+    'المتأخرات': 'Arrears', 'العقود': 'Contracts', 'الدفعات المسجَّلة': 'Recorded payments',
+    '+ عمود سنة': '+ Year column', 'اكتملت عشر سنوات': 'Ten years reached',
+    'أقصى مدة عشر سنوات': 'Ten years is the maximum term',
+    'املأ باقي السنوات بزيادة 10٪ (النمط السائد)': 'Fill the remaining years with a 10% increase (the common pattern)',
+    'أدخل قيمة السنة 1 أولًا': 'Enter the year-1 value first',
+    'طباعة العقد بعد تسجيله': 'Printing the contract after recording it',
+    'العقود ← عمود «العقد» ← «اطبع العقد»': 'Contracts → the “Contract” column → “Print contract”',
+    'يُكتب العقد ببنوده من بيانات النظام ويفتح جاهزًا للطباعة أو الحفظ PDF':
+      'The lease is written with its clauses from the system’s data and opens ready to print or save as PDF',
+    'تقرير شامل للمالك': 'A full report for the owner',
+    'الإعدادات ← «التقرير الشامل (Excel)»': 'Settings → “Full report (Excel)”',
+    'ملف Excel واحد بأوراق منسَّقة: المشاريع والعقود والعملاء والمتأخرات والتحصيل والدفعات والشواغر والمراجعات':
+      'One Excel file with formatted sheets: projects, contracts, clients, arrears, collection, payments, vacancies and reviews',
   });
   I18N.addPatterns([
     [/^(\d+) من (\d+) وحدة متاحة في المدة المطلوبة$/, function (m) { return m[1] + ' of ' + m[2] + ' units are available for the requested term'; }],
     [/^كل وحدات المشروع \((\d+)\) — غير المتاحة معلَّم سببها بجوار اسمها$/, function (m) { return 'All project units (' + m[1] + ') — unavailable ones show the reason next to their name'; }],
     [/^«(.+)» لم تعد متاحة بهذه المدة — اختر وحدة أخرى$/, function (m) { return '“' + I18N.tt(m[1]) + '” is no longer available for this term — choose another unit'; }],
+    [/^عملاء مسجَّلون بلا عقود بعد \((\d+)\)$/, function (m) { return 'Clients registered with no contract yet (' + m[1] + ')'; }],
+    [/^بزيادة (\d+(?:\.\d+)?)٪$/, function (m) { return '+' + m[1] + '%'; }],
+    [/^سنة (\d+)$/, function (m) { return 'Year ' + m[1]; }],
+    [/^قيمة سنة (\d+)$/, function (m) { return 'Year ' + m[1] + ' value'; }],
+    [/^(\d+) سنوات$/, function (m) { return m[1] + ' years'; }],
     [/^هذا الكود مسجَّل بالفعل للعميل: (.+)$/, function (m) { return 'This code already belongs to client: ' + I18N.tt(m[1]); }],
     [/^لا يمكن حفظ عقدين متداخلين على الوحدة — العقد القائم حتى (.+)\. لو تجديد فاجعل البداية (.+)$/,
       function (m) { return 'Two overlapping contracts cannot be saved on one unit — the existing one runs to ' + m[1] + '. If this is a renewal, start it on ' + m[2]; }],
