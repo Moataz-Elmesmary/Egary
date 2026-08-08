@@ -51,6 +51,8 @@
     const asOf = Store.today();
     const cur = Store.periodOf(asOf);
     if (!dashMonth) dashMonth = Store.addMonths(cur, -1);
+    // لا معنى لتقرير عن شهر لم يأتِ بعد — مستحقاته صفر فيبدو زورًا «مسدَّدًا بالكامل»
+    if (Store.cmpPeriod(dashMonth, cur) > 0) dashMonth = cur;
     const m = dashMonth;
     const F = App.filters;
     const uset = Views.fset(asOf);
@@ -403,14 +405,21 @@
     }
 
     /* ---------- تجميع الصفحة ---------- */
+    const atCur = Store.cmpPeriod(m, cur) >= 0;
     const filterRow = h('div.filter-row', [
       h('span.filter-label', 'شهر التقرير'),
       h('div.month-nav', [
         h('button.btn-icon', { onclick: () => { dashMonth = Store.addMonths(dashMonth, -1); App.render(); }, 'aria-label': 'شهر أسبق' }, icon('right')),
-        h('span.month-name', Store.periodLabel(m, true)),
-        h('button.btn-icon', { onclick: () => { dashMonth = Store.addMonths(dashMonth, 1); App.render(); }, 'aria-label': 'شهر أحدث' }, icon('left')),
+        h('span.month-name', [h('span', Store.periodLabel(m, true)), atCur ? h('span.month-live', ' — جارٍ') : null]),
+        h('button.btn-icon', {
+          disabled: atCur ? true : null,
+          title: atCur ? 'لا تقرير عن شهر لم يبدأ بعد' : null,
+          onclick: () => { if (!atCur) { dashMonth = Store.addMonths(dashMonth, 1); App.render(); } },
+          'aria-label': 'شهر أحدث',
+        }, icon('left')),
       ]),
       h('button.btn.btn-ghost', { onclick: () => { dashMonth = Store.addMonths(cur, -1); App.render(); } }, 'آخر شهر مكتمل'),
+      h('span.filter-hint', 'يغيِّر: تحصيل الشهر، «من لم يسدِّد؟»، وإيجارات المشاريع — وبقية المؤشرات محسوبة دائمًا حتى اليوم.'),
     ]);
 
     return h('div.view.anim-in', [
@@ -463,6 +472,10 @@
     'التزام المستأجرين': 'Tenant punctuality',
     'الدخل المتوقع 12 شهر (من العقود — التأمينات غير محسوبة)': 'Expected income, 12 months (from contracts — deposits excluded)',
     'حركة الوحدات (دخول/خروج) وأثرها': 'Move-ins / move-outs and their impact',
+    ' — جارٍ': ' — in progress',
+    'لا تقرير عن شهر لم يبدأ بعد': 'No report for a month that has not started yet',
+    'يغيِّر: تحصيل الشهر، «من لم يسدِّد؟»، وإيجارات المشاريع — وبقية المؤشرات محسوبة دائمًا حتى اليوم.':
+      'Changes: month collection, “Who has not paid?”, and project rents — all other indicators are always computed as of today.',
     '«داخلة» = وحدة يبدأ عقدها ذلك الشهر فيُضاف إيجارها إلى الدخل، و«خارجة» = وحدة ينتهي عقدها دون تجديد فيسقط إيجارها. «الأثر» = نسبة تغيّر دخل الشهر عن الشهر السابق بسبب ذلك.':
       '“Moving in” = a unit whose contract starts that month, adding its rent to income. “Moving out” = a unit whose contract ends unrenewed, dropping its rent. “Impact” = the resulting % change in that month’s income vs the month before.',
     'حركة الوحدات: داخل / خارج': 'Unit movement: in / out',
