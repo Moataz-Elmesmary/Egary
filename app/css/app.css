@@ -998,3 +998,8 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
 :root[data-theme="dark"] .month-live { color: var(--accent); }
 .filter-hint { color: var(--muted); font-size: 12px; }
 .month-nav .btn-icon[disabled] { opacity: .35; cursor: not-allowed; }
+/* ===== شارات الأكواد ===== */
+.code-chip { display: inline-block; font-family: Consolas, "Courier New", monospace; font-size: 12px; font-weight: 700; color: var(--accent-ink); background: var(--accent-weak); border: 1px solid var(--border); border-radius: 6px; padding: 1px 7px; direction: ltr; unicode-bidi: embed; }
+:root[data-theme="dark"] .code-chip { color: var(--accent); background: rgba(167, 139, 250, 0.12); }
+.sug-code { color: var(--muted); font-size: 12px; direction: ltr; unicode-bidi: embed; }
+.new-client-box { grid-column: 1 / -1; border: 1px dashed var(--border); border-radius: 10px; padding: 10px 12px; display: grid; gap: 10px; }

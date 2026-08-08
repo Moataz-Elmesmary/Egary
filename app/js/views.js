@@ -16,7 +16,7 @@
     collectionAsTable: false,
   };
 
-  /* مستأجرو الوحدات بلا عقود (معلومون من الكشف) */
+  /* عملاء الوحدات بلا عقود (معلومون من الكشف) */
   const ORPHAN_TENANT = { U9: 'T7', U10: 'T9' };
 
   function currentPeriod() { return Store.periodOf(Store.today()); }
@@ -93,14 +93,15 @@
         }
       }
       if (q) {
-        // البحث يغطي ما يبحث عنه المكتب فعلًا: اسم/وحدة/كشف/مالك/منطقة/تليفون/رقم إيصال
+        // البحث يغطي ما يبحث عنه المكتب فعلًا: اسم/كود/وحدة/كشف/مالك/منطقة/تليفون/رقم إيصال
         const ts = unitTenantIds(u).map(id => Store.tenant(id)).filter(Boolean);
         const b = Store.building(u.buildingId) || {};
         const receipts = Store.state.payments
           .filter(p => p.unitId === u.id && p.receiptNo).map(p => p.receiptNo).join(' ');
         const hay = [
-          u.name, u.type, u.floor || '', b.name || '', b.owner || '', b.area || '',
-          ts.map(t => t.name).join(' '), ts.map(t => t.phone || '').join(' '), receipts,
+          u.name, u.code || '', u.type, u.floor || '', b.name || '', b.code || '', b.owner || '', b.area || '',
+          ts.map(t => t.name).join(' '), ts.map(t => t.code || '').join(' '),
+          ts.map(t => t.phone || '').join(' '), receipts,
         ].join(' ');
         if (!UI.arMatch(hay, q)) return false;
       }
@@ -122,7 +123,7 @@
       placeholder: 'كل المشاريع',
       items: [
         { value: '', label: 'كل المشاريع' },
-        ...Store.state.buildings.map(b => ({ value: b.id, label: b.name + (b.demo ? ' · تجريبي' : '') })),
+        ...Store.state.buildings.map(b => ({ value: b.id, label: (b.code ? b.code + ' · ' : '') + b.name + (b.demo ? ' · تجريبي' : '') })),
       ],
       value: f.b,
       onPick: v => { f.b = v; App.render(); },
@@ -132,9 +133,9 @@
       ...types.map(t => ({ value: t, label: t })),
     ], f.ty);
     const tnSel = UI.combo({
-      placeholder: 'كل المستأجرين',
+      placeholder: 'كل العملاء',
       items: [
-        { value: '', label: 'كل المستأجرين' },
+        { value: '', label: 'كل العملاء' },
         ...[...Store.state.tenants].sort((a, b) => a.name.localeCompare(b.name, 'ar'))
           .map(t => ({ value: t.id, label: t.name })),
       ],
@@ -150,7 +151,7 @@
       { value: 'vacant', label: 'شاغرة' },
       { value: 'arrears', label: 'عليها متأخرات' },
     ], f.st);
-    const qIn = input({ type: 'search', placeholder: 'ابحث عن وحدة أو مستأجر…', value: f.q || '',
+    const qIn = input({ type: 'search', placeholder: 'ابحث بالاسم أو الكود — عميل أو وحدة أو مشروع…', value: f.q || '',
       role: 'combobox', 'aria-expanded': 'false', 'aria-autocomplete': 'list' });
     bSel.addEventListener('change', () => { f.b = bSel.value; App.render(); });
     tySel.addEventListener('change', () => { f.ty = tySel.value; App.render(); });
@@ -160,13 +161,13 @@
     /* اقتراحات فورية أثناء الكتابة: كلمات مفتاحية جاهزة يضغطها فتفلتر */
     const sugList = h('div.sug-list', { role: 'listbox', hidden: true });
     function sugPool() {
-      // raw = النص العربي المخزَّن (هو ما يُفلتَر به)، label = المعروض بلغة الواجهة
+      // raw = النص العربي المخزَّن (هو ما يُفلتَر به)، label = المعروض بلغة الواجهة، code = للبحث بالكود
       const en = I18N.lang === 'en';
-      const mk = (raw, cat) => ({ raw, label: en ? I18N.tt(raw) : raw, cat });
+      const mk = (raw, cat, code) => ({ raw, label: en ? I18N.tt(raw) : raw, cat, code: code || '' });
       const pool = [];
-      for (const tn of Store.state.tenants) pool.push(mk(tn.name, 'مستأجر'));
-      for (const u of Store.state.units) pool.push(mk(u.name, 'وحدة'));
-      for (const b of Store.state.buildings) pool.push(mk(b.name, 'مشروع'));
+      for (const tn of Store.state.tenants) pool.push(mk(tn.name, 'عميل', tn.code));
+      for (const u of Store.state.units) pool.push(mk(u.name, 'وحدة', u.code));
+      for (const b of Store.state.buildings) pool.push(mk(b.name, 'مشروع', b.code));
       for (const ty of new Set(Store.state.units.map(u => u.type).filter(Boolean))) pool.push(mk(ty, 'نوع'));
       for (const fl of new Set(Store.state.units.map(u => u.floor).filter(Boolean))) pool.push(mk(fl, 'دور'));
       return pool;
@@ -177,11 +178,12 @@
       sugIdx = -1;
       sugList.innerHTML = '';
       if (!q) { sugList.hidden = true; qIn.setAttribute('aria-expanded', 'false'); return; }
-      const hits = sugPool().filter(s => UI.arMatch(s.label, q) || UI.arMatch(s.raw, q)).slice(0, 8);
+      const hits = sugPool().filter(s =>
+        UI.arMatch(s.label, q) || UI.arMatch(s.raw, q) || (s.code && UI.arMatch(s.code, q))).slice(0, 8);
       if (!hits.length) { sugList.hidden = true; qIn.setAttribute('aria-expanded', 'false'); return; }
       for (const s of hits) {
         const item = h('button.sug-item', { type: 'button', role: 'option' }, [
-          h('span', s.label), h('span.sug-cat', s.cat),
+          h('span', [s.label, s.code ? h('span.sug-code', ' · ' + s.code) : null]), h('span.sug-cat', s.cat),
         ]);
         item.addEventListener('mousedown', e => {
           e.preventDefault();
@@ -647,7 +649,7 @@
     ar.unknowns.forEach(r => { unkByUnit[r.unitId] = (unkByUnit[r.unitId] || 0) + 1; });
 
     const head = h('tr', [
-      h('th.sticky-col', 'الوحدة / المستأجر'),
+      h('th.sticky-col', 'الوحدة / العميل'),
       ...periods.map(p => h('th', Store.periodLabel(p))),
       h('th.mx-arr-h', 'متأخرات'),
     ]);
@@ -745,7 +747,7 @@
             ? `مشروع «${fb.name}» لسه مفيهوش صفوف`
             : 'لا وحدات ضمن الترشيح الحالي'),
           h('p.empty-sub', fb
-            ? 'علامات ✓/✗ بتتعلّم على صفوف الورقة (وحدة + مستأجر + عقد). أضف صفوف الورقة الأول، وبعدين ارجع هنا فرّغ العلامات.'
+            ? 'علامات ✓/✗ بتتعلّم على صفوف الورقة (وحدة + عميل + عقد). أضف صفوف الورقة الأول، وبعدين ارجع هنا فرّغ العلامات.'
             : 'وسّع الترشيح من السلايسرز فوق، أو امسح البحث.'),
           fb && App.canEdit() ? h('button.btn.btn-primary', {
             onclick: () => { VS.wizardBid = fb.id; location.hash = '#intake'; },
@@ -862,7 +864,7 @@
         return { y, days: Store.daysBetween(f, l) + 1 };
       }).filter(Boolean);
       body.push(h('div.kv', [
-        h('div.kv-row', [h('span.kv-k', 'المستأجر'), h('span.kv-v', tenantLabel(c.tenantId))]),
+        h('div.kv-row', [h('span.kv-k', 'العميل'), h('span.kv-v', tenantLabel(c.tenantId))]),
         h('div.kv-row', [h('span.kv-k', 'العقد'), h('span.kv-v', `${shortDate(c.start)} ← ${shortDate(c.end)}`)]),
         h('div.kv-row', [h('span.kv-k', 'يوم الاستحقاق'), h('span.kv-v', String(c.dueDay || 1) + ' من الشهر')]),
         ci.due ? h('div.kv-row', [h('span.kv-k', 'مستحق الشهر'), h('span.kv-v', money(ci.due.amount, { approx: ci.due.estimated }))]) : null,
@@ -943,7 +945,7 @@
 
   function exportMatrix(year) {
     const periods = Array.from({ length: 12 }, (_, i) => year + '-' + String(i + 1).padStart(2, '0'));
-    const rows = [['المبنى', 'الوحدة', 'المستأجر', ...periods.map(p => Store.periodLabel(p, true))]];
+    const rows = [['المبنى', 'الوحدة', 'العميل', ...periods.map(p => Store.periodLabel(p, true))]];
     const asOf = Store.today();
     for (const u of filteredUnits(asOf)) {
       const tid = unitTenantIds(u).slice(-1)[0];
@@ -999,6 +1001,7 @@
         return keyClickable(h('div.card.unit-card', { onclick: () => openUnitDrawer(u) }, [
           h('div.unit-head', [h('h3.unit-name', u.name), unitStatusChipOf(u, asOf)]),
           h('div.unit-meta', [
+            u.code ? h('code.code-chip', u.code) : null,
             h('span.chip.chip-neutral', u.type),
             u.floor ? h('span.chip.chip-neutral', u.floor) : null,
             u.area ? h('span.chip.chip-neutral', u.area + ' م²') : null,
@@ -1040,6 +1043,7 @@
     const cs = Store.unitContracts(u.id);
     const body = [];
     body.push(h('div.kv', [
+      u.code ? h('div.kv-row', [h('span.kv-k', 'كود الوحدة'), h('span.kv-v', h('code.code-chip', u.code))]) : null,
       h('div.kv-row', [h('span.kv-k', 'المبنى'), h('span.kv-v', bLabel(u.buildingId))]),
       h('div.kv-row', [h('span.kv-k', 'النوع'), h('span.kv-v', u.type + (u.floor ? ' — ' + u.floor : ''))]),
       u.area ? h('div.kv-row', [h('span.kv-k', 'المساحة'), h('span.kv-v', u.area + ' م²')]) : null,
@@ -1203,7 +1207,7 @@
         ]),
       ])) : null,
       h('div.table-wrap', h('table.table', [
-        h('thead', h('tr', [h('th', 'المبنى'), h('th', 'الوحدة'), h('th', 'المستأجر'), h('th', 'من'), h('th', 'إلى'),
+        h('thead', h('tr', [h('th', 'المبنى'), h('th', 'الوحدة'), h('th', 'العميل'), h('th', 'من'), h('th', 'إلى'),
           h('th', 'قيمة السنة الجارية'), h('th', 'صيانة'), h('th', 'التأمين'), h('th', 'الحالة'), h('th', 'النوع')])),
         h('tbody', rows.length ? rows : h('tr', h('td', { colspan: 10 }, emptyState('لا عقود ضمن الترشيح')))),
       ])),
@@ -1211,7 +1215,7 @@
   }
 
   function exportContracts() {
-    const rows = [['المبنى', 'الوحدة', 'المستأجر', 'من', 'إلى', 'سنة 1', 'سنة 2', 'سنة 3', 'صيانة شهرية', 'ض.ق.م', 'التأمين', 'تجديد']];
+    const rows = [['المبنى', 'الوحدة', 'العميل', 'من', 'إلى', 'سنة 1', 'سنة 2', 'سنة 3', 'صيانة شهرية', 'ض.ق.م', 'التأمين', 'تجديد']];
     for (const c of Store.state.contracts) {
       const u = Store.unit(c.unitId);
       rows.push([bLabel(u.buildingId), u.name, tenantLabel(c.tenantId), c.start, c.end,
@@ -1221,28 +1225,65 @@
     Store.download('العقود.csv', Store.toCSV(rows));
   }
 
-  /* معالج عقد جديد */
+  /* معالج عقد جديد — الترتيب الطبيعي للمكتب: العميل ← المشروع ← وحداته الشاغرة فقط */
   function openAddContract(presetUnitId) {
     const s = Store.state.settings;
-    const unitIn = h('select.input');
-    for (const b of Store.state.buildings) {
-      const og = h('optgroup', { label: b.name + (b.demo ? ' · تجريبي' : '') });
-      for (const u of Store.state.units.filter(u => u.buildingId === b.id)) {
-        const opt = h('option', { value: u.id }, u.name);
-        if (u.id === presetUnitId) opt.selected = true;
-        og.appendChild(opt);
-      }
-      unitIn.appendChild(og);
-    }
-    const tenantIn = select({}, [
-      ...[...Store.state.tenants].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(t => ({ value: t.id, label: t.name })),
-      { value: '__new', label: '+ مستأجر جديد…' },
-    ], Store.state.tenants[0].id);
-    const newTenantIn = input({ type: 'text', placeholder: 'اسم المستأجر الجديد', style: { display: 'none' } });
-    tenantIn.addEventListener('change', () => {
-      newTenantIn.style.display = tenantIn.value === '__new' ? '' : 'none';
-    });
+    const presetU = presetUnitId ? Store.unit(presetUnitId) : null;
     const startIn = input({ type: 'date', value: Store.iso(Store.today()) });
+
+    /* 1) العميل — بحث بالاسم أو الكود، أو تسجيل عميل جديد في نفس الخطوة */
+    let tenantVal = '';
+    const ntName = input({ type: 'text', placeholder: 'الاسم كما في البطاقة أو السجل' });
+    const ntCode = input({ type: 'text', inputmode: 'numeric', placeholder: 'الرقم القومي (14 رقمًا) — أو السجل التجاري للشركات' });
+    const ntPhone = input({ type: 'tel', placeholder: '01xxxxxxxxx' });
+    const newTenantBox = h('div.new-client-box', { style: { display: 'none' } }, [
+      field('اسم العميل الجديد', ntName),
+      field('كود العميل — الرقم القومي', ntCode, 'هو ما ستبحث به عن العميل لاحقًا في أي شاشة'),
+      field('هاتف العميل', ntPhone),
+    ]);
+    const tenantIn = UI.combo({
+      placeholder: 'ابحث بالاسم أو الرقم القومي…',
+      items: [
+        { value: '__new', label: '+ عميل جديد…' },
+        ...[...Store.state.tenants].sort((a, b) => a.name.localeCompare(b.name, 'ar'))
+          .map(t => ({ value: t.id, label: t.name + (t.code ? ' · ' + t.code : '') })),
+      ],
+      value: '',
+      onPick: v => { tenantVal = v; newTenantBox.style.display = v === '__new' ? '' : 'none'; },
+    });
+
+    /* 2) المشروع ← 3) الوحدة: القائمة تعرض الشاغر فقط في تاريخ البداية المختار */
+    const projIn = select({}, Store.state.buildings.map(b => ({
+      value: b.id, label: (b.code ? b.code + ' · ' : '') + b.name + (b.demo ? ' · تجريبي' : ''),
+    })), presetU ? presetU.buildingId : Store.state.buildings[0].id);
+    const unitIn = h('select.input');
+    const unitHint = h('p.field-hint');
+    const showAllChk = h('input', { type: 'checkbox' });
+    const unitVacantAt = (u, dateIso) => !Store.unitContracts(u.id).some(c => c.end >= dateIso);
+    if (presetU && !unitVacantAt(presetU, Store.iso(Store.today()))) showAllChk.checked = true;
+    function refreshUnits() {
+      const bid = projIn.value, st = startIn.value || Store.iso(Store.today());
+      const all = Store.state.units.filter(u => u.buildingId === bid);
+      const vac = all.filter(u => unitVacantAt(u, st));
+      const list = showAllChk.checked ? all : vac;
+      const keep = unitIn.value;
+      unitIn.innerHTML = '';
+      for (const u of list) {
+        unitIn.appendChild(h('option', { value: u.id },
+          (u.code ? u.code + ' · ' : '') + u.name + (unitVacantAt(u, st) ? '' : ' — عليها عقد قائم')));
+      }
+      if (presetUnitId && list.some(u => u.id === presetUnitId)) unitIn.value = presetUnitId;
+      else if (list.some(u => u.id === keep)) unitIn.value = keep;
+      unitHint.textContent = showAllChk.checked
+        ? `كل وحدات المشروع (${all.length}) — التي عليها عقد معلَّمة بجوار اسمها`
+        : (vac.length
+          ? `${vac.length} من ${all.length} وحدة شاغرة في تاريخ البداية المختار`
+          : 'لا وحدات شاغرة في هذا المشروع بهذا التاريخ — علِّم «عرض كل الوحدات» إن كان تجديدًا');
+      refreshPreview();
+    }
+    projIn.addEventListener('change', refreshUnits);
+    showAllChk.addEventListener('change', refreshUnits);
+    startIn.addEventListener('input', refreshUnits);
     const yearsIn = select({}, [1, 2, 3, 4, 5].map(n => ({ value: String(n), label: n + (n === 1 ? ' سنة' : ' سنوات') })), '1');
     const rentIn = input({ type: 'number', min: 0, step: 'any', placeholder: s.rentBasis === 'monthly' ? 'الإيجار الشهري للسنة الأولى' : 'الإيجار السنوي للسنة الأولى' });
     const incIn = input({ type: 'number', min: 0, max: 100, step: 'any', value: s.defaultIncreasePct });
@@ -1274,13 +1315,17 @@
             ` تنبيه: يوجد عقد قائم على الوحدة حتى ${shortDate(overlap.end)} — تأكد أن هذا تجديد أو صحّح التواريخ.`]));
       }
     }
-    [yearsIn, rentIn, incIn, unitIn, startIn].forEach(el => el.addEventListener('input', refreshPreview));
-    refreshPreview();
+    [yearsIn, rentIn, incIn].forEach(el => el.addEventListener('input', refreshPreview));
+    unitIn.addEventListener('change', refreshPreview);
+    refreshUnits();
 
     openDrawer('عقد جديد', [
       h('div.form-grid', [
-        field('الوحدة', unitIn),
-        field('المستأجر', tenantIn), newTenantIn,
+        field('العميل', tenantIn, 'اكتب حرفين من الاسم أو أرقامًا من الكود'),
+        newTenantBox,
+        field('المشروع', projIn),
+        field('الوحدة — الشاغرة فقط', unitIn), unitHint,
+        h('label.radio-row', [showAllChk, h('span', 'عرض كل الوحدات (لتسجيل تجديد على وحدة عليها عقد)')]),
         field('تاريخ البداية', startIn, 'النهاية تُحسب تلقائيًا — يستحيل عقد نهايته قبل بدايته'),
         field('عدد السنوات', yearsIn),
         field('قيمة السنة الأولى', rentIn, 'أساس الحساب الحالي: ' + (s.rentBasis === 'monthly' ? 'شهري' : 'سنوي')),
@@ -1296,12 +1341,20 @@
       h('button.btn.btn-primary', {
         onclick: () => {
           const r0 = Number(rentIn.value);
-          if (!r0 || r0 <= 0 || !startIn.value) { toast('أكمل الوحدة والبداية وقيمة سنة أولى موجبة', 'warning'); return; }
+          if (!tenantVal) { toast('اختر العميل أولًا — أو سجِّل عميلًا جديدًا من نفس القائمة', 'warning'); return; }
+          if (!unitIn.value) { toast('اختر الوحدة — غيِّر المشروع أو علِّم «عرض كل الوحدات»', 'warning'); return; }
+          if (!r0 || r0 <= 0 || !startIn.value) { toast('أكمل تاريخ البداية وقيمة سنة أولى موجبة', 'warning'); return; }
           if (Number(depIn.value) < 0 || Number(mntIn.value) < 0 || Number(incIn.value) < 0) { toast('لا تُقبل قيم سالبة', 'warning'); return; }
-          let tenantId = tenantIn.value;
+          let tenantId = tenantVal;
           if (tenantId === '__new') {
-            if (!newTenantIn.value.trim()) { toast('أدخل اسم المستأجر الجديد', 'warning'); return; }
-            tenantId = Store.addTenant({ name: newTenantIn.value.trim() }).id;
+            const nm = ntName.value.trim();
+            if (!nm) { toast('أدخل اسم العميل الجديد', 'warning'); return; }
+            const code = ntCode.value.replace(/\s+/g, '');
+            if (code) {
+              const dup = Store.tenantByCode(code);
+              if (dup) { toast('هذا الكود مسجَّل بالفعل للعميل: ' + dup.name, 'warning'); return; }
+            }
+            tenantId = Store.addTenant({ name: nm, code, phone: ntPhone.value.trim() }).id;
           }
           const n = Number(yearsIn.value), inc = Number(incIn.value) / 100;
           const years = []; let r = r0;
@@ -1321,7 +1374,7 @@
   }
 
   /* ========================================================
-     5) المستأجرون
+     5) العملاء
      ======================================================== */
   function viewTenants() {
     const asOf = Store.today();
@@ -1342,6 +1395,7 @@
       const avTone = ['av-a', 'av-b', 'av-c', 'av-d', 'av-e'][[...t.name].reduce((s, ch) => s + ch.charCodeAt(0), 0) % 5];
       return keyClickable(h('tr.row-click', { onclick: () => openTenantDrawer(t) }, [
         h('td', h('span.tenant-cell', [h('span.avatar.' + avTone, initials), h('span', t.name)])),
+        h('td', t.code ? h('code.code-chip', t.code) : h('span.val-warning', 'غير مسجَّل')),
         h('td', t.kind === 'شركة' ? statusChip('neutral', 'شركة') : t.kind === 'فرد' ? statusChip('neutral', 'فرد') : '—'),
         h('td', unitsNames),
         h('td', t.phone || h('span.val-warning', 'غير مسجّل')),
@@ -1350,13 +1404,13 @@
       ]));
     });
     return h('div.view', [
-      pageHead('المستأجرون', 'أرصدة المتأخرات محسوبة من جدول التحصيل مباشرة.', [
-        App.canEdit() ? h('button.btn.btn-primary', { onclick: () => openTenantDrawer(null) }, [icon('plus'), ' مستأجر جديد']) : null,
+      pageHead('العملاء', 'أرصدة المتأخرات محسوبة من جدول التحصيل مباشرة.', [
+        App.canEdit() ? h('button.btn.btn-primary', { onclick: () => openTenantDrawer(null) }, [icon('plus'), ' عميل جديد']) : null,
       ]),
       demoBanner(),
       h('div.table-wrap', h('table.table', [
-        h('thead', h('tr', [h('th', 'الاسم'), h('th', 'النوع'), h('th', 'الوحدات'), h('th', 'الهاتف'), h('th', 'متأخرات'), h('th', 'ملاحظات')])),
-        h('tbody', rows.length ? rows : h('tr', h('td', { colspan: 6 }, emptyState('لا مستأجرين ضمن الترشيح')))),
+        h('thead', h('tr', [h('th', 'الاسم'), h('th', 'الكود (الرقم القومي)'), h('th', 'النوع'), h('th', 'الوحدات'), h('th', 'الهاتف'), h('th', 'متأخرات'), h('th', 'ملاحظات')])),
+        h('tbody', rows.length ? rows : h('tr', h('td', { colspan: 7 }, emptyState('لا عملاء ضمن الترشيح')))),
       ])),
     ]);
   }
@@ -1367,7 +1421,7 @@
     return [...new Set([...cs.map(c => c.unitId), ...orphans])];
   }
 
-  /* سجل سداد المستأجر شهرًا بشهر — أشهر عقوده هو فقط، لا أشهر مستأجر سابق على نفس الوحدة */
+  /* سجل سداد العميل شهرًا بشهر — أشهر عقوده هو فقط، لا أشهر عميل سابق على نفس الوحدة */
   function tenantLedger(t, asOf) {
     const nowP = Store.periodOf(asOf);
     const cov = Store.state.meta.importCoverage;
@@ -1407,24 +1461,32 @@
   function openTenantDrawer(t) {
     const isNew = !t;
     const nameIn = input({ type: 'text', value: t ? t.name : '', placeholder: 'الاسم' });
+    const codeIn = input({ type: 'text', inputmode: 'numeric', value: t ? (t.code || '') : '', placeholder: 'الرقم القومي (14 رقمًا) — أو السجل التجاري للشركات' });
     const kindIn = select({}, ['فرد', 'شركة', 'غير محدد'].map(x => ({ value: x, label: x })), t ? (t.kind || 'فرد') : 'فرد');
     const phoneIn = input({ type: 'tel', value: t ? t.phone : '', placeholder: '01xxxxxxxxx' });
     const noteIn = input({ type: 'text', value: t ? t.note : '' });
     const formGrid = h('div.form-grid', [
-      field('الاسم', nameIn), field('النوع', kindIn),
+      field('الاسم', nameIn),
+      field('كود العميل — الرقم القومي', codeIn, 'به تبحث عن العميل من أي شاشة'),
+      field('النوع', kindIn),
       field('الهاتف', phoneIn, 'لازم للتنبيهات لاحقًا (واتساب)'), field('ملاحظات', noteIn),
     ]);
     const saveBtn = h('button.btn.btn-primary', {
       onclick: () => {
         if (!nameIn.value.trim()) { toast('أدخل الاسم', 'warning'); return; }
-        const patch = { name: nameIn.value.trim(), kind: kindIn.value, phone: phoneIn.value, note: noteIn.value };
+        const code = codeIn.value.replace(/\s+/g, '');
+        if (code) {
+          const dup = Store.tenantByCode(code);
+          if (dup && (!t || dup.id !== t.id)) { toast('هذا الكود مسجَّل بالفعل للعميل: ' + dup.name, 'warning'); return; }
+        }
+        const patch = { name: nameIn.value.trim(), code: code || null, kind: kindIn.value, phone: phoneIn.value, note: noteIn.value };
         if (isNew) Store.addTenant(patch); else Store.updateTenant(t.id, patch);
         closeDrawer(); toast('حُفظ');
       },
     }, isNew ? 'حفظ' : 'حفظ البيانات');
 
     if (isNew) {
-      openDrawer('مستأجر جديد', [formGrid], [saveBtn, h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إلغاء')]);
+      openDrawer('عميل جديد', [formGrid], [saveBtn, h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إلغاء')]);
       return;
     }
 
@@ -1474,7 +1536,7 @@
       ? h('span', [h('b', money(lastPay.amount)), ' — ', shortDate(lastPay.date), ' · ', h('span', 'عن شهر'), ' ', h('span', Store.periodLabel(lastPay.period, true))])
       : lastTick
         ? h('span', [h('span', 'لا مدفوعات مسجَّلة بمبلغ وتاريخ'), ' — ', h('span', 'آخر شهر مؤشَّر ✓ في ورقة المالك:'), ' ', h('span', Store.periodLabel(lastTick.period, true))])
-        : h('span.val-critical', 'لا سداد مسجَّل لهذا المستأجر إطلاقًا');
+        : h('span.val-critical', 'لا سداد مسجَّل لهذا العميل إطلاقًا');
 
     const arrNode = arrCells.length
       ? h('span.val-critical', [h('b', money(arrTotal)), ' — ', h('span', pluralMonths(arrCells.length)), unkCount ? h('span', [' + ', h('span', pluralMonths(unkCount)), ' ', h('span', 'بقيمة مجهولة')]) : null])
@@ -1483,6 +1545,7 @@
         : h('span', 'لا شيء');
 
     const facts = h('div.tp-facts', [
+      h('span.k', 'كود العميل'), t.code ? h('code.code-chip', t.code) : h('span.val-warning', 'غير مسجَّل — أضفه من «تعديل البيانات» بالأسفل'),
       h('span.k', 'الهاتف'), h('span', t.phone || 'غير مسجّل'),
       h('span.k', 'آخر سداد مسجَّل'), lastPayNode,
       h('span.k', 'إجمالي المتأخرات'), arrNode,
@@ -1504,12 +1567,12 @@
       ]));
     });
 
-    openDrawer('ملف المستأجر', [
+    openDrawer('ملف العميل', [
       h('h3.tp-name', t.name),
       ...unitLines,
       facts,
       h('h4.tp-sub', 'سجل السداد شهرًا بشهر'),
-      h('p.step-hint', 'أشهر هذا المستأجر فقط، الأحدث أولًا — كل سطر يفتح خلية الشهر نفسها للتفصيل أو تسجيل دفعة.'),
+      h('p.step-hint', 'أشهر هذا العميل فقط، الأحدث أولًا — كل سطر يفتح خلية الشهر نفسها للتفصيل أو تسجيل دفعة.'),
       h('div.mini-scroll', h('table.table.table-mini', [
         h('thead', h('tr', [h('th', 'الشهر'), multiUnit ? h('th', 'الوحدة') : null, h('th', 'المستحق'), h('th', 'المسدَّد'), h('th', 'تاريخ السداد'), h('th', 'الحالة')])),
         h('tbody', rows.length ? rows : h('tr', h('td', { colspan: multiUnit ? 6 : 5 }, 'لا أشهر مسجَّلة بعد'))),
@@ -1600,7 +1663,7 @@
     const dateIn = input({ type: 'date', value: Store.iso(Store.today()) });
     const descIn = input({ type: 'text', placeholder: 'وصف مختصر' });
     const costIn = input({ type: 'number', min: 0, step: 'any', placeholder: '0' });
-    const borneIn = select({}, ['المالك', 'المستأجر', 'المقاول', 'مشترك'].map(x => ({ value: x, label: x })), 'المالك');
+    const borneIn = select({}, ['المالك', 'العميل', 'المقاول', 'مشترك'].map(x => ({ value: x, label: x })), 'المالك');
     openDrawer('شكوى جديدة', [h('div.form-grid', [
       field('الوحدة', unitIn), field('التصنيف', catIn), field('تاريخ الفتح', dateIn),
       field('الوصف', descIn), field('التكلفة المتوقعة', costIn), field('يتحمّلها', borneIn),
@@ -1899,7 +1962,7 @@
       }));
     }
 
-    /* ---------- التزام السداد بالمستأجر (من الدفعات الموثقة فقط) ---------- */
+    /* ---------- التزام السداد بالعميل (من الدفعات الموثقة فقط) ---------- */
     const grace = Store.state.settings.graceDays;
     const compliance = [];
     for (const t of Store.state.tenants) {
@@ -1980,7 +2043,7 @@
       }),
       statTile({
         label: 'بصيانة / خاضعة للضريبة', value: `${withMnt} · ${withVat}`, ic: 'doc', tone: 'violet',
-        sub: 'البند الرابع (صيانة شهرية مع الإيجار) والعاشر (ض.ق.م على المستأجر)',
+        sub: 'البند الرابع (صيانة شهرية مع الإيجار) والعاشر (ض.ق.م على العميل)',
       }),
     ]);
 
@@ -2024,9 +2087,9 @@
           ? Charts.typeBars(methodItems)
           : emptyState('لا دفعات موثَّقة بعد')),
       ]),
-      sectionCard('التزام السداد بالمستأجر (من الدفعات الموثَّقة فقط)', compliance.length
+      sectionCard('التزام السداد بالعميل (من الدفعات الموثَّقة فقط)', compliance.length
         ? h('div.mini-scroll', h('table.table.table-mini', [
-            h('thead', h('tr', [h('th', 'المستأجر'), h('th', 'دفعات موثَّقة'), h('th', 'في الميعاد'), h('th', 'التقييم')])),
+            h('thead', h('tr', [h('th', 'العميل'), h('th', 'دفعات موثَّقة'), h('th', 'في الميعاد'), h('th', 'التقييم')])),
             h('tbody', compliance.slice(0, 10).map(x => h('tr', [
               h('td', x.t.name),
               h('td', String(x.n)),
@@ -2055,10 +2118,10 @@
             risk ? insightCard({
               tone: risk.share >= 35 ? 'serious' : 'accent', ic: 'warn',
               num: risk.share + '٪',
-              title: `من دخل الشهر معتمد على مستأجر واحد: ${risk.tenant.name}`,
+              title: `من دخل الشهر معتمد على عميل واحد: ${risk.tenant.name}`,
               text: risk.share >= 35
                 ? 'اعتماد مرتفع — خروجه يؤثر بشدة على الدخل. نوِّع العقود القادمة أو أمِّن تجديده مبكرًا.'
-                : 'توزيع صحي للدخل على المستأجرين.',
+                : 'توزيع صحي للدخل على العملاء.',
             }) : emptyState('لا بيانات'),
             insightCard({
               tone: health.score >= 75 ? 'good' : health.score >= 50 ? 'warning' : 'critical', ic: 'shield',
@@ -2141,7 +2204,7 @@
       const bUnits = Store.state.units.filter(u => u.buildingId === bid);
       const rowsTable = bUnits.length
         ? h('table.table.table-mini', [
-            h('thead', h('tr', [h('th', 'الوحدة'), h('th', 'المستأجر'), h('th', 'من'), h('th', 'إلى'),
+            h('thead', h('tr', [h('th', 'الوحدة'), h('th', 'العميل'), h('th', 'من'), h('th', 'إلى'),
               h('th', 'سنة 1'), h('th', 'سنة 2'), h('th', 'سنة 3'), h('th', 'ملاحظات')])),
             h('tbody', bUnits.map(u => {
               const c = Store.unitContracts(u.id).slice(-1)[0];
@@ -2223,6 +2286,22 @@
   }
 
   /* جدول أنواع الإدخال — مرجع سريع (يُعرض في دليل الشرح) */
+  function codesCard() {
+    const b0 = Store.state.buildings[0] || {};
+    const u0 = Store.state.units[0] || {};
+    return sectionCard('الأكواد — كيف تجد أي شيء في ثانية', h('div', [
+      h('p.step-hint', 'لكل مشروع ووحدة كود قصير يولِّده النظام تلقائيًا، وللعميل كود تُدخله أنت هو رقمه القومي. اكتب أي كود في خانة البحث أعلى الشاشة وستصل مباشرة.'),
+      h('div.mini-scroll', h('table.table.table-mini', [
+        h('thead', h('tr', [h('th', 'الكود'), h('th', 'شكله'), h('th', 'من أين يأتي'), h('th', 'مثال من بياناتك')])),
+        h('tbody', [
+          ['كود المشروع', 'P ثم رقم', 'يُولَّد تلقائيًا عند إضافة مشروع', (b0.code || 'P1') + ' — ' + (b0.name || '')],
+          ['كود الوحدة', 'كود المشروع ثم رقم متسلسل', 'يُولَّد تلقائيًا عند إضافة وحدة', (u0.code || 'P1-01') + ' — ' + (u0.name || '')],
+          ['كود العميل', 'الرقم القومي (14 رقمًا) أو السجل التجاري', 'تُدخله عند تسجيل العميل — والنظام يمنع تكراره لعميلَين', '28501011234567'],
+        ].map(r => h('tr', [h('td', h('b', r[0])), h('td', h('code.code-chip', r[1])), h('td', r[2]), h('td', r[3])]))),
+      ])),
+    ]));
+  }
+
   function entryTypesCard() {
     return sectionCard('أنواع الإدخال في النظام — ماذا تُدخل ومن أين', h('div.mini-scroll', h('table.table.table-mini', [
       h('thead', h('tr', [h('th', 'ماذا تريد أن تُدخل؟'), h('th', 'من أين'), h('th', 'الخطوات باختصار')])),
@@ -2230,9 +2309,9 @@
         ['مشروع جديد (ورقة كاملة)', '«إضافة مشروع جديد»', 'اسم المالك ← صفوف الورقة ← نقل علامات ✓/✗'],
         ['دفعة شهر واحد', 'جدول التحصيل', 'اضغط خلية الشهر ← المبلغ مُعبَّأ بالمتبقي ← احفظ'],
         ['سداد شهر كامل (دفعة واحدة للجميع)', 'جدول التحصيل ← «سداد جماعي»', 'حدِّد من سدَّدوا ← تاريخ وطريقة موحَّدان ← حفظ'],
-        ['عقد جديد أو تجديد', 'العقود ← «عقد جديد» أو زر «+ إدخال»', 'وحدة + مستأجر + بداية وقيمة سنة أولى — الجدول يتولَّد'],
+        ['عقد جديد أو تجديد', 'العقود ← «عقد جديد» أو زر «+ إدخال»', 'العميل (بالاسم أو الرقم القومي) ← المشروع ← وحدة شاغرة ← البداية وقيمة السنة الأولى — جدول السنوات يتولَّد'],
         ['وحدة داخل مشروع قائم', 'الوحدات ← «وحدة جديدة»', 'اختر المشروع ← الاسم والنوع'],
-        ['مستأجر أو تعديل بياناته', 'المستأجرون', 'اضغط الصف للتعديل أو «مستأجر جديد»'],
+        ['عميل أو تعديل بياناته', 'العملاء', 'اضغط الصف للتعديل أو «عميل جديد»'],
         ['شكوى صيانة', 'الشكاوى ← «شكوى جديدة»', 'الوحدة ← التصنيف والتكلفة ومن يتحمَّلها'],
         ['رد المالك على سؤال مراجعة', 'مراجعات مطلوبة', '«سجّل رد المالك» ← اكتب الإجابة — يُغلق البند'],
       ].map(r => h('tr', [h('td', h('b', r[0])), h('td', r[1]), h('td', r[2])]))),
@@ -2314,9 +2393,9 @@
         { name: 'سداد الإيجار «في اليوم الأول من الشهر الميلادي»', what: 'يوم الاستحقاق وبداية عدّ التأخير', source: 'بند الالتزامات', calc: 'خانة «يوم الاستحقاق» في كل عقد (افتراضي 1) + أيام سماح قابلة للضبط', example: 'دفعة بتاريخ بعد اليوم 1+5 سماح تتعلّم «مدفوع متأخرًا»' },
         { name: 'البند الرابع: صيانة شهرية تُسدَّد مع الإيجار', what: 'بند مستقل في الاستحقاق مش مضموم للإيجار', source: 'نص البند (القيمة فارغة في العينة!)', calc: 'خانة صيانة بكل عقد تدخل استحقاق الشهر وتظهر منفصلة في التلميح والدرج', example: 'محل 1 (برج النيل): 41,800 إيجار + 1,200 صيانة + ض.ق.م' },
         { name: 'البند الخامس: التأمين «بواقع شهر»، يُرد أو يُخصم', what: 'التزام مالي على المالك لازم يبان', source: 'نص البند + ملاحظة «35,000 تأمين» للوحدة 41', calc: 'خانة تأمين بكل عقد + كارد «تأمينات محتجزة» يجمعها + تنبيه للعقود الناقصة', example: '41: تأمين 35,000 ≈ شهر من 36,000 — مطابق للبند' },
-        { name: 'البند السادس: لا تأجير من الباطن ولا تغيير استخدام', what: 'خطر تشغيلي يُتابَع ميدانيًا', source: 'نص البند', calc: 'ملاحظة الوحدة + الشكاوى مكانهما الطبيعي لأي مخالفة تُرصد', example: 'صف «الميزان 2» المزدوج (الدقة/العنوان) — Q2 بيسأل: مين المستأجر الفعلي؟' },
-        { name: 'البند العاشر: ض.ق.م على المستأجر وتُسدَّد مع الإيجار', what: 'إضافة الضريبة لاستحقاق الخاضعين', source: 'نص البند', calc: 'علامة «خاضع» بكل عقد ⇒ الاستحقاق × (1 + النسبة من الإعدادات)', example: 'Q19: لسه محتاجين حصر مين الخاضع في كشف سكرية' },
-        { name: 'البندان التاسع والسادس: الإنهاء المبكر = مصادرة التأمين', what: 'قاعدة تسوية عند خروج مستأجر', source: 'نص البندين', calc: 'مرحلة قادمة: شاشة «تسوية خروج» (رد/خصم من التأمين بمستنداته) — مسجّلة في خارطة الطريق', example: '42 المنتهي بلا تجديد: Q16 بيسأل عن تسوية تأمينه' },
+        { name: 'البند السادس: لا تأجير من الباطن ولا تغيير استخدام', what: 'خطر تشغيلي يُتابَع ميدانيًا', source: 'نص البند', calc: 'ملاحظة الوحدة + الشكاوى مكانهما الطبيعي لأي مخالفة تُرصد', example: 'صف «الميزان 2» المزدوج (الدقة/العنوان) — Q2 بيسأل: مين العميل الفعلي؟' },
+        { name: 'البند العاشر: ض.ق.م على العميل وتُسدَّد مع الإيجار', what: 'إضافة الضريبة لاستحقاق الخاضعين', source: 'نص البند', calc: 'علامة «خاضع» بكل عقد ⇒ الاستحقاق × (1 + النسبة من الإعدادات)', example: 'Q19: لسه محتاجين حصر مين الخاضع في كشف سكرية' },
+        { name: 'البندان التاسع والسادس: الإنهاء المبكر = مصادرة التأمين', what: 'قاعدة تسوية عند خروج عميل', source: 'نص البندين', calc: 'مرحلة قادمة: شاشة «تسوية خروج» (رد/خصم من التأمين بمستنداته) — مسجّلة في خارطة الطريق', example: '42 المنتهي بلا تجديد: Q16 بيسأل عن تسوية تأمينه' },
       ]);
 
     /* توثيق الشاشات */
@@ -2341,7 +2420,7 @@
 
     const otherDocs = docSection('متبقّي الشاشات — باختصار', null, [
       { name: 'التحليلات', what: 'الإنسايتس المكتوبة + تحليل العقود + الالتزام + التوزيعات', source: 'كل ما سبق', calc: 'كل بطاقة إنسايت جملة محسوبة بشرطها (مثلًا: منحدر الإيراد يظهر فقط لو النصف الثاني أقل 15٪+) وتنقلك لمكان الإجراء', example: '' },
-      { name: 'الوحدات / العقود / المستأجرون', what: 'ملفات الكيانات: بطاقات بالكشف، جانت زمني بخط «اليوم»، أرصدة لحظية', source: 'العقود والدفعات', calc: 'حالة الوحدة محسوبة من عقودها — عمرها ما بتتكتب يدويًا', example: '' },
+      { name: 'الوحدات / العقود / العملاء', what: 'ملفات الكيانات: بطاقات بالكشف، جانت زمني بخط «اليوم»، أرصدة لحظية', source: 'العقود والدفعات', calc: 'حالة الوحدة محسوبة من عقودها — عمرها ما بتتكتب يدويًا', example: '' },
       { name: 'الشكاوى', what: 'سجل بالتصنيف والتكلفة ومن يتحمّلها وزمن الإغلاق', source: 'إدخال يدوي — السجل بيبدأ من أول يوم تشغيل', calc: 'متوسط زمن الإغلاق = متوسط (تاريخ الإغلاق − الفتح) · مؤشر «بعد التسليم» محتاج تواريخ تسليم (Q20)', example: '' },
       { name: 'جودة البيانات', what: 'كل تناقض/نقص في الورقة بنصه الحرفي وقرار تفسيره وسؤاله للمالك', source: 'التفريغ + شيت درجة الثقة + صور الورقة والعقد', calc: 'الحسم بيتسجّل بنصه في السجل — عمره ما بيتمسح', example: `${Store.state.issues.filter(q => q.status === 'open').length} ملاحظة مفتوحة الآن` },
       { name: 'الإعدادات', what: 'كل افتراض معلن هنا: أساس الإيجار، السماح، الزيادة، الضريبة + إدارة الكشوف + التصدير', source: '—', calc: 'أي تغيير يعيد حساب كل الأرقام فورًا', example: '' },
@@ -2350,6 +2429,7 @@
     return h('div.view', [
       pageHead('دليل الشرح', 'المرجع الكامل: خريطة العملية، ومنطق كل رقم — من الورقة للإنسايت.'),
       sectionCard('خريطة العملية الكاملة — من الورقة للقرار', flowNode),
+      codesCard(),
       entryTypesCard(),
       chain,
       contractMap,
@@ -2370,22 +2450,22 @@
     filteredUnits, fset,
   };
 
-  /* ترجمة ملف المستأجر واقتراحات البحث */
+  /* ترجمة ملف العميل واقتراحات البحث */
   I18N.extend({
-    'ملف المستأجر': 'Tenant profile',
+    'ملف العميل': 'Client profile',
     'حفظ البيانات': 'Save details',
     'تعديل البيانات': 'Edit details',
     'آخر سداد مسجَّل': 'Last recorded payment',
     'عن شهر': 'for',
     'لا مدفوعات مسجَّلة بمبلغ وتاريخ': 'No payments recorded with an amount and date',
     'آخر شهر مؤشَّر ✓ في ورقة المالك:': 'last month ticked ✓ on the owner’s paper:',
-    'لا سداد مسجَّل لهذا المستأجر إطلاقًا': 'No payment recorded for this tenant at all',
+    'لا سداد مسجَّل لهذا العميل إطلاقًا': 'No payment recorded for this client at all',
     'إجمالي المتأخرات': 'Total arrears',
     'بقيمة مجهولة': 'of unknown value',
     'لا شيء': 'None',
     'سجل السداد شهرًا بشهر': 'Payment history, month by month',
-    'أشهر هذا المستأجر فقط، الأحدث أولًا — كل سطر يفتح خلية الشهر نفسها للتفصيل أو تسجيل دفعة.':
-      'This tenant’s months only, newest first — each row opens that month’s cell to inspect or record a payment.',
+    'أشهر هذا العميل فقط، الأحدث أولًا — كل سطر يفتح خلية الشهر نفسها للتفصيل أو تسجيل دفعة.':
+      'This client’s months only, newest first — each row opens that month’s cell to inspect or record a payment.',
     'الشهر': 'Month', 'الوحدة': 'Unit', 'المستحق': 'Due', 'المسدَّد': 'Paid',
     'تاريخ السداد': 'Payment date', 'الحالة': 'Status',
     'لا أشهر مسجَّلة بعد': 'No months recorded yet',
@@ -2396,6 +2476,43 @@
     'عقد من': 'Contract from', 'إلى': 'to', 'الإيجار الحالي': 'current rent', 'منتهٍ': 'ended',
     'تسجيل دفعة في جدول التحصيل': 'Record a payment in the collection sheet',
     'الهاتف': 'Phone', 'غير مسجّل': 'not recorded',
-    'مستأجر': 'Tenant', 'وحدة': 'Unit', 'مشروع': 'Project', 'نوع': 'Type', 'دور': 'Floor',
+    'عميل': 'Client', 'وحدة': 'Unit', 'مشروع': 'Project', 'نوع': 'Type', 'دور': 'Floor',
+    /* الأكواد وفورم العقد الجديد */
+    'ابحث بالاسم أو الرقم القومي…': 'Search by name or national ID…',
+    'اكتب حرفين من الاسم أو أرقامًا من الكود': 'Type part of the name or a few digits of the code',
+    'كود العميل — الرقم القومي': 'Client code — national ID',
+    'هو ما ستبحث به عن العميل لاحقًا في أي شاشة': 'It is what you will search the client by later, from any screen',
+    'به تبحث عن العميل من أي شاشة': 'You can search the client by it from any screen',
+    'هاتف العميل': 'Client phone',
+    'الاسم كما في البطاقة أو السجل': 'The name as on the ID card or registry',
+    'الرقم القومي (14 رقمًا) — أو السجل التجاري للشركات': 'National ID (14 digits) — or commercial registry for companies',
+    'المشروع': 'Project',
+    'الوحدة — الشاغرة فقط': 'Unit — vacant only',
+    'عرض كل الوحدات (لتسجيل تجديد على وحدة عليها عقد)': 'Show all units (to record a renewal on an occupied unit)',
+    'لا وحدات شاغرة في هذا المشروع بهذا التاريخ — علِّم «عرض كل الوحدات» إن كان تجديدًا':
+      'No vacant units in this project on this date — tick “Show all units” if this is a renewal',
+    'كود العميل': 'Client code',
+    'كود الوحدة': 'Unit code',
+    'الكود (الرقم القومي)': 'Code (national ID)',
+    'غير مسجَّل': 'Not recorded',
+    'غير مسجَّل — أضفه من «تعديل البيانات» بالأسفل': 'Not recorded — add it from “Edit details” below',
+    /* بطاقة الأكواد في دليل الشرح */
+    'الأكواد — كيف تجد أي شيء في ثانية': 'Codes — how to find anything in a second',
+    'لكل مشروع ووحدة كود قصير يولِّده النظام تلقائيًا، وللعميل كود تُدخله أنت هو رقمه القومي. اكتب أي كود في خانة البحث أعلى الشاشة وستصل مباشرة.':
+      'Every project and unit gets a short code generated automatically, and every client gets a code you enter — their national ID. Type any code into the search box at the top of the screen to jump straight to it.',
+    'الكود': 'Code', 'شكله': 'Format', 'من أين يأتي': 'Where it comes from', 'مثال من بياناتك': 'Example from your data',
+    'كود المشروع': 'Project code', 'P ثم رقم': 'P then a number',
+    'يُولَّد تلقائيًا عند إضافة مشروع': 'Generated automatically when a project is added',
+    'كود المشروع ثم رقم متسلسل': 'The project code then a serial number',
+    'يُولَّد تلقائيًا عند إضافة وحدة': 'Generated automatically when a unit is added',
+    'الرقم القومي (14 رقمًا) أو السجل التجاري': 'National ID (14 digits) or commercial registry',
+    'تُدخله عند تسجيل العميل — والنظام يمنع تكراره لعميلَين': 'You enter it when registering the client — the system prevents two clients sharing one code',
+    'العميل (بالاسم أو الرقم القومي) ← المشروع ← وحدة شاغرة ← البداية وقيمة السنة الأولى — جدول السنوات يتولَّد':
+      'Client (by name or national ID) → project → a vacant unit → start date and first-year rent — the year schedule is generated',
   });
+  I18N.addPatterns([
+    [/^(\d+) من (\d+) وحدة شاغرة في تاريخ البداية المختار$/, function (m) { return m[1] + ' of ' + m[2] + ' units are vacant on the chosen start date'; }],
+    [/^كل وحدات المشروع \((\d+)\) — التي عليها عقد معلَّمة بجوار اسمها$/, function (m) { return 'All project units (' + m[1] + ') — occupied ones are marked next to their name'; }],
+  ]);
+  I18N.addTokens([[/— عليها عقد قائم/g, '— has an active contract']]);
 })();

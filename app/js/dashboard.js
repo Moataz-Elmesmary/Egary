@@ -132,7 +132,7 @@
       }, [
         h('div.proj-head', [
           h('div', [
-            h('h3.proj-name', b.name),
+            h('h3.proj-name', [b.name, b.code ? h('code.code-chip', ' ' + b.code) : null]),
             h('div.proj-owner', (b.owner ? 'المالك: ' + b.owner : '') + (b.demo ? ' · بيانات تجريبية' : '')),
           ]),
           b.demo ? h('span.chip.chip-neutral', 'تجريبي') : h('span.chip.chip-good-soft', 'فعلي'),
@@ -260,7 +260,7 @@
           openDrawer('التأمينات عند المالك', [
             h('p.step-hint', 'التأمين ≈ شهر إيجار (البند الخامس) — بيترد بالكامل عند التسليم أو بيتخصم منه الإصلاحات. مش بيدخل في حسابات الدخل.'),
             h('table.table.table-mini', [
-              h('thead', h('tr', [h('th', 'المشروع'), h('th', 'الوحدة'), h('th', 'المستأجر'), h('th', 'المبلغ')])),
+              h('thead', h('tr', [h('th', 'المشروع'), h('th', 'الوحدة'), h('th', 'العميل'), h('th', 'المبلغ')])),
               h('tbody', rows.map(x => h('tr', [
                 h('td', bName(Store.unit(x.contract.unitId).buildingId)),
                 h('td', (Store.unit(x.contract.unitId) || {}).name),
@@ -272,7 +272,7 @@
         },
       }),
       tile({
-        label: 'التزام المستأجرين',
+        label: 'التزام العملاء',
         value: comp.perTenant.length ? `${comp.punctual} ملتزم` : '—',
         ic: 'check', tone: 'good',
         sub: comp.perTenant.length
@@ -280,10 +280,10 @@
           : 'يُحسب من الدفعات المسجَّلة بتاريخ — يظهر بعد أول أشهر التشغيل',
         onclick: () => {
           if (!comp.perTenant.length) { go('#insights', { b: F.b }); return; }
-          openDrawer('التزام المستأجرين — بالأسماء والنقاط', [
+          openDrawer('التزام العملاء — بالأسماء والنقاط', [
             h('p.step-hint', 'النقاط = نسبة الدفعات التي وصلت في ميعادها (يوم الاستحقاق + أيام السماح) من سجل السداد الفعلي المُوثَّق.'),
             h('table.table.table-mini', [
-              h('thead', h('tr', [h('th', 'المستأجر'), h('th', 'دفعات'), h('th', 'في الميعاد'), h('th', 'النقاط'), h('th', 'التقييم')])),
+              h('thead', h('tr', [h('th', 'العميل'), h('th', 'دفعات'), h('th', 'في الميعاد'), h('th', 'النقاط'), h('th', 'التقييم')])),
               h('tbody', comp.perTenant.map(x => h('tr', [
                 h('td', x.tenant.name),
                 h('td', String(x.n)),
@@ -469,7 +469,7 @@
     'سداد يحتاج تأكيد': 'Payments needing confirmation', 'لا شيء بانتظار التأكيد': 'All confirmed',
     'تأمينات عند المالك': 'Deposits held by owner',
     'ليست دخلًا — التزام يُرَدُّ عند نهاية العقد (خارج الإيرادات)': 'Not income — a liability returned at contract end (kept out of revenue)',
-    'التزام المستأجرين': 'Tenant punctuality',
+    'التزام العملاء': 'Client punctuality',
     'الدخل المتوقع 12 شهر (من العقود — التأمينات غير محسوبة)': 'Expected income, 12 months (from contracts — deposits excluded)',
     'حركة الوحدات (دخول/خروج) وأثرها': 'Move-ins / move-outs and their impact',
     ' — جارٍ': ' — in progress',
@@ -537,7 +537,7 @@
       m2 => `Collection — ${I18N.tt(m2[1])} ${m2[2] === 'انخفض' ? 'down' : 'up'} ${m2[3]} pts`],
     [/^تحصيل (\d+)\/40 · إشغال (\d+)\/25 · خصم عدم التأكيد (\d+) · خصم تعمّر المتأخرات (\d+) · خصم الانتهاءات (\d+)$/,
       m2 => `Collection ${m2[1]}/40 · occupancy ${m2[2]}/25 · unconfirmed −${m2[3]} · arrears aging −${m2[4]} · expiries −${m2[5]}`],
-    [/^من دخل الشهر معتمد على مستأجر واحد: (.+)$/, m2 => "of this month's income depends on a single tenant: " + I18N.tt(m2[1])],
+    [/^من دخل الشهر معتمد على عميل واحد: (.+)$/, m2 => "of this month's income depends on a single tenant: " + I18N.tt(m2[1])],
     [/^(\d+) vacant units · avg vacancy ([\d.]+) شهر · lost so far ≈([\d,]+)$/,
       m2 => `${m2[1]} vacant units · avg vacancy ${m2[2]} mo · lost so far ≈${m2[3]}`],
     [/^غير مشمول: (\d+) أشهر قيمتها غير معروفة \(لا يوجد عقد مسجّل\)\.$/,
@@ -557,7 +557,7 @@
   I18N.addPatterns([
     [/^المشروع: (.+)$/, m2 => 'Project: ' + I18N.tt(m2[1])],
     [/^النوع: (.+)$/, m2 => 'Type: ' + I18N.tt(m2[1])],
-    [/^المستأجر: (.+)$/, m2 => 'Tenant: ' + I18N.tt(m2[1])],
+    [/^العميل: (.+)$/, m2 => 'Tenant: ' + I18N.tt(m2[1])],
     [/^الحالة: (.+)$/, m2 => 'State: ' + I18N.tt(m2[1])],
     [/^بحث: (.+)$/, m2 => 'Search: ' + m2[1]],
   ]);
@@ -574,11 +574,11 @@
     'حدِّد من سدَّدوا ← تاريخ وطريقة موحَّدان ← حفظ': 'Tick who paid → one date & method → save',
     'عقد جديد أو تجديد': 'New contract or renewal',
     'العقود ← «عقد جديد» أو زر «+ إدخال»': 'Contracts → “New contract” or the “+ Add” button',
-    'وحدة + مستأجر + بداية وقيمة سنة أولى — الجدول يتولَّد': 'Unit + tenant + start & year-1 rent — the schedule generates itself',
+    'وحدة + عميل + بداية وقيمة سنة أولى — الجدول يتولَّد': 'Unit + tenant + start & year-1 rent — the schedule generates itself',
     'وحدة داخل مشروع قائم': 'A unit inside an existing project', 'الوحدات ← «وحدة جديدة»': 'Units → “New unit”',
     'اختر المشروع ← الاسم والنوع': 'Pick the project → name & type',
-    'مستأجر أو تعديل بياناته': 'A tenant, or editing one', 'المستأجرون': 'Tenants',
-    'اضغط الصف للتعديل أو «مستأجر جديد»': 'Click a row to edit, or “New tenant”',
+    'عميل أو تعديل بياناته': 'A tenant, or editing one', 'العملاء': 'Tenants',
+    'اضغط الصف للتعديل أو «عميل جديد»': 'Click a row to edit, or “New tenant”',
     'شكوى صيانة': 'A maintenance complaint', 'الشكاوى ← «شكوى جديدة»': 'Complaints → “New complaint”',
     'الوحدة ← التصنيف والتكلفة ومن يتحمَّلها': 'Unit → category, cost and who bears it',
     'رد المالك على سؤال مراجعة': 'Owner’s answer to a review question', 'مراجعات مطلوبة': 'Reviews Needed',
@@ -591,7 +591,7 @@
       'Every incoming paper = an independent project named after its owner. Type the owner name exactly as written on it.',
     'الدخل السنوي المتوقع لكل مشروع (التأمينات مفصولة — ليست دخلًا)': 'Expected annual income per project (deposits separated — not income)',
     'التأمينات التزام يُرَد — اعرف سيولتك الحقيقية بدونها.': 'Deposits are a returnable liability — know your real liquidity without them.',
-    'توزيع صحي للدخل على المستأجرين.': 'Healthy income spread across tenants.',
+    'توزيع صحي للدخل على العملاء.': 'Healthy income spread across tenants.',
     'مراجعات مطلوبة — أسئلة للمالك': 'Reviews needed — questions for the owner',
     'تركيز المخاطر والتقييم العام': 'Risk concentration & portfolio health',
     'التقييم العام — مؤشر مجمَّع': 'Portfolio health — composite index',
@@ -612,7 +612,7 @@
     'هذه الأشهر داخل مدة العقد لكن الورقة القديمة لم تضع عليها ✓ ولا ✗ — لا تُعتبر سدادًا ولا متأخرات قبل سؤال المالك. اضغط أي سطر لفتح خلية الشهر وتسجيل الحقيقة.':
       'These months fall inside the contract term but the old paper carries neither ✓ nor ✗ — they count as neither payment nor arrears until the owner answers. Click any row to open that month’s cell and record the truth.',
     'الإجمالي غير المحسوم: ': 'Total unresolved: ',
-    'التزام المستأجرين — بالأسماء والنقاط': 'Tenant punctuality — names and points',
+    'التزام العملاء — بالأسماء والنقاط': 'Client punctuality — names and points',
     'النقاط = نسبة الدفعات التي وصلت في ميعادها (يوم الاستحقاق + أيام السماح) من سجل السداد الفعلي المُوثَّق.':
       'Points = the share of documented payments that arrived on time (due day + grace days).',
     'دفعات': 'Payments', 'النقاط': 'Points', 'يتأخر أحيانًا': 'Sometimes late',

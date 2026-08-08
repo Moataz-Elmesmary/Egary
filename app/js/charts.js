@@ -306,7 +306,7 @@
     const today = Store.d(todayIso);
     rows.forEach((r, i) => {
       const y = padT + i * rowH;
-      // اسم الوحدة + المستأجر
+      // اسم الوحدة + العميل
       svg.appendChild(txt(W - 8, y + 16, r.label, { 'text-anchor': 'end', fill: C.ink, 'font-size': 12.5, 'font-weight': 700 }));
       if (r.sub) svg.appendChild(txt(W - 8, y + 30, r.sub, { 'text-anchor': 'end', fill: C.muted, 'font-size': 10 }));
 

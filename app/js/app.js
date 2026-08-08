@@ -14,7 +14,7 @@
     { id: 'intake',     label: 'إضافة مشروع جديد',  path: 'M4 2.5h5L11.5 5v3M4 2.5V13.5h4.5M9 2.5V5h2.5M11.5 9.5v4M9.5 11.5h4' },
     { id: 'units',      label: 'الوحدات',          path: 'M3 13.5V6l5-3.5L13 6v7.5M6.5 13.5v-4h3v4' },
     { id: 'contracts',  label: 'العقود',           path: 'M4 2.5h6l2.5 2.5v8.5H4zM10 2.5V5h2.5M6 8h4M6 10.5h4' },
-    { id: 'tenants',    label: 'المستأجرون',       path: 'M5.5 7a2.2 2.2 0 100-4.4A2.2 2.2 0 005.5 7zM1.8 13.2c0-2 1.7-3.6 3.7-3.6s3.7 1.6 3.7 3.6M11 6.8a1.9 1.9 0 100-3.8M10.6 9.7c1.9.2 3.4 1.7 3.4 3.5' },
+    { id: 'tenants',    label: 'العملاء',       path: 'M5.5 7a2.2 2.2 0 100-4.4A2.2 2.2 0 005.5 7zM1.8 13.2c0-2 1.7-3.6 3.7-3.6s3.7 1.6 3.7 3.6M11 6.8a1.9 1.9 0 100-3.8M10.6 9.7c1.9.2 3.4 1.7 3.4 3.5' },
     { id: 'complaints', label: 'الشكاوى',          path: 'M13.5 7.5a5.5 5.5 0 01-8 4.9L2.5 13.5l1.1-3a5.5 5.5 0 119.9-3zM8 5.5v2.5M8 10.4v.1' },
     { id: 'quality',    label: 'مراجعات مطلوبة',    path: 'M8 1.8l5.5 2v4c0 3.2-2.3 5.6-5.5 6.4-3.2-.8-5.5-3.2-5.5-6.4v-4zM8 5.2v3M8 10.6v.1' },
     { id: 'guide',      label: 'دليل الشرح',       path: 'M8 3c-1.4-.9-3.2-1.2-5.5-1v10c2.3-.2 4.1.1 5.5 1 1.4-.9 3.2-1.2 5.5-1V2c-2.3-.2-4.1.1-5.5 1zM8 3v10' },
@@ -65,7 +65,7 @@
       ['عقد جديد', () => Views.openAddContract()],
       ['كشف جديد (ورقة كاملة)', () => { location.hash = '#intake'; }],
       ['وحدة جديدة', () => Views.openAddUnit()],
-      ['مستأجر جديد', () => Views.openTenantDrawer(null)],
+      ['عميل جديد', () => Views.openTenantDrawer(null)],
       ['شكوى جديدة', () => Views.openAddComplaint()],
     ].map(([label, fn]) => h('button.qa-item', { onclick: () => { closeQa(); fn(); } }, label)));
     const wrap = h('div.qa-wrap', [
@@ -115,7 +115,7 @@
       const items = [];
       if (F.b) items.push(chip('المشروع: ' + ((Store.building(F.b) || {}).name || ''), 'b'));
       if (F.ty) items.push(chip('النوع: ' + F.ty, 'ty'));
-      if (F.tn) items.push(chip('المستأجر: ' + ((Store.tenant(F.tn) || {}).name || ''), 'tn'));
+      if (F.tn) items.push(chip('العميل: ' + ((Store.tenant(F.tn) || {}).name || ''), 'tn'));
       if (F.st) items.push(chip('الحالة: ' + (ST_LBL[F.st] || F.st), 'st'));
       if ((F.q || '').trim()) items.push(chip('بحث: ' + F.q.trim(), 'q'));
       chipsEl = h('div.fchips', [

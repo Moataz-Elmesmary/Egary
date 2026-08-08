@@ -1007,6 +1007,11 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
 :root[data-theme="dark"] .month-live { color: var(--accent); }
 .filter-hint { color: var(--muted); font-size: 12px; }
 .month-nav .btn-icon[disabled] { opacity: .35; cursor: not-allowed; }
+/* ===== شارات الأكواد ===== */
+.code-chip { display: inline-block; font-family: Consolas, "Courier New", monospace; font-size: 12px; font-weight: 700; color: var(--accent-ink); background: var(--accent-weak); border: 1px solid var(--border); border-radius: 6px; padding: 1px 7px; direction: ltr; unicode-bidi: embed; }
+:root[data-theme="dark"] .code-chip { color: var(--accent); background: rgba(167, 139, 250, 0.12); }
+.sug-code { color: var(--muted); font-size: 12px; direction: ltr; unicode-bidi: embed; }
+.new-client-box { grid-column: 1 / -1; border: 1px dashed var(--border); border-radius: 10px; padding: 10px 12px; display: grid; gap: 10px; }
 </style>
 </head>
 <body>
@@ -1039,26 +1044,26 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
   const tenants = [
     { id: 'T1', name: 'صالون علاء',           kind: 'فرد',  phone: '', note: '' },
     { id: 'T2', name: 'حسام سنوسي',           kind: 'فرد',  phone: '', note: '' },
-    { id: 'T3', name: 'الدقة',                kind: 'غير محدد', phone: '', note: 'مستأجر لأكثر من وحدة' },
+    { id: 'T3', name: 'الدقة',                kind: 'غير محدد', phone: '', note: 'عميل لأكثر من وحدة' },
     { id: 'T4', name: 'العنوان',              kind: 'غير محدد', phone: '', note: '' },
     { id: 'T5', name: 'عز الدين',             kind: 'فرد',  phone: '', note: '' },
     { id: 'T6', name: 'مصطفى عثمان',          kind: 'فرد',  phone: '', note: '' },
     { id: 'T7', name: 'علاء الدين محمد حافظ', kind: 'فرد',  phone: '', note: '' },
     { id: 'T8', name: 'تقوى عبدالمنعم',       kind: 'فرد',  phone: '', note: '' },
-    { id: 'T9', name: 'غير مسجّل',            kind: 'غير محدد', phone: '', note: 'مستأجر جراج الهدم — الاسم غير وارد في الكشف' },
+    { id: 'T9', name: 'غير مسجّل',            kind: 'غير محدد', phone: '', note: 'عميل جراج الهدم — الاسم غير وارد في الكشف' },
   ];
 
   const units = [
     { id: 'U1',  buildingId: 'B1', name: 'محل 1',   type: 'محل',      floor: '', area: null, note: 'ورد في الكشف باسم «محل» — رُقِّم مؤقتًا' },
     { id: 'U2',  buildingId: 'B1', name: 'محل 2',   type: 'محل',      floor: '', area: null, note: 'ورد في الكشف باسم «محل» — رُقِّم مؤقتًا' },
     { id: 'U3',  buildingId: 'B1', name: 'الميزان 1', type: 'غير محدد', floor: '', area: null, note: '' },
-    { id: 'U4',  buildingId: 'B1', name: 'الميزان 2', type: 'غير محدد', floor: '', area: null, note: 'وردت في صفّين بمستأجرَين مختلفَين' },
+    { id: 'U4',  buildingId: 'B1', name: 'الميزان 2', type: 'غير محدد', floor: '', area: null, note: 'وردت في صفّين بعميلَين مختلفَين' },
     { id: 'U5',  buildingId: 'B1', name: 'الثاني',  type: 'غير محدد', floor: '', area: null, note: '' },
     { id: 'U6',  buildingId: 'B1', name: '41',      type: 'غير محدد', floor: '', area: null, note: '' },
     { id: 'U7',  buildingId: 'B1', name: '42',      type: 'غير محدد', floor: '', area: null, note: '' },
     { id: 'U8',  buildingId: 'B1', name: '61',      type: 'غير محدد', floor: '', area: null, note: '' },
     { id: 'U9',  buildingId: 'B1', name: 'سكرية',   type: 'غير محدد', floor: '', area: null, note: '' },
-    { id: 'U10', buildingId: 'B1', name: 'جراج الهدم', type: 'جراج',  floor: '', area: null, note: 'بلا عقد ولا مستأجر مسجّل' },
+    { id: 'U10', buildingId: 'B1', name: 'جراج الهدم', type: 'جراج',  floor: '', area: null, note: 'بلا عقد ولا عميل مسجّل' },
     { id: 'U11', buildingId: 'B1', name: 'وحدة غير محددة', type: 'غير محدد', floor: '', area: null, note: 'وحدة تقوى عبدالمنعم — غير مذكورة في الكشف' },
   ];
 
@@ -1186,6 +1191,12 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     const tid = 'T' + (++tn);
     tenants.push({
       id: tid, name: def.tname, kind: def.tkind || 'فرد',
+      // كود العميل: رقم قومي 14 رقمًا للأفراد (قرن+سنة+شهر+يوم+محافظة+مسلسل+تحقق)
+      // وسجل تجاري 6 أرقام للشركات — توضيحي في المشروعين التجريبيين فقط
+      code: def.tkind === 'شركة'
+        ? String(ri(100000, 999999))
+        : '2' + String(ri(60, 99)) + String(ri(1, 12)).padStart(2, '0') + String(ri(1, 28)).padStart(2, '0')
+          + String(ri(1, 35)).padStart(2, '0') + String(ri(1000, 9999)) + String(ri(0, 9)),
       phone: '01' + pick(['0', '1', '2']) + String(ri(10000000, 99999999)), note: '',
     });
     const mkC = (start, nY, r0, prevId) => {
@@ -1287,7 +1298,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
   }
   demoComplaint('مكتب 101', 'B2', '2026-06-14', 0, 6, 1800, 'المالك');
   demoComplaint('محل 1',   'B2', '2026-07-02', 1, 3, 900, 'المالك');
-  demoComplaint('شقة 401', 'B2', '2026-07-19', 2, 9, 2500, 'المستأجر');
+  demoComplaint('شقة 401', 'B2', '2026-07-19', 2, 9, 2500, 'العميل');
   demoComplaint('مكتب 201','B2', '2026-07-28', 3, 0);
   demoComplaint('محل أ',   'B3', '2026-06-25', 4, 4, 700, 'المالك');
   demoComplaint('ميزانين 1','B3', '2026-07-30', 5, 0);
@@ -1297,7 +1308,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
      التجميعة النهائية
      ========================================================= */
   window.SEED = {
-    version: 4,
+    version: 5,
     meta: {
       sourceName: 'بيان عبدالمنعم سكرية — الكشف الورقي المفرّغ',
       importCoverage: { buildingId: 'B1', from: '2026-01', to: '2026-06' },
@@ -1325,9 +1336,9 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
         detail: 'صف «علاء الدين محمد حافظ» كل شهوره ✗ من يناير إلى يونيو بلا أي بيانات عقد أو قيمة إيجار. المتأخرات مؤكدة الوجود لكن قيمتها غير قابلة للحساب من الكشف.',
         action: 'إحضار عقد الوحدة أو تحديد القيمة المتفق عليها لتسجيل المتأخرات بقيمتها.' },
       { id: 'Q2', severity: 'critical', refType: 'unit', refId: 'U4', status: 'open',
-        title: 'الميزان 2 واردة في صفّين لمستأجرَين مختلفَين',
+        title: 'الميزان 2 واردة في صفّين لعميلَين مختلفَين',
         detail: 'صفّ باسم «الدقة» وصفّ باسم «العنوان» وكلاهما على نفس الوحدة وعليهما ✓ من يناير إلى يونيو — لا يمكن أن يسدِّد اثنان لوحدة واحدة. اعتُمدت بيانات صف «العنوان» لوجود عقود به.',
-        action: 'تحديد المستأجر الفعلي للوحدة، وتوضيح علاقة «الدقة» بها.' },
+        action: 'تحديد العميل الفعلي للوحدة، وتوضيح علاقة «الدقة» بها.' },
       { id: 'Q3', severity: 'critical', refType: 'contract', refId: 'C10', status: 'open',
         title: '61: تواريخ العقد الأصلية متناقضة (النهاية قبل البداية)',
         detail: 'المدوَّن حرفيًا: من «2026/4/1 و2028/4/1» إلى «2026/3/31 و2027/3/31». فُسِّر الأرجح: عقد 2026/4/1 حتى 2027/3/31 بقيمة 25,325 وتجديد 2027/4/1 حتى 2028/3/31 بقيمة 40,000.',
@@ -1341,9 +1352,9 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
         detail: 'المدوَّن: من 2025/5/1 إلى 2026/4/30 مع قيمتين 30,500 و39,000. فُسِّر عقد سنتين حتى 2027/4/30. الزيادة 27.9٪ خارج نمط الـ10٪ المعتاد.',
         action: 'مراجعة أصل العقد: هل المدة سنتان فعلًا؟ وهل القيمة الثانية 39,000 صحيحة؟' },
       { id: 'Q6', severity: 'high', refType: 'unit', refId: 'U10', status: 'open',
-        title: 'جراج الهدم: سداد منتظم بلا عقد ولا مستأجر مسجّل',
-        detail: 'المدوَّن حرفيًا: «جراج الهدم» في عمود اسم العميل وعمود الوحدة فارغ — كصف تقوى عبدالمنعم تمامًا — مع ✓ ستة أشهر وقيمة 9,000 بلا أي تواريخ عقد. فُسِّر الاسم اسمَ وحدة (جراج) لا اسمَ شخص، فسُجِّلت وحدة «جراج الهدم» ومستأجر «غير مسجّل». التفريغ يصنّف هذا الصف «خارج ترتيب الجدول — ثقة منخفضة جدًا». لا يُحتسب ضمن الإشغال الموثَّق ولا المستحقات إلى أن يُسجَّل عقد.',
-        action: 'تسجيل اسم المستأجر وبيانات الاتفاق (القيمة 9,000 شهري؟ سنوي؟ ومنذ متى؟).' },
+        title: 'جراج الهدم: سداد منتظم بلا عقد ولا عميل مسجّل',
+        detail: 'المدوَّن حرفيًا: «جراج الهدم» في عمود اسم العميل وعمود الوحدة فارغ — كصف تقوى عبدالمنعم تمامًا — مع ✓ ستة أشهر وقيمة 9,000 بلا أي تواريخ عقد. فُسِّر الاسم اسمَ وحدة (جراج) لا اسمَ شخص، فسُجِّلت وحدة «جراج الهدم» وعميل «غير مسجّل». التفريغ يصنّف هذا الصف «خارج ترتيب الجدول — ثقة منخفضة جدًا». لا يُحتسب ضمن الإشغال الموثَّق ولا المستحقات إلى أن يُسجَّل عقد.',
+        action: 'تسجيل اسم العميل وبيانات الاتفاق (القيمة 9,000 شهري؟ سنوي؟ ومنذ متى؟).' },
       { id: 'Q7', severity: 'high', refType: 'contract', refId: 'C12', status: 'open',
         title: 'تقوى عبدالمنعم: يناير–مارس داخل مدة العقد بلا أي علامة',
         detail: 'العقد من 2025/10/1 والعلامات تبدأ من أبريل. الورق لا يفرِّق بين «متأخر» و«لم يُسجَّل» — الأشهر الثلاثة معلَّمة في النظام «يحتاج تأكيدًا» لحين الحسم.',
@@ -1406,16 +1417,16 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
         action: 'تحديد قيمة الصيانة لكل وحدة.' },
       { id: 'Q19', severity: 'medium', refType: 'global', refId: null, status: 'open',
         title: 'ضريبة القيمة المضافة: غير محدَّد مَن الخاضع لها',
-        detail: 'البند العاشر يُحمِّل المستأجر الضريبة. يلزم تحديد العقود الخاضعة لتظهر في الاستحقاق والإيصالات. (النظام جاهز: علامة خضوع في كل عقد.)',
-        action: 'حصر المستأجرين الخاضعين للضريبة.' },
+        detail: 'البند العاشر يُحمِّل العميل الضريبة. يلزم تحديد العقود الخاضعة لتظهر في الاستحقاق والإيصالات. (النظام جاهز: علامة خضوع في كل عقد.)',
+        action: 'حصر العملاء الخاضعين للضريبة.' },
       { id: 'Q20', severity: 'low', refType: 'global', refId: null, status: 'open',
         title: 'تواريخ تسليم الوحدات غير مسجَّلة',
         detail: 'بدونها لا يمكن حساب مؤشر «الشكاوى خلال 30 يومًا من التسليم».',
         action: 'إدخال تاريخ التسليم لكل وحدة.' },
       { id: 'Q21', severity: 'low', refType: 'global', refId: null, status: 'open',
-        title: 'بيانات التواصل غائبة بالكامل (الكشف الحقيقي)',
-        detail: 'لا هاتف ولا رقم بطاقة لأي مستأجر — لازمة للتنبيهات وللتوثيق القانوني.',
-        action: 'استكمال بيانات المستأجرين.' },
+        title: 'بيانات التواصل وأكواد العملاء غائبة (الكشف الحقيقي)',
+        detail: 'لا هاتف ولا رقم قومي لأي عميل في كشف سكرية — الرقم القومي هو كود العميل الذي يُبحث به، ولازم للتنبيهات وللتوثيق القانوني.',
+        action: 'استكمال أسماء العملاء بأرقامهم القومية وهواتفهم من صور العقود.' },
       { id: 'Q22', severity: 'high', refType: 'global', refId: null, status: 'open',
         title: 'أرقام الإيجار شهرية أم سنوية؟ — عقد العينة يحسمها «شهريًا»',
         detail: 'البند الثالث في عقد العينة ينص حرفيًا: «القيمة الإيجارية للمكان … جنيه شهريًا (فقط لا غير) شهريًا»، والبند الخامس: التأمين «بواقع شهر» (يطابق 41: تأمين 35,000 ≈ شهر من 36,000). النظام محسوب على «شهري». يتبقى التأكيد أن كل العقود على نفس النموذج.',
@@ -1490,11 +1501,46 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       const raw = localStorage.getItem(LS_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.seedVersion === SEED.version) { STATE = parsed; return; }
+        if (parsed && parsed.seedVersion === SEED.version) { STATE = parsed; ensureCodes(); return; }
       }
     } catch (e) { /* تخزين تالف → بذرة جديدة */ }
     STATE = freshFromSeed();
+    ensureCodes();
     save();
+  }
+
+  /* أكواد قصيرة ثابتة قابلة للبحث: المشروع P1 والوحدة P1-01 —
+     تُولَّد مرة واحدة للبيانات القائمة (ترقية بلا مسح) وكود العميل = رقمه القومي يُدخل يدويًا */
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function ensureCodes() {
+    let changed = false;
+    STATE.buildings.forEach((b, i) => { if (!b.code) { b.code = 'P' + (i + 1); changed = true; } });
+    for (const b of STATE.buildings) {
+      let n = 0;
+      for (const u of STATE.units.filter(u => u.buildingId === b.id)) {
+        n++;
+        if (!u.code) { u.code = b.code + '-' + pad2(n); changed = true; }
+      }
+    }
+    if (changed) save();
+  }
+  function nextUnitCode(buildingId) {
+    const b = building(buildingId);
+    if (!b || !b.code) return null;
+    const used = new Set(STATE.units.filter(u => u.buildingId === buildingId).map(u => u.code));
+    let n = STATE.units.filter(u => u.buildingId === buildingId).length + 1;
+    while (used.has(b.code + '-' + pad2(n))) n++;
+    return b.code + '-' + pad2(n);
+  }
+  function nextBuildingCode() {
+    const used = new Set(STATE.buildings.map(b => b.code));
+    let n = STATE.buildings.length + 1;
+    while (used.has('P' + n)) n++;
+    return 'P' + n;
+  }
+  function tenantByCode(code) {
+    const c = String(code || '').trim();
+    return c ? STATE.tenants.find(t => (t.code || '') === c) || null : null;
   }
   function save() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) { /* تخزين ممتلئ */ }
@@ -2085,22 +2131,22 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
   }
 
   function addTenant(rec) {
-    const t = { id: genId('T'), name: rec.name, kind: rec.kind || 'فرد', phone: rec.phone || '', note: rec.note || '' };
+    const t = { id: genId('T'), name: rec.name, code: (rec.code || '').trim() || null, kind: rec.kind || 'فرد', phone: rec.phone || '', note: rec.note || '' };
     STATE.tenants.push(t); commit(); return t;
   }
   function updateTenant(id, patch) {
     const t = tenant(id); if (t) { Object.assign(t, patch); commit(); }
   }
   function addUnit(rec) {
-    const u = { id: genId('U'), buildingId: rec.buildingId, name: rec.name, type: rec.type || 'غير محدد', floor: rec.floor || '', note: rec.note || '' };
+    const u = { id: genId('U'), buildingId: rec.buildingId, code: nextUnitCode(rec.buildingId), name: rec.name, type: rec.type || 'غير محدد', floor: rec.floor || '', note: rec.note || '' };
     STATE.units.push(u);
-    logAct(`وحدة جديدة — ${rec.name}`);
+    logAct(`وحدة جديدة — ${rec.name} (${u.code || ''})`);
     commit(); return u;
   }
   function addBuilding(rec) {
-    const b = { id: genId('B'), name: rec.name, owner: rec.owner || '', area: rec.area || '', note: rec.note || '', demo: false };
+    const b = { id: genId('B'), code: nextBuildingCode(), name: rec.name, owner: rec.owner || '', area: rec.area || '', note: rec.note || '', demo: false };
     STATE.buildings.push(b);
-    logAct(`كشف/مبنى جديد — ${rec.name}`);
+    logAct(`كشف/مبنى جديد — ${rec.name} (${b.code})`);
     commit(); return b;
   }
   /* حذف البيانات التوضيحية عند بدء الاستخدام الفعلي */
@@ -2181,6 +2227,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     projectStats, allProjectsStats, vacancyInfo, inOutForecast,
     consecutiveLateAlarms, complianceBuckets, healthScore,
     topTenantShare, annualByProject, unitIsEarning,
+    tenantByCode,
     // إدخال
     addPayment, addPaymentsBulk, deletePayment, setMark, addContract, addTenant, updateTenant,
     addUnit, addBuilding, removeDemoData, addComplaint, closeComplaint,
@@ -2207,7 +2254,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
   };
   var MONTH_RE = 'يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر';
 
-  /* خريطة الأسماء: مباني/ملاك/مناطق/مستأجرين/وحدات/أدوار — تُرتَّب الأطول أولًا */
+  /* خريطة الأسماء: مباني/ملاك/مناطق/عميلين/وحدات/أدوار — تُرتَّب الأطول أولًا */
   var NAMES = [
     // كشوف وملاك ومناطق
     ['بيان عبدالمنعم سكرية', 'Abdelmoneim Sokareya Statement'],
@@ -2221,7 +2268,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     ['الدقي — الجيزة', 'Dokki — Giza'],
     ['المهندسين — الجيزة', 'Mohandessin — Giza'],
     ['الهرم — الجيزة', 'Haram — Giza'],
-    // مستأجرو الكشف الفعلي
+    // عملاء الكشف الفعلي
     ['علاء الدين محمد حافظ', 'Alaa El-Din Mohamed Hafez'],
     ['صالون علاء', 'Alaa Salon'],
     ['حسام سنوسي', 'Hossam Senoussi'],
@@ -2231,7 +2278,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     ['عز الدين', 'Ezz El-Din'],
     ['مصطفى عثمان', 'Mostafa Osman'],
     ['غير مسجّل', 'Not recorded'],
-    // مستأجرو المبنيين التوضيحيين
+    // عملاء المبنيين التوضيحيين
     ['مطعم بيت الكشري', 'Beit El-Koshary Restaurant'],
     ['صيدلية الرحمة', 'El-Rahma Pharmacy'],
     ['مكتب النخبة للمحاماة', 'Elite Law Office'],
@@ -2322,11 +2369,11 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       'The “Alaa El-Din Mohamed Hafez” row is ✗ every month from January to June, with no contract data or rent amount. The arrears certainly exist, but their value cannot be computed from the statement.',
     'إحضار عقد الوحدة أو تحديد القيمة المتفق عليها لتسجيل المتأخرات بقيمتها.':
       'Obtain the unit contract, or establish the agreed amount, so the arrears can be recorded at their actual amount.',
-    'الميزان 2 واردة في صفّين لمستأجرَين مختلفَين': 'Mezzanine 2 appears in two rows under two different tenants',
+    'الميزان 2 واردة في صفّين لعميلَين مختلفَين': 'Mezzanine 2 appears in two rows under two different clients',
     'صفّ باسم «الدقة» وصفّ باسم «العنوان» وكلاهما على نفس الوحدة وعليهما ✓ من يناير إلى يونيو — لا يمكن أن يسدِّد اثنان لوحدة واحدة. اعتُمدت بيانات صف «العنوان» لوجود عقود به.':
-      'One row named “El-Dekka” and one named “El-Enwan”, both for the same unit and both marked ✓ from January to June — two tenants cannot both be paying for one unit. The “El-Enwan” row was used because it has contract data on file.',
-    'تحديد المستأجر الفعلي للوحدة، وتوضيح علاقة «الدقة» بها.':
-      'Identify the unit’s actual tenant, and clarify how “El-Dekka” relates to it.',
+      'One row named “El-Dekka” and one named “El-Enwan”, both for the same unit and both marked ✓ from January to June — two clients cannot both be paying for one unit. The “El-Enwan” row was used because it has contract data on file.',
+    'تحديد العميل الفعلي للوحدة، وتوضيح علاقة «الدقة» بها.':
+      'Identify the unit’s actual client, and clarify how “El-Dekka” relates to it.',
     '61: تواريخ العقد الأصلية متناقضة (النهاية قبل البداية)': '61: original contract dates contradict each other (end before start)',
     'المدوَّن حرفيًا: من «2026/4/1 و2028/4/1» إلى «2026/3/31 و2027/3/31». فُسِّر الأرجح: عقد 2026/4/1 حتى 2027/3/31 بقيمة 25,325 وتجديد 2027/4/1 حتى 2028/3/31 بقيمة 40,000.':
       'Written verbatim: from “2026/4/1 and 2028/4/1” to “2026/3/31 and 2027/3/31”. The most likely reading was adopted: a contract 2026/4/1–2027/3/31 at 25,325, renewed 2027/4/1–2028/3/31 at 40,000.',
@@ -2341,11 +2388,11 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       'Written: from 2025/5/1 to 2026/4/30 with two values, 30,500 and 39,000. Interpreted as a two-year contract to 2027/4/30. The 27.9% increase is outside the usual 10% pattern.',
     'مراجعة أصل العقد: هل المدة سنتان فعلًا؟ وهل القيمة الثانية 39,000 صحيحة؟':
       'Review the original contract: is the term really two years? And is 39,000 correct for year 2?',
-    'جراج الهدم: سداد منتظم بلا عقد ولا مستأجر مسجّل': 'Demolition Garage: regular payments with no contract and no tenant on file',
-    'المدوَّن حرفيًا: «جراج الهدم» في عمود اسم العميل وعمود الوحدة فارغ — كصف تقوى عبدالمنعم تمامًا — مع ✓ ستة أشهر وقيمة 9,000 بلا أي تواريخ عقد. فُسِّر الاسم اسمَ وحدة (جراج) لا اسمَ شخص، فسُجِّلت وحدة «جراج الهدم» ومستأجر «غير مسجّل». التفريغ يصنّف هذا الصف «خارج ترتيب الجدول — ثقة منخفضة جدًا». لا يُحتسب ضمن الإشغال الموثَّق ولا المستحقات إلى أن يُسجَّل عقد.':
-      'Written verbatim: “Demolition Garage” in the client-name column with the unit column empty — exactly like the Taqwa Abdelmoneim row — with ✓ for six months and a value of 9,000, and no contract dates. The name was interpreted as a unit name (a garage), not a person, so a “Demolition Garage” unit and a “Not recorded” tenant were created. The transcription flags this row “out of table order — very low confidence”. It is excluded from documented occupancy and dues until a contract is recorded.',
-    'تسجيل اسم المستأجر وبيانات الاتفاق (القيمة 9,000 شهري؟ سنوي؟ ومنذ متى؟).':
-      'Record the tenant name and the terms of the agreement (is 9,000 monthly? annual? and since when?).',
+    'جراج الهدم: سداد منتظم بلا عقد ولا عميل مسجّل': 'Demolition Garage: regular payments with no contract and no client on file',
+    'المدوَّن حرفيًا: «جراج الهدم» في عمود اسم العميل وعمود الوحدة فارغ — كصف تقوى عبدالمنعم تمامًا — مع ✓ ستة أشهر وقيمة 9,000 بلا أي تواريخ عقد. فُسِّر الاسم اسمَ وحدة (جراج) لا اسمَ شخص، فسُجِّلت وحدة «جراج الهدم» وعميل «غير مسجّل». التفريغ يصنّف هذا الصف «خارج ترتيب الجدول — ثقة منخفضة جدًا». لا يُحتسب ضمن الإشغال الموثَّق ولا المستحقات إلى أن يُسجَّل عقد.':
+      'Written verbatim: “Demolition Garage” in the client-name column with the unit column empty — exactly like the Taqwa Abdelmoneim row — with ✓ for six months and a value of 9,000, and no contract dates. The name was interpreted as a unit name (a garage), not a person, so a “Demolition Garage” unit and a “Not recorded” client were created. The transcription flags this row “out of table order — very low confidence”. It is excluded from documented occupancy and dues until a contract is recorded.',
+    'تسجيل اسم العميل وبيانات الاتفاق (القيمة 9,000 شهري؟ سنوي؟ ومنذ متى؟).':
+      'Record the client name and the terms of the agreement (is 9,000 monthly? annual? and since when?).',
     'تقوى عبدالمنعم: يناير–مارس داخل مدة العقد بلا أي علامة': 'Taqwa Abdelmoneim: January–March fall within the contract term with no mark at all',
     'العقد من 2025/10/1 والعلامات تبدأ من أبريل. الورق لا يفرِّق بين «متأخر» و«لم يُسجَّل» — الأشهر الثلاثة معلَّمة في النظام «يحتاج تأكيدًا» لحين الحسم.':
       'The contract runs from 2025/10/1 while the marks start in April. Paper cannot distinguish “late” from “not recorded” — the three months are flagged “Needs confirmation” in the system until resolved.',
@@ -2406,26 +2453,27 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       'Clause 4 of the contract stipulates a monthly maintenance charge paid with the rent, yet it leaves no trace in the statement. (The system is ready: a maintenance field on every contract feeds dues automatically.)',
     'تحديد قيمة الصيانة لكل وحدة.': 'Establish the maintenance amount for each unit.',
     'ضريبة القيمة المضافة: غير محدَّد مَن الخاضع لها': 'VAT: it is unclear who is subject to it',
-    'البند العاشر يُحمِّل المستأجر الضريبة. يلزم تحديد العقود الخاضعة لتظهر في الاستحقاق والإيصالات. (النظام جاهز: علامة خضوع في كل عقد.)':
-      'Clause 10 puts the tax on the tenant. The VAT-applicable contracts must be identified so it shows in dues and receipts. (The system is ready: a VAT flag on every contract.)',
-    'حصر المستأجرين الخاضعين للضريبة.': 'Inventory the VAT-applicable tenants.',
+    'البند العاشر يُحمِّل العميل الضريبة. يلزم تحديد العقود الخاضعة لتظهر في الاستحقاق والإيصالات. (النظام جاهز: علامة خضوع في كل عقد.)':
+      'Clause 10 puts the tax on the client. The VAT-applicable contracts must be identified so it shows in dues and receipts. (The system is ready: a VAT flag on every contract.)',
+    'حصر العملاء الخاضعين للضريبة.': 'Inventory the VAT-applicable clients.',
     'تواريخ تسليم الوحدات غير مسجَّلة': 'Unit handover dates are unrecorded',
     'بدونها لا يمكن حساب مؤشر «الشكاوى خلال 30 يومًا من التسليم».': 'Without them, the “complaints within 30 days of handover” KPI cannot be computed.',
     'إدخال تاريخ التسليم لكل وحدة.': 'Enter the handover date for each unit.',
-    'بيانات التواصل غائبة بالكامل (الكشف الحقيقي)': 'Contact details are entirely missing (the real statement)',
-    'لا هاتف ولا رقم بطاقة لأي مستأجر — لازمة للتنبيهات وللتوثيق القانوني.': 'No phone or ID number for any tenant — needed for reminders and legal documentation.',
-    'استكمال بيانات المستأجرين.': 'Complete the tenants’ details.',
+    'بيانات التواصل وأكواد العملاء غائبة (الكشف الحقيقي)': 'Contact details and client codes are missing (the real statement)',
+    'لا هاتف ولا رقم قومي لأي عميل في كشف سكرية — الرقم القومي هو كود العميل الذي يُبحث به، ولازم للتنبيهات وللتوثيق القانوني.':
+      'No phone or national ID for any client in the Sokareya statement — the national ID is the client code you search by, and it is needed for reminders and legal documentation.',
+    'استكمال أسماء العملاء بأرقامهم القومية وهواتفهم من صور العقود.': 'Complete the client names with their national IDs and phones from the contract photos.',
     'أرقام الإيجار شهرية أم سنوية؟ — عقد العينة يحسمها «شهريًا»': 'Are the rent figures monthly or annual? — the sample contract settles it: “monthly”',
     'البند الثالث في عقد العينة ينص حرفيًا: «القيمة الإيجارية للمكان … جنيه شهريًا (فقط لا غير) شهريًا»، والبند الخامس: التأمين «بواقع شهر» (يطابق 41: تأمين 35,000 ≈ شهر من 36,000). النظام محسوب على «شهري». يتبقى التأكيد أن كل العقود على نفس النموذج.':
       'Clause 3 of the sample contract reads verbatim: “the rental value of the premises … pounds monthly (and no more) monthly”, and Clause 5 sets the deposit “at one month” (matching 41: a 35,000 deposit ≈ one month of 36,000). The system is computed on “monthly”. It remains to confirm all contracts follow the same form.',
     'تأكيد أن جميع العقود بنفس نموذج العينة، ثم تعليم «تم التأكيد» في الإعدادات.':
       'Confirm all contracts follow the sample form, then tick “Confirmed” in Settings.',
     /* ---------- بذرة: ملاحظات وسجل وشكاوى ---------- */
-    'مستأجر لأكثر من وحدة': 'Tenant of more than one unit',
-    'مستأجر جراج الهدم — الاسم غير وارد في الكشف': 'Demolition Garage tenant — name not given in the statement',
+    'عميل لأكثر من وحدة': 'Client of more than one unit',
+    'عميل جراج الهدم — الاسم غير وارد في الكشف': 'Demolition Garage client — name not given in the statement',
     'ورد في الكشف باسم «محل» — رُقِّم مؤقتًا': 'Listed in the statement as “Shop” — numbered provisionally',
-    'وردت في صفّين بمستأجرَين مختلفَين': 'Appears in two rows with two different tenants',
-    'بلا عقد ولا مستأجر مسجّل': 'No contract and no tenant on file',
+    'وردت في صفّين بعميلَين مختلفَين': 'Appears in two rows with two different clients',
+    'بلا عقد ولا عميل مسجّل': 'No contract and no client on file',
     'وحدة تقوى عبدالمنعم — غير مذكورة في الكشف': 'Taqwa Abdelmoneim’s unit — not named in the statement',
     '— الوحيد المسجّل في الكشف': '— the only one recorded in the statement',
     'الوحيد المسجّل في الكشف': 'The only one recorded in the statement',
@@ -2520,14 +2568,14 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'البند السادس: لا تأجير من الباطن ولا تغيير استخدام': 'Clause 6: no subletting and no change of use',
     'خطر تشغيلي يُتابَع ميدانيًا': 'An operational risk followed up in the field',
     'ملاحظة الوحدة + الشكاوى مكانهما الطبيعي لأي مخالفة تُرصد': 'The unit note + Complaints are the natural home for any observed violation',
-    'صف «الميزان 2» المزدوج (الدقة/العنوان) — Q2 بيسأل: مين المستأجر الفعلي؟':
-      'The duplicated “Mezzanine 2” row (El-Dekka/El-Enwan) — Q2 asks: who is the actual tenant?',
-    'البند العاشر: ض.ق.م على المستأجر وتُسدَّد مع الإيجار': 'Clause 10: VAT on the tenant, paid with the rent',
+    'صف «الميزان 2» المزدوج (الدقة/العنوان) — Q2 بيسأل: مين العميل الفعلي؟':
+      'The duplicated “Mezzanine 2” row (El-Dekka/El-Enwan) — Q2 asks: who is the actual client?',
+    'البند العاشر: ض.ق.م على العميل وتُسدَّد مع الإيجار': 'Clause 10: VAT on the client, paid with the rent',
     'إضافة الضريبة لاستحقاق الخاضعين': 'Adds the tax to dues on VAT-applicable contracts',
     'علامة «خاضع» بكل عقد ⇒ الاستحقاق × (1 + النسبة من الإعدادات)': 'A “VAT applicable” flag per contract ⇒ dues × (1 + the rate from Settings)',
     'Q19: لسه محتاجين حصر مين الخاضع في كشف سكرية': 'Q19: we still need to identify who is VAT-applicable in the Sokareya statement',
     'البندان التاسع والسادس: الإنهاء المبكر = مصادرة التأمين': 'Clauses 9 & 6: early termination = deposit forfeiture',
-    'قاعدة تسوية عند خروج مستأجر': 'A settlement rule on tenant exit',
+    'قاعدة تسوية عند خروج عميل': 'A settlement rule on client exit',
     'مرحلة قادمة: شاشة «تسوية خروج» (رد/خصم من التأمين بمستنداته) — مسجّلة في خارطة الطريق':
       'A coming phase: an “exit settlement” screen (refund / documented deduction from the deposit) — on the roadmap',
     '42 المنتهي بلا تجديد: Q16 بيسأل عن تسوية تأمينه': '42, ended with no renewal: Q16 asks about settling its deposit',
@@ -2617,7 +2665,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'كل ما سبق': 'All of the above',
     'كل بطاقة إنسايت جملة محسوبة بشرطها (مثلًا: منحدر الإيراد يظهر فقط لو النصف الثاني أقل 15٪+) وتنقلك لمكان الإجراء':
       'Every insight card is a computed sentence with its own condition (e.g. the revenue slope shows only if H2 is 15%+ lower) and links you to where you act',
-    'الوحدات / العقود / المستأجرون': 'Units / Contracts / Tenants',
+    'الوحدات / العقود / العملاء': 'Units / Contracts / Clients',
     'ملفات الكيانات: بطاقات بالكشف، جانت زمني بخط «اليوم»، أرصدة لحظية':
       'Entity files: cards per statement, a Gantt timeline with a “today” line, live balances',
     'العقود والدفعات': 'Contracts and payments',
@@ -2656,7 +2704,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'لا وحدات ضمن الترشيح الحالي': 'No units match the current filter',
     'لا وحدات ضمن الترشيح': 'No units match the filter',
     'لا عقود ضمن الترشيح': 'No contracts match the filter',
-    'لا مستأجرين ضمن الترشيح': 'No tenants match the filter',
+    'لا عميلين ضمن الترشيح': 'No clients match the filter',
     'لا ملاحظات ضمن هذا الترشيح': 'No notes match this filter',
     'لا انتهاءات خلال 12 شهرًا': 'No expiries within 12 months',
     'لا مستحقات غير مسدَّدة لهذا الشهر ضمن الترشيح': 'No unpaid dues this month within the filter',
@@ -2676,8 +2724,8 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'لا استحقاق': 'No dues',
     'الشهر عليه دفعات مسجَّلة — أطفئ وضع التفريغ لتعديلها':
       'This month has recorded payments — turn off Transcribe mode to edit them',
-    'علامات ✓/✗ بتتعلّم على صفوف الورقة (وحدة + مستأجر + عقد). أضف صفوف الورقة الأول، وبعدين ارجع هنا فرّغ العلامات.':
-      '✓/✗ marks attach to paper rows (unit + tenant + contract). Add the paper’s rows first, then come back here to transcribe the marks.',
+    'علامات ✓/✗ بتتعلّم على صفوف الورقة (وحدة + عميل + عقد). أضف صفوف الورقة الأول، وبعدين ارجع هنا فرّغ العلامات.':
+      '✓/✗ marks attach to paper rows (unit + client + contract). Add the paper’s rows first, then come back here to transcribe the marks.',
     'وسّع الترشيح من السلايسرز فوق، أو امسح البحث.': 'Widen the filter from the slicers above, or clear the search.',
     /* ---------- الأدراج ---------- */
     'سداد جماعي — شهر كامل': 'Bulk collection — a whole month',
@@ -2703,7 +2751,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'حُذفت الدفعة': 'Payment deleted',
     'حذف': 'Delete',
     'خاضع لض.ق.م': 'VAT applicable',
-    'بيانات المستأجر': 'Tenant details',
+    'بيانات العميل': 'Client details',
     'الاسم': 'Name', 'الوحدات': 'Units',
     'لازم للتنبيهات لاحقًا (واتساب)': 'Needed for reminders later (WhatsApp)',
     'أدخل الاسم': 'Enter the name',
@@ -2715,8 +2763,8 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'م² — اختياري': 'm² — optional',
     'المبنى / الكشف': 'Building / Statement',
     'اسم الوحدة': 'Unit name',
-    '+ مستأجر جديد…': '+ New tenant…',
-    'اسم المستأجر الجديد': 'New tenant name',
+    '+ عميل جديد…': '+ New client…',
+    'اسم العميل الجديد': 'New client name',
     'النهاية تُحسب تلقائيًا — يستحيل عقد نهايته قبل بدايته': 'The end is computed automatically — an end-before-start contract is impossible',
     'أساس الحساب الحالي: شهري': 'Current basis: monthly',
     'أساس الحساب الحالي: سنوي': 'Current basis: annual',
@@ -2729,7 +2777,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'أدخل قيمة السنة الأولى لتوليد الجدول.': 'Enter the year-1 value to generate the schedule.',
     'أكمل الوحدة والبداية وقيمة سنة أولى موجبة': 'Complete the unit, the start, and a positive year-1 value',
     'لا تُقبل قيم سالبة': 'Negative values are not accepted',
-    'أدخل اسم المستأجر الجديد': 'Enter the new tenant’s name',
+    'أدخل اسم العميل الجديد': 'Enter the new client’s name',
     'سُجِّل العقد وبدأ حساب الاستحقاق فورًا': 'Contract recorded — dues computation started instantly',
     'أُغلقت الشكوى': 'Complaint closed',
     'سُجِّلت الشكوى': 'Complaint logged',
@@ -2829,11 +2877,11 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'عقود نشطة بتأمين مسجّل': 'Active contracts with a recorded deposit',
     'البند الخامس: التأمين «بواقع شهر» — الناقص فجوة توثيق': 'Clause 5: the deposit “at one month” — what’s missing is a documentation gap',
     'بصيانة / خاضعة للضريبة': 'With maintenance / VAT-applicable',
-    'البند الرابع (صيانة شهرية مع الإيجار) والعاشر (ض.ق.م على المستأجر)':
-      'Clause 4 (monthly maintenance with the rent) and 10 (VAT on the tenant)',
+    'البند الرابع (صيانة شهرية مع الإيجار) والعاشر (ض.ق.م على العميل)':
+      'Clause 4 (monthly maintenance with the rent) and 10 (VAT on the client)',
     'تقويم انتهاءات العقود — 12 شهرًا (بلا تجديد مسجّل)': 'Contract expiry calendar — 12 months (no renewal on file)',
     'عدد العقود المنتهية شهريًا': 'Contracts expiring per month',
-    'التزام السداد بالمستأجر (من الدفعات الموثَّقة فقط)': 'Payment punctuality by tenant (documented payments only)',
+    'التزام السداد بالعميل (من الدفعات الموثَّقة فقط)': 'Payment punctuality by client (documented payments only)',
     'يُحسب من الدفعات الموثَّقة فقط': 'Computed from documented payments only',
     'كشف سكرية كله علامات ✓ بلا تواريخ — أول شهر توثيق حقيقي سيُظهر هذا الجدول':
       'The Sokareya statement is all undated ✓ marks — the first real month of documentation will populate this table',
@@ -2848,7 +2896,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'الحقيقة 1: العقد (من/إلى + قيم السنوات 1-2-3)': 'Fact 1: the contract (from/to + year values 1-2-3)',
   };
 
-  /* حروف أوائل الأسماء (أفاتار المستأجرين) → حروف لاتينية */
+  /* حروف أوائل الأسماء (أفاتار العملاء) → حروف لاتينية */
   var INITIAL = {
     'ا': 'A', 'أ': 'A', 'إ': 'E', 'آ': 'A', 'ء': 'A', 'ى': 'A', 'ئ': 'Y', 'ؤ': 'W', 'ة': 'H',
     'ب': 'B', 'ت': 'T', 'ث': 'T', 'ج': 'G', 'ح': 'H', 'خ': 'K', 'د': 'D', 'ذ': 'Z',
@@ -3067,21 +3115,21 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'إيجاري': 'Egary', 'منظومة إدارة بيانات الإيجارات': 'Rental Data Management Suite',
     'لوحة المؤشرات': 'Dashboard', 'التحليلات': 'Insights', 'جدول التحصيل': 'Collection Sheet',
     'إضافة مشروع جديد': 'Add New Project', 'الوحدات': 'Units', 'العقود': 'Contracts',
-    'المستأجرون': 'Tenants', 'الشكاوى': 'Complaints', 'مراجعات مطلوبة': 'Reviews Needed',
+    'العملاء': 'Clients', 'الشكاوى': 'Complaints', 'مراجعات مطلوبة': 'Reviews Needed',
     'الإعدادات': 'Settings', 'إدخال': 'Add', 'دليل الشرح': 'User Guide',
     'دليل الاستخدام الكامل': 'Full documentation',
     'نسخة عرض — مشروع سكرية الفعلي ومشروعان تجريبيان':
       'Demo build · Sokareya (real) + 2 sample statements',
     // السلايسرز
-    'ابحث عن وحدة أو مستأجر…': 'Search unit, tenant, phone, receipt…',
-    'كل المشاريع': 'All projects', 'كل الأنواع': 'All types', 'كل المستأجرين': 'All tenants',
+    'ابحث بالاسم أو الكود — عميل أو وحدة أو مشروع…': 'Search unit, client, phone, receipt…',
+    'كل المشاريع': 'All projects', 'كل الأنواع': 'All types', 'كل العملاء': 'All clients',
     'كل الحالات': 'All states', 'مسح': 'Clear', 'مؤجَّرة': 'Occupied',
     'تنتهي خلال 90 يوم': 'Ending within 90 days', 'عقد منتهٍ بلا تجديد': 'Ended, no renewal',
     'بلا عقد مسجّل': 'No contract on file', 'شاغرة': 'Vacant', 'عليها متأخرات': 'Has arrears',
     '· توضيحي': '· sample',
     // عام
     'مشروع فعلي': 'Real project', 'تجريبي': 'Sample', 'المبنى': 'Building',
-    'الوحدة': 'Unit', 'المستأجر': 'Tenant', 'الشهر': 'Month', 'الحالة': 'State',
+    'الوحدة': 'Unit', 'العميل': 'Client', 'الشهر': 'Month', 'الحالة': 'State',
     'النوع': 'Type', 'ملاحظات': 'Notes', 'ملاحظة': 'Note', 'المنطقة': 'District',
     'محل': 'Shop', 'مكتب': 'Office', 'شقة': 'Apartment', 'جراج': 'Garage',
     'مخزن': 'Warehouse', 'غير محدد': 'Unspecified', 'فرد': 'Individual', 'شركة': 'Company',
@@ -3118,7 +3166,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'وضع العمل': 'Mode', 'تسجيل دفعات — اضغط الخلية تفتح دفعة كاملة': 'Record payments — click a cell to log a full payment',
     'نقل ورقة قديمة — الضغطة تقلّب ✓ ← ✗ ← فارغ': 'Transfer old paper — click cycles ✓ → ✗ → blank',
     'سداد جماعي لشهر كامل': 'Bulk collect a whole month',
-    'الوحدة / المستأجر': 'Unit / Tenant', 'متأخرات': 'Arrears',
+    'الوحدة / العميل': 'Unit / Client', 'متأخرات': 'Arrears',
     'الإجمالي (محصَّل / مستحق)': 'Total (collected / due)',
     'مدفوع (موثَّق)': 'Paid (documented)', 'مدفوع متأخرًا عن ميعاده': 'Paid late',
     'مدفوع (من الورقة) — من غير مبلغ/تاريخ': 'Paid (per old paper) — no amount/date',
@@ -3140,7 +3188,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'علامة الكشف الورقي: ✗ عدم سداد — بلا مبلغ ولا تاريخ.': 'Paper mark: ✗ unpaid — no amount, no date.',
     // البطاقات والكشوف
     'حذف البيانات التوضيحية': 'Delete sample data', 'وحدة جديدة': 'New unit', 'عقد جديد': 'New contract',
-    'مستأجر جديد': 'New tenant', 'شكوى جديدة': 'New complaint', 'كشف جديد (ورقة كاملة)': 'New statement (full paper)',
+    'عميل جديد': 'New client', 'شكوى جديدة': 'New complaint', 'كشف جديد (ورقة كاملة)': 'New statement (full paper)',
     'كشف/مبنى جديد': 'New statement/building', 'الهاتف': 'Phone', 'غير مسجّل': 'Not recorded',
     'الإيجار الحالي': 'Current rent', 'متأخرات مجهولة': 'Unknown arrears',
     'سلسلة العقود': 'Contract chain', 'من الكشف': 'From paper', 'لا عقود مسجَّلة': 'No contracts on file',
@@ -3164,7 +3212,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'اتجاه نسبة التحصيل — 12 شهرًا': 'Collection rate trend — 12 months',
     'أعلى المتأخرين': 'Top debtors', 'حالة الوحدات': 'Unit states',
     'متوسط الإيجار الشهري حسب النوع': 'Average monthly rent by type',
-    'التزام السداد بالمستأجر': 'Payment punctuality by tenant',
+    'التزام السداد بالعميل': 'Payment punctuality by client',
     'توزيع المحصَّل حسب طريقة السداد': 'Collected amount by payment method',
     'دفعات موثَّقة': 'Documented payments', 'في الميعاد': 'On time', 'التقييم': 'Rating',
     'ملتزم': 'Punctual', 'متذبذب': 'Inconsistent', 'الكشوف': 'Statements', 'عقود نشطة': 'Active contracts',
@@ -3194,7 +3242,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       'Every incoming paper = an independent statement named after its owner. Type the owner name exactly as written.',
     'الخطوة 3 — علامات الشهور ✓/✗': 'Step 3 — Month marks ✓/✗',
     'مثال: عبدالمنعم سكرية': 'e.g. Abdelmoneim Sokareya', 'مثال: الدقي — الجيزة': 'e.g. Dokki — Giza',
-    'اسم المستأجر': 'Tenant name', 'الوحدة (كما في الورقة)': 'Unit (as on paper)',
+    'اسم العميل': 'Client name', 'الوحدة (كما في الورقة)': 'Unit (as on paper)',
     'بداية العقد': 'Contract start', 'الزيادة ٪': 'Increase %',
     'التأمين — اختياري': 'Deposit — optional',
     // شروحات الصفحات
@@ -3938,7 +3986,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     const today = Store.d(todayIso);
     rows.forEach((r, i) => {
       const y = padT + i * rowH;
-      // اسم الوحدة + المستأجر
+      // اسم الوحدة + العميل
       svg.appendChild(txt(W - 8, y + 16, r.label, { 'text-anchor': 'end', fill: C.ink, 'font-size': 12.5, 'font-weight': 700 }));
       if (r.sub) svg.appendChild(txt(W - 8, y + 30, r.sub, { 'text-anchor': 'end', fill: C.muted, 'font-size': 10 }));
 
@@ -4149,7 +4197,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     collectionAsTable: false,
   };
 
-  /* مستأجرو الوحدات بلا عقود (معلومون من الكشف) */
+  /* عملاء الوحدات بلا عقود (معلومون من الكشف) */
   const ORPHAN_TENANT = { U9: 'T7', U10: 'T9' };
 
   function currentPeriod() { return Store.periodOf(Store.today()); }
@@ -4226,14 +4274,15 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
         }
       }
       if (q) {
-        // البحث يغطي ما يبحث عنه المكتب فعلًا: اسم/وحدة/كشف/مالك/منطقة/تليفون/رقم إيصال
+        // البحث يغطي ما يبحث عنه المكتب فعلًا: اسم/كود/وحدة/كشف/مالك/منطقة/تليفون/رقم إيصال
         const ts = unitTenantIds(u).map(id => Store.tenant(id)).filter(Boolean);
         const b = Store.building(u.buildingId) || {};
         const receipts = Store.state.payments
           .filter(p => p.unitId === u.id && p.receiptNo).map(p => p.receiptNo).join(' ');
         const hay = [
-          u.name, u.type, u.floor || '', b.name || '', b.owner || '', b.area || '',
-          ts.map(t => t.name).join(' '), ts.map(t => t.phone || '').join(' '), receipts,
+          u.name, u.code || '', u.type, u.floor || '', b.name || '', b.code || '', b.owner || '', b.area || '',
+          ts.map(t => t.name).join(' '), ts.map(t => t.code || '').join(' '),
+          ts.map(t => t.phone || '').join(' '), receipts,
         ].join(' ');
         if (!UI.arMatch(hay, q)) return false;
       }
@@ -4255,7 +4304,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       placeholder: 'كل المشاريع',
       items: [
         { value: '', label: 'كل المشاريع' },
-        ...Store.state.buildings.map(b => ({ value: b.id, label: b.name + (b.demo ? ' · تجريبي' : '') })),
+        ...Store.state.buildings.map(b => ({ value: b.id, label: (b.code ? b.code + ' · ' : '') + b.name + (b.demo ? ' · تجريبي' : '') })),
       ],
       value: f.b,
       onPick: v => { f.b = v; App.render(); },
@@ -4265,9 +4314,9 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       ...types.map(t => ({ value: t, label: t })),
     ], f.ty);
     const tnSel = UI.combo({
-      placeholder: 'كل المستأجرين',
+      placeholder: 'كل العملاء',
       items: [
-        { value: '', label: 'كل المستأجرين' },
+        { value: '', label: 'كل العملاء' },
         ...[...Store.state.tenants].sort((a, b) => a.name.localeCompare(b.name, 'ar'))
           .map(t => ({ value: t.id, label: t.name })),
       ],
@@ -4283,7 +4332,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       { value: 'vacant', label: 'شاغرة' },
       { value: 'arrears', label: 'عليها متأخرات' },
     ], f.st);
-    const qIn = input({ type: 'search', placeholder: 'ابحث عن وحدة أو مستأجر…', value: f.q || '',
+    const qIn = input({ type: 'search', placeholder: 'ابحث بالاسم أو الكود — عميل أو وحدة أو مشروع…', value: f.q || '',
       role: 'combobox', 'aria-expanded': 'false', 'aria-autocomplete': 'list' });
     bSel.addEventListener('change', () => { f.b = bSel.value; App.render(); });
     tySel.addEventListener('change', () => { f.ty = tySel.value; App.render(); });
@@ -4293,13 +4342,13 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     /* اقتراحات فورية أثناء الكتابة: كلمات مفتاحية جاهزة يضغطها فتفلتر */
     const sugList = h('div.sug-list', { role: 'listbox', hidden: true });
     function sugPool() {
-      // raw = النص العربي المخزَّن (هو ما يُفلتَر به)، label = المعروض بلغة الواجهة
+      // raw = النص العربي المخزَّن (هو ما يُفلتَر به)، label = المعروض بلغة الواجهة، code = للبحث بالكود
       const en = I18N.lang === 'en';
-      const mk = (raw, cat) => ({ raw, label: en ? I18N.tt(raw) : raw, cat });
+      const mk = (raw, cat, code) => ({ raw, label: en ? I18N.tt(raw) : raw, cat, code: code || '' });
       const pool = [];
-      for (const tn of Store.state.tenants) pool.push(mk(tn.name, 'مستأجر'));
-      for (const u of Store.state.units) pool.push(mk(u.name, 'وحدة'));
-      for (const b of Store.state.buildings) pool.push(mk(b.name, 'مشروع'));
+      for (const tn of Store.state.tenants) pool.push(mk(tn.name, 'عميل', tn.code));
+      for (const u of Store.state.units) pool.push(mk(u.name, 'وحدة', u.code));
+      for (const b of Store.state.buildings) pool.push(mk(b.name, 'مشروع', b.code));
       for (const ty of new Set(Store.state.units.map(u => u.type).filter(Boolean))) pool.push(mk(ty, 'نوع'));
       for (const fl of new Set(Store.state.units.map(u => u.floor).filter(Boolean))) pool.push(mk(fl, 'دور'));
       return pool;
@@ -4310,11 +4359,12 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       sugIdx = -1;
       sugList.innerHTML = '';
       if (!q) { sugList.hidden = true; qIn.setAttribute('aria-expanded', 'false'); return; }
-      const hits = sugPool().filter(s => UI.arMatch(s.label, q) || UI.arMatch(s.raw, q)).slice(0, 8);
+      const hits = sugPool().filter(s =>
+        UI.arMatch(s.label, q) || UI.arMatch(s.raw, q) || (s.code && UI.arMatch(s.code, q))).slice(0, 8);
       if (!hits.length) { sugList.hidden = true; qIn.setAttribute('aria-expanded', 'false'); return; }
       for (const s of hits) {
         const item = h('button.sug-item', { type: 'button', role: 'option' }, [
-          h('span', s.label), h('span.sug-cat', s.cat),
+          h('span', [s.label, s.code ? h('span.sug-code', ' · ' + s.code) : null]), h('span.sug-cat', s.cat),
         ]);
         item.addEventListener('mousedown', e => {
           e.preventDefault();
@@ -4780,7 +4830,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     ar.unknowns.forEach(r => { unkByUnit[r.unitId] = (unkByUnit[r.unitId] || 0) + 1; });
 
     const head = h('tr', [
-      h('th.sticky-col', 'الوحدة / المستأجر'),
+      h('th.sticky-col', 'الوحدة / العميل'),
       ...periods.map(p => h('th', Store.periodLabel(p))),
       h('th.mx-arr-h', 'متأخرات'),
     ]);
@@ -4878,7 +4928,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
             ? `مشروع «${fb.name}» لسه مفيهوش صفوف`
             : 'لا وحدات ضمن الترشيح الحالي'),
           h('p.empty-sub', fb
-            ? 'علامات ✓/✗ بتتعلّم على صفوف الورقة (وحدة + مستأجر + عقد). أضف صفوف الورقة الأول، وبعدين ارجع هنا فرّغ العلامات.'
+            ? 'علامات ✓/✗ بتتعلّم على صفوف الورقة (وحدة + عميل + عقد). أضف صفوف الورقة الأول، وبعدين ارجع هنا فرّغ العلامات.'
             : 'وسّع الترشيح من السلايسرز فوق، أو امسح البحث.'),
           fb && App.canEdit() ? h('button.btn.btn-primary', {
             onclick: () => { VS.wizardBid = fb.id; location.hash = '#intake'; },
@@ -4995,7 +5045,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
         return { y, days: Store.daysBetween(f, l) + 1 };
       }).filter(Boolean);
       body.push(h('div.kv', [
-        h('div.kv-row', [h('span.kv-k', 'المستأجر'), h('span.kv-v', tenantLabel(c.tenantId))]),
+        h('div.kv-row', [h('span.kv-k', 'العميل'), h('span.kv-v', tenantLabel(c.tenantId))]),
         h('div.kv-row', [h('span.kv-k', 'العقد'), h('span.kv-v', `${shortDate(c.start)} ← ${shortDate(c.end)}`)]),
         h('div.kv-row', [h('span.kv-k', 'يوم الاستحقاق'), h('span.kv-v', String(c.dueDay || 1) + ' من الشهر')]),
         ci.due ? h('div.kv-row', [h('span.kv-k', 'مستحق الشهر'), h('span.kv-v', money(ci.due.amount, { approx: ci.due.estimated }))]) : null,
@@ -5076,7 +5126,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
 
   function exportMatrix(year) {
     const periods = Array.from({ length: 12 }, (_, i) => year + '-' + String(i + 1).padStart(2, '0'));
-    const rows = [['المبنى', 'الوحدة', 'المستأجر', ...periods.map(p => Store.periodLabel(p, true))]];
+    const rows = [['المبنى', 'الوحدة', 'العميل', ...periods.map(p => Store.periodLabel(p, true))]];
     const asOf = Store.today();
     for (const u of filteredUnits(asOf)) {
       const tid = unitTenantIds(u).slice(-1)[0];
@@ -5132,6 +5182,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
         return keyClickable(h('div.card.unit-card', { onclick: () => openUnitDrawer(u) }, [
           h('div.unit-head', [h('h3.unit-name', u.name), unitStatusChipOf(u, asOf)]),
           h('div.unit-meta', [
+            u.code ? h('code.code-chip', u.code) : null,
             h('span.chip.chip-neutral', u.type),
             u.floor ? h('span.chip.chip-neutral', u.floor) : null,
             u.area ? h('span.chip.chip-neutral', u.area + ' م²') : null,
@@ -5173,6 +5224,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     const cs = Store.unitContracts(u.id);
     const body = [];
     body.push(h('div.kv', [
+      u.code ? h('div.kv-row', [h('span.kv-k', 'كود الوحدة'), h('span.kv-v', h('code.code-chip', u.code))]) : null,
       h('div.kv-row', [h('span.kv-k', 'المبنى'), h('span.kv-v', bLabel(u.buildingId))]),
       h('div.kv-row', [h('span.kv-k', 'النوع'), h('span.kv-v', u.type + (u.floor ? ' — ' + u.floor : ''))]),
       u.area ? h('div.kv-row', [h('span.kv-k', 'المساحة'), h('span.kv-v', u.area + ' م²')]) : null,
@@ -5336,7 +5388,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
         ]),
       ])) : null,
       h('div.table-wrap', h('table.table', [
-        h('thead', h('tr', [h('th', 'المبنى'), h('th', 'الوحدة'), h('th', 'المستأجر'), h('th', 'من'), h('th', 'إلى'),
+        h('thead', h('tr', [h('th', 'المبنى'), h('th', 'الوحدة'), h('th', 'العميل'), h('th', 'من'), h('th', 'إلى'),
           h('th', 'قيمة السنة الجارية'), h('th', 'صيانة'), h('th', 'التأمين'), h('th', 'الحالة'), h('th', 'النوع')])),
         h('tbody', rows.length ? rows : h('tr', h('td', { colspan: 10 }, emptyState('لا عقود ضمن الترشيح')))),
       ])),
@@ -5344,7 +5396,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
   }
 
   function exportContracts() {
-    const rows = [['المبنى', 'الوحدة', 'المستأجر', 'من', 'إلى', 'سنة 1', 'سنة 2', 'سنة 3', 'صيانة شهرية', 'ض.ق.م', 'التأمين', 'تجديد']];
+    const rows = [['المبنى', 'الوحدة', 'العميل', 'من', 'إلى', 'سنة 1', 'سنة 2', 'سنة 3', 'صيانة شهرية', 'ض.ق.م', 'التأمين', 'تجديد']];
     for (const c of Store.state.contracts) {
       const u = Store.unit(c.unitId);
       rows.push([bLabel(u.buildingId), u.name, tenantLabel(c.tenantId), c.start, c.end,
@@ -5354,28 +5406,65 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     Store.download('العقود.csv', Store.toCSV(rows));
   }
 
-  /* معالج عقد جديد */
+  /* معالج عقد جديد — الترتيب الطبيعي للمكتب: العميل ← المشروع ← وحداته الشاغرة فقط */
   function openAddContract(presetUnitId) {
     const s = Store.state.settings;
-    const unitIn = h('select.input');
-    for (const b of Store.state.buildings) {
-      const og = h('optgroup', { label: b.name + (b.demo ? ' · تجريبي' : '') });
-      for (const u of Store.state.units.filter(u => u.buildingId === b.id)) {
-        const opt = h('option', { value: u.id }, u.name);
-        if (u.id === presetUnitId) opt.selected = true;
-        og.appendChild(opt);
-      }
-      unitIn.appendChild(og);
-    }
-    const tenantIn = select({}, [
-      ...[...Store.state.tenants].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(t => ({ value: t.id, label: t.name })),
-      { value: '__new', label: '+ مستأجر جديد…' },
-    ], Store.state.tenants[0].id);
-    const newTenantIn = input({ type: 'text', placeholder: 'اسم المستأجر الجديد', style: { display: 'none' } });
-    tenantIn.addEventListener('change', () => {
-      newTenantIn.style.display = tenantIn.value === '__new' ? '' : 'none';
-    });
+    const presetU = presetUnitId ? Store.unit(presetUnitId) : null;
     const startIn = input({ type: 'date', value: Store.iso(Store.today()) });
+
+    /* 1) العميل — بحث بالاسم أو الكود، أو تسجيل عميل جديد في نفس الخطوة */
+    let tenantVal = '';
+    const ntName = input({ type: 'text', placeholder: 'الاسم كما في البطاقة أو السجل' });
+    const ntCode = input({ type: 'text', inputmode: 'numeric', placeholder: 'الرقم القومي (14 رقمًا) — أو السجل التجاري للشركات' });
+    const ntPhone = input({ type: 'tel', placeholder: '01xxxxxxxxx' });
+    const newTenantBox = h('div.new-client-box', { style: { display: 'none' } }, [
+      field('اسم العميل الجديد', ntName),
+      field('كود العميل — الرقم القومي', ntCode, 'هو ما ستبحث به عن العميل لاحقًا في أي شاشة'),
+      field('هاتف العميل', ntPhone),
+    ]);
+    const tenantIn = UI.combo({
+      placeholder: 'ابحث بالاسم أو الرقم القومي…',
+      items: [
+        { value: '__new', label: '+ عميل جديد…' },
+        ...[...Store.state.tenants].sort((a, b) => a.name.localeCompare(b.name, 'ar'))
+          .map(t => ({ value: t.id, label: t.name + (t.code ? ' · ' + t.code : '') })),
+      ],
+      value: '',
+      onPick: v => { tenantVal = v; newTenantBox.style.display = v === '__new' ? '' : 'none'; },
+    });
+
+    /* 2) المشروع ← 3) الوحدة: القائمة تعرض الشاغر فقط في تاريخ البداية المختار */
+    const projIn = select({}, Store.state.buildings.map(b => ({
+      value: b.id, label: (b.code ? b.code + ' · ' : '') + b.name + (b.demo ? ' · تجريبي' : ''),
+    })), presetU ? presetU.buildingId : Store.state.buildings[0].id);
+    const unitIn = h('select.input');
+    const unitHint = h('p.field-hint');
+    const showAllChk = h('input', { type: 'checkbox' });
+    const unitVacantAt = (u, dateIso) => !Store.unitContracts(u.id).some(c => c.end >= dateIso);
+    if (presetU && !unitVacantAt(presetU, Store.iso(Store.today()))) showAllChk.checked = true;
+    function refreshUnits() {
+      const bid = projIn.value, st = startIn.value || Store.iso(Store.today());
+      const all = Store.state.units.filter(u => u.buildingId === bid);
+      const vac = all.filter(u => unitVacantAt(u, st));
+      const list = showAllChk.checked ? all : vac;
+      const keep = unitIn.value;
+      unitIn.innerHTML = '';
+      for (const u of list) {
+        unitIn.appendChild(h('option', { value: u.id },
+          (u.code ? u.code + ' · ' : '') + u.name + (unitVacantAt(u, st) ? '' : ' — عليها عقد قائم')));
+      }
+      if (presetUnitId && list.some(u => u.id === presetUnitId)) unitIn.value = presetUnitId;
+      else if (list.some(u => u.id === keep)) unitIn.value = keep;
+      unitHint.textContent = showAllChk.checked
+        ? `كل وحدات المشروع (${all.length}) — التي عليها عقد معلَّمة بجوار اسمها`
+        : (vac.length
+          ? `${vac.length} من ${all.length} وحدة شاغرة في تاريخ البداية المختار`
+          : 'لا وحدات شاغرة في هذا المشروع بهذا التاريخ — علِّم «عرض كل الوحدات» إن كان تجديدًا');
+      refreshPreview();
+    }
+    projIn.addEventListener('change', refreshUnits);
+    showAllChk.addEventListener('change', refreshUnits);
+    startIn.addEventListener('input', refreshUnits);
     const yearsIn = select({}, [1, 2, 3, 4, 5].map(n => ({ value: String(n), label: n + (n === 1 ? ' سنة' : ' سنوات') })), '1');
     const rentIn = input({ type: 'number', min: 0, step: 'any', placeholder: s.rentBasis === 'monthly' ? 'الإيجار الشهري للسنة الأولى' : 'الإيجار السنوي للسنة الأولى' });
     const incIn = input({ type: 'number', min: 0, max: 100, step: 'any', value: s.defaultIncreasePct });
@@ -5407,13 +5496,17 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
             ` تنبيه: يوجد عقد قائم على الوحدة حتى ${shortDate(overlap.end)} — تأكد أن هذا تجديد أو صحّح التواريخ.`]));
       }
     }
-    [yearsIn, rentIn, incIn, unitIn, startIn].forEach(el => el.addEventListener('input', refreshPreview));
-    refreshPreview();
+    [yearsIn, rentIn, incIn].forEach(el => el.addEventListener('input', refreshPreview));
+    unitIn.addEventListener('change', refreshPreview);
+    refreshUnits();
 
     openDrawer('عقد جديد', [
       h('div.form-grid', [
-        field('الوحدة', unitIn),
-        field('المستأجر', tenantIn), newTenantIn,
+        field('العميل', tenantIn, 'اكتب حرفين من الاسم أو أرقامًا من الكود'),
+        newTenantBox,
+        field('المشروع', projIn),
+        field('الوحدة — الشاغرة فقط', unitIn), unitHint,
+        h('label.radio-row', [showAllChk, h('span', 'عرض كل الوحدات (لتسجيل تجديد على وحدة عليها عقد)')]),
         field('تاريخ البداية', startIn, 'النهاية تُحسب تلقائيًا — يستحيل عقد نهايته قبل بدايته'),
         field('عدد السنوات', yearsIn),
         field('قيمة السنة الأولى', rentIn, 'أساس الحساب الحالي: ' + (s.rentBasis === 'monthly' ? 'شهري' : 'سنوي')),
@@ -5429,12 +5522,20 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       h('button.btn.btn-primary', {
         onclick: () => {
           const r0 = Number(rentIn.value);
-          if (!r0 || r0 <= 0 || !startIn.value) { toast('أكمل الوحدة والبداية وقيمة سنة أولى موجبة', 'warning'); return; }
+          if (!tenantVal) { toast('اختر العميل أولًا — أو سجِّل عميلًا جديدًا من نفس القائمة', 'warning'); return; }
+          if (!unitIn.value) { toast('اختر الوحدة — غيِّر المشروع أو علِّم «عرض كل الوحدات»', 'warning'); return; }
+          if (!r0 || r0 <= 0 || !startIn.value) { toast('أكمل تاريخ البداية وقيمة سنة أولى موجبة', 'warning'); return; }
           if (Number(depIn.value) < 0 || Number(mntIn.value) < 0 || Number(incIn.value) < 0) { toast('لا تُقبل قيم سالبة', 'warning'); return; }
-          let tenantId = tenantIn.value;
+          let tenantId = tenantVal;
           if (tenantId === '__new') {
-            if (!newTenantIn.value.trim()) { toast('أدخل اسم المستأجر الجديد', 'warning'); return; }
-            tenantId = Store.addTenant({ name: newTenantIn.value.trim() }).id;
+            const nm = ntName.value.trim();
+            if (!nm) { toast('أدخل اسم العميل الجديد', 'warning'); return; }
+            const code = ntCode.value.replace(/\s+/g, '');
+            if (code) {
+              const dup = Store.tenantByCode(code);
+              if (dup) { toast('هذا الكود مسجَّل بالفعل للعميل: ' + dup.name, 'warning'); return; }
+            }
+            tenantId = Store.addTenant({ name: nm, code, phone: ntPhone.value.trim() }).id;
           }
           const n = Number(yearsIn.value), inc = Number(incIn.value) / 100;
           const years = []; let r = r0;
@@ -5454,7 +5555,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
   }
 
   /* ========================================================
-     5) المستأجرون
+     5) العملاء
      ======================================================== */
   function viewTenants() {
     const asOf = Store.today();
@@ -5475,6 +5576,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       const avTone = ['av-a', 'av-b', 'av-c', 'av-d', 'av-e'][[...t.name].reduce((s, ch) => s + ch.charCodeAt(0), 0) % 5];
       return keyClickable(h('tr.row-click', { onclick: () => openTenantDrawer(t) }, [
         h('td', h('span.tenant-cell', [h('span.avatar.' + avTone, initials), h('span', t.name)])),
+        h('td', t.code ? h('code.code-chip', t.code) : h('span.val-warning', 'غير مسجَّل')),
         h('td', t.kind === 'شركة' ? statusChip('neutral', 'شركة') : t.kind === 'فرد' ? statusChip('neutral', 'فرد') : '—'),
         h('td', unitsNames),
         h('td', t.phone || h('span.val-warning', 'غير مسجّل')),
@@ -5483,13 +5585,13 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       ]));
     });
     return h('div.view', [
-      pageHead('المستأجرون', 'أرصدة المتأخرات محسوبة من جدول التحصيل مباشرة.', [
-        App.canEdit() ? h('button.btn.btn-primary', { onclick: () => openTenantDrawer(null) }, [icon('plus'), ' مستأجر جديد']) : null,
+      pageHead('العملاء', 'أرصدة المتأخرات محسوبة من جدول التحصيل مباشرة.', [
+        App.canEdit() ? h('button.btn.btn-primary', { onclick: () => openTenantDrawer(null) }, [icon('plus'), ' عميل جديد']) : null,
       ]),
       demoBanner(),
       h('div.table-wrap', h('table.table', [
-        h('thead', h('tr', [h('th', 'الاسم'), h('th', 'النوع'), h('th', 'الوحدات'), h('th', 'الهاتف'), h('th', 'متأخرات'), h('th', 'ملاحظات')])),
-        h('tbody', rows.length ? rows : h('tr', h('td', { colspan: 6 }, emptyState('لا مستأجرين ضمن الترشيح')))),
+        h('thead', h('tr', [h('th', 'الاسم'), h('th', 'الكود (الرقم القومي)'), h('th', 'النوع'), h('th', 'الوحدات'), h('th', 'الهاتف'), h('th', 'متأخرات'), h('th', 'ملاحظات')])),
+        h('tbody', rows.length ? rows : h('tr', h('td', { colspan: 7 }, emptyState('لا عملاء ضمن الترشيح')))),
       ])),
     ]);
   }
@@ -5500,7 +5602,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     return [...new Set([...cs.map(c => c.unitId), ...orphans])];
   }
 
-  /* سجل سداد المستأجر شهرًا بشهر — أشهر عقوده هو فقط، لا أشهر مستأجر سابق على نفس الوحدة */
+  /* سجل سداد العميل شهرًا بشهر — أشهر عقوده هو فقط، لا أشهر عميل سابق على نفس الوحدة */
   function tenantLedger(t, asOf) {
     const nowP = Store.periodOf(asOf);
     const cov = Store.state.meta.importCoverage;
@@ -5540,24 +5642,32 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
   function openTenantDrawer(t) {
     const isNew = !t;
     const nameIn = input({ type: 'text', value: t ? t.name : '', placeholder: 'الاسم' });
+    const codeIn = input({ type: 'text', inputmode: 'numeric', value: t ? (t.code || '') : '', placeholder: 'الرقم القومي (14 رقمًا) — أو السجل التجاري للشركات' });
     const kindIn = select({}, ['فرد', 'شركة', 'غير محدد'].map(x => ({ value: x, label: x })), t ? (t.kind || 'فرد') : 'فرد');
     const phoneIn = input({ type: 'tel', value: t ? t.phone : '', placeholder: '01xxxxxxxxx' });
     const noteIn = input({ type: 'text', value: t ? t.note : '' });
     const formGrid = h('div.form-grid', [
-      field('الاسم', nameIn), field('النوع', kindIn),
+      field('الاسم', nameIn),
+      field('كود العميل — الرقم القومي', codeIn, 'به تبحث عن العميل من أي شاشة'),
+      field('النوع', kindIn),
       field('الهاتف', phoneIn, 'لازم للتنبيهات لاحقًا (واتساب)'), field('ملاحظات', noteIn),
     ]);
     const saveBtn = h('button.btn.btn-primary', {
       onclick: () => {
         if (!nameIn.value.trim()) { toast('أدخل الاسم', 'warning'); return; }
-        const patch = { name: nameIn.value.trim(), kind: kindIn.value, phone: phoneIn.value, note: noteIn.value };
+        const code = codeIn.value.replace(/\s+/g, '');
+        if (code) {
+          const dup = Store.tenantByCode(code);
+          if (dup && (!t || dup.id !== t.id)) { toast('هذا الكود مسجَّل بالفعل للعميل: ' + dup.name, 'warning'); return; }
+        }
+        const patch = { name: nameIn.value.trim(), code: code || null, kind: kindIn.value, phone: phoneIn.value, note: noteIn.value };
         if (isNew) Store.addTenant(patch); else Store.updateTenant(t.id, patch);
         closeDrawer(); toast('حُفظ');
       },
     }, isNew ? 'حفظ' : 'حفظ البيانات');
 
     if (isNew) {
-      openDrawer('مستأجر جديد', [formGrid], [saveBtn, h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إلغاء')]);
+      openDrawer('عميل جديد', [formGrid], [saveBtn, h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إلغاء')]);
       return;
     }
 
@@ -5607,7 +5717,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       ? h('span', [h('b', money(lastPay.amount)), ' — ', shortDate(lastPay.date), ' · ', h('span', 'عن شهر'), ' ', h('span', Store.periodLabel(lastPay.period, true))])
       : lastTick
         ? h('span', [h('span', 'لا مدفوعات مسجَّلة بمبلغ وتاريخ'), ' — ', h('span', 'آخر شهر مؤشَّر ✓ في ورقة المالك:'), ' ', h('span', Store.periodLabel(lastTick.period, true))])
-        : h('span.val-critical', 'لا سداد مسجَّل لهذا المستأجر إطلاقًا');
+        : h('span.val-critical', 'لا سداد مسجَّل لهذا العميل إطلاقًا');
 
     const arrNode = arrCells.length
       ? h('span.val-critical', [h('b', money(arrTotal)), ' — ', h('span', pluralMonths(arrCells.length)), unkCount ? h('span', [' + ', h('span', pluralMonths(unkCount)), ' ', h('span', 'بقيمة مجهولة')]) : null])
@@ -5616,6 +5726,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
         : h('span', 'لا شيء');
 
     const facts = h('div.tp-facts', [
+      h('span.k', 'كود العميل'), t.code ? h('code.code-chip', t.code) : h('span.val-warning', 'غير مسجَّل — أضفه من «تعديل البيانات» بالأسفل'),
       h('span.k', 'الهاتف'), h('span', t.phone || 'غير مسجّل'),
       h('span.k', 'آخر سداد مسجَّل'), lastPayNode,
       h('span.k', 'إجمالي المتأخرات'), arrNode,
@@ -5637,12 +5748,12 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       ]));
     });
 
-    openDrawer('ملف المستأجر', [
+    openDrawer('ملف العميل', [
       h('h3.tp-name', t.name),
       ...unitLines,
       facts,
       h('h4.tp-sub', 'سجل السداد شهرًا بشهر'),
-      h('p.step-hint', 'أشهر هذا المستأجر فقط، الأحدث أولًا — كل سطر يفتح خلية الشهر نفسها للتفصيل أو تسجيل دفعة.'),
+      h('p.step-hint', 'أشهر هذا العميل فقط، الأحدث أولًا — كل سطر يفتح خلية الشهر نفسها للتفصيل أو تسجيل دفعة.'),
       h('div.mini-scroll', h('table.table.table-mini', [
         h('thead', h('tr', [h('th', 'الشهر'), multiUnit ? h('th', 'الوحدة') : null, h('th', 'المستحق'), h('th', 'المسدَّد'), h('th', 'تاريخ السداد'), h('th', 'الحالة')])),
         h('tbody', rows.length ? rows : h('tr', h('td', { colspan: multiUnit ? 6 : 5 }, 'لا أشهر مسجَّلة بعد'))),
@@ -5733,7 +5844,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     const dateIn = input({ type: 'date', value: Store.iso(Store.today()) });
     const descIn = input({ type: 'text', placeholder: 'وصف مختصر' });
     const costIn = input({ type: 'number', min: 0, step: 'any', placeholder: '0' });
-    const borneIn = select({}, ['المالك', 'المستأجر', 'المقاول', 'مشترك'].map(x => ({ value: x, label: x })), 'المالك');
+    const borneIn = select({}, ['المالك', 'العميل', 'المقاول', 'مشترك'].map(x => ({ value: x, label: x })), 'المالك');
     openDrawer('شكوى جديدة', [h('div.form-grid', [
       field('الوحدة', unitIn), field('التصنيف', catIn), field('تاريخ الفتح', dateIn),
       field('الوصف', descIn), field('التكلفة المتوقعة', costIn), field('يتحمّلها', borneIn),
@@ -6032,7 +6143,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       }));
     }
 
-    /* ---------- التزام السداد بالمستأجر (من الدفعات الموثقة فقط) ---------- */
+    /* ---------- التزام السداد بالعميل (من الدفعات الموثقة فقط) ---------- */
     const grace = Store.state.settings.graceDays;
     const compliance = [];
     for (const t of Store.state.tenants) {
@@ -6113,7 +6224,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       }),
       statTile({
         label: 'بصيانة / خاضعة للضريبة', value: `${withMnt} · ${withVat}`, ic: 'doc', tone: 'violet',
-        sub: 'البند الرابع (صيانة شهرية مع الإيجار) والعاشر (ض.ق.م على المستأجر)',
+        sub: 'البند الرابع (صيانة شهرية مع الإيجار) والعاشر (ض.ق.م على العميل)',
       }),
     ]);
 
@@ -6157,9 +6268,9 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
           ? Charts.typeBars(methodItems)
           : emptyState('لا دفعات موثَّقة بعد')),
       ]),
-      sectionCard('التزام السداد بالمستأجر (من الدفعات الموثَّقة فقط)', compliance.length
+      sectionCard('التزام السداد بالعميل (من الدفعات الموثَّقة فقط)', compliance.length
         ? h('div.mini-scroll', h('table.table.table-mini', [
-            h('thead', h('tr', [h('th', 'المستأجر'), h('th', 'دفعات موثَّقة'), h('th', 'في الميعاد'), h('th', 'التقييم')])),
+            h('thead', h('tr', [h('th', 'العميل'), h('th', 'دفعات موثَّقة'), h('th', 'في الميعاد'), h('th', 'التقييم')])),
             h('tbody', compliance.slice(0, 10).map(x => h('tr', [
               h('td', x.t.name),
               h('td', String(x.n)),
@@ -6188,10 +6299,10 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
             risk ? insightCard({
               tone: risk.share >= 35 ? 'serious' : 'accent', ic: 'warn',
               num: risk.share + '٪',
-              title: `من دخل الشهر معتمد على مستأجر واحد: ${risk.tenant.name}`,
+              title: `من دخل الشهر معتمد على عميل واحد: ${risk.tenant.name}`,
               text: risk.share >= 35
                 ? 'اعتماد مرتفع — خروجه يؤثر بشدة على الدخل. نوِّع العقود القادمة أو أمِّن تجديده مبكرًا.'
-                : 'توزيع صحي للدخل على المستأجرين.',
+                : 'توزيع صحي للدخل على العملاء.',
             }) : emptyState('لا بيانات'),
             insightCard({
               tone: health.score >= 75 ? 'good' : health.score >= 50 ? 'warning' : 'critical', ic: 'shield',
@@ -6274,7 +6385,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       const bUnits = Store.state.units.filter(u => u.buildingId === bid);
       const rowsTable = bUnits.length
         ? h('table.table.table-mini', [
-            h('thead', h('tr', [h('th', 'الوحدة'), h('th', 'المستأجر'), h('th', 'من'), h('th', 'إلى'),
+            h('thead', h('tr', [h('th', 'الوحدة'), h('th', 'العميل'), h('th', 'من'), h('th', 'إلى'),
               h('th', 'سنة 1'), h('th', 'سنة 2'), h('th', 'سنة 3'), h('th', 'ملاحظات')])),
             h('tbody', bUnits.map(u => {
               const c = Store.unitContracts(u.id).slice(-1)[0];
@@ -6356,6 +6467,22 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
   }
 
   /* جدول أنواع الإدخال — مرجع سريع (يُعرض في دليل الشرح) */
+  function codesCard() {
+    const b0 = Store.state.buildings[0] || {};
+    const u0 = Store.state.units[0] || {};
+    return sectionCard('الأكواد — كيف تجد أي شيء في ثانية', h('div', [
+      h('p.step-hint', 'لكل مشروع ووحدة كود قصير يولِّده النظام تلقائيًا، وللعميل كود تُدخله أنت هو رقمه القومي. اكتب أي كود في خانة البحث أعلى الشاشة وستصل مباشرة.'),
+      h('div.mini-scroll', h('table.table.table-mini', [
+        h('thead', h('tr', [h('th', 'الكود'), h('th', 'شكله'), h('th', 'من أين يأتي'), h('th', 'مثال من بياناتك')])),
+        h('tbody', [
+          ['كود المشروع', 'P ثم رقم', 'يُولَّد تلقائيًا عند إضافة مشروع', (b0.code || 'P1') + ' — ' + (b0.name || '')],
+          ['كود الوحدة', 'كود المشروع ثم رقم متسلسل', 'يُولَّد تلقائيًا عند إضافة وحدة', (u0.code || 'P1-01') + ' — ' + (u0.name || '')],
+          ['كود العميل', 'الرقم القومي (14 رقمًا) أو السجل التجاري', 'تُدخله عند تسجيل العميل — والنظام يمنع تكراره لعميلَين', '28501011234567'],
+        ].map(r => h('tr', [h('td', h('b', r[0])), h('td', h('code.code-chip', r[1])), h('td', r[2]), h('td', r[3])]))),
+      ])),
+    ]));
+  }
+
   function entryTypesCard() {
     return sectionCard('أنواع الإدخال في النظام — ماذا تُدخل ومن أين', h('div.mini-scroll', h('table.table.table-mini', [
       h('thead', h('tr', [h('th', 'ماذا تريد أن تُدخل؟'), h('th', 'من أين'), h('th', 'الخطوات باختصار')])),
@@ -6363,9 +6490,9 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
         ['مشروع جديد (ورقة كاملة)', '«إضافة مشروع جديد»', 'اسم المالك ← صفوف الورقة ← نقل علامات ✓/✗'],
         ['دفعة شهر واحد', 'جدول التحصيل', 'اضغط خلية الشهر ← المبلغ مُعبَّأ بالمتبقي ← احفظ'],
         ['سداد شهر كامل (دفعة واحدة للجميع)', 'جدول التحصيل ← «سداد جماعي»', 'حدِّد من سدَّدوا ← تاريخ وطريقة موحَّدان ← حفظ'],
-        ['عقد جديد أو تجديد', 'العقود ← «عقد جديد» أو زر «+ إدخال»', 'وحدة + مستأجر + بداية وقيمة سنة أولى — الجدول يتولَّد'],
+        ['عقد جديد أو تجديد', 'العقود ← «عقد جديد» أو زر «+ إدخال»', 'العميل (بالاسم أو الرقم القومي) ← المشروع ← وحدة شاغرة ← البداية وقيمة السنة الأولى — جدول السنوات يتولَّد'],
         ['وحدة داخل مشروع قائم', 'الوحدات ← «وحدة جديدة»', 'اختر المشروع ← الاسم والنوع'],
-        ['مستأجر أو تعديل بياناته', 'المستأجرون', 'اضغط الصف للتعديل أو «مستأجر جديد»'],
+        ['عميل أو تعديل بياناته', 'العملاء', 'اضغط الصف للتعديل أو «عميل جديد»'],
         ['شكوى صيانة', 'الشكاوى ← «شكوى جديدة»', 'الوحدة ← التصنيف والتكلفة ومن يتحمَّلها'],
         ['رد المالك على سؤال مراجعة', 'مراجعات مطلوبة', '«سجّل رد المالك» ← اكتب الإجابة — يُغلق البند'],
       ].map(r => h('tr', [h('td', h('b', r[0])), h('td', r[1]), h('td', r[2])]))),
@@ -6447,9 +6574,9 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
         { name: 'سداد الإيجار «في اليوم الأول من الشهر الميلادي»', what: 'يوم الاستحقاق وبداية عدّ التأخير', source: 'بند الالتزامات', calc: 'خانة «يوم الاستحقاق» في كل عقد (افتراضي 1) + أيام سماح قابلة للضبط', example: 'دفعة بتاريخ بعد اليوم 1+5 سماح تتعلّم «مدفوع متأخرًا»' },
         { name: 'البند الرابع: صيانة شهرية تُسدَّد مع الإيجار', what: 'بند مستقل في الاستحقاق مش مضموم للإيجار', source: 'نص البند (القيمة فارغة في العينة!)', calc: 'خانة صيانة بكل عقد تدخل استحقاق الشهر وتظهر منفصلة في التلميح والدرج', example: 'محل 1 (برج النيل): 41,800 إيجار + 1,200 صيانة + ض.ق.م' },
         { name: 'البند الخامس: التأمين «بواقع شهر»، يُرد أو يُخصم', what: 'التزام مالي على المالك لازم يبان', source: 'نص البند + ملاحظة «35,000 تأمين» للوحدة 41', calc: 'خانة تأمين بكل عقد + كارد «تأمينات محتجزة» يجمعها + تنبيه للعقود الناقصة', example: '41: تأمين 35,000 ≈ شهر من 36,000 — مطابق للبند' },
-        { name: 'البند السادس: لا تأجير من الباطن ولا تغيير استخدام', what: 'خطر تشغيلي يُتابَع ميدانيًا', source: 'نص البند', calc: 'ملاحظة الوحدة + الشكاوى مكانهما الطبيعي لأي مخالفة تُرصد', example: 'صف «الميزان 2» المزدوج (الدقة/العنوان) — Q2 بيسأل: مين المستأجر الفعلي؟' },
-        { name: 'البند العاشر: ض.ق.م على المستأجر وتُسدَّد مع الإيجار', what: 'إضافة الضريبة لاستحقاق الخاضعين', source: 'نص البند', calc: 'علامة «خاضع» بكل عقد ⇒ الاستحقاق × (1 + النسبة من الإعدادات)', example: 'Q19: لسه محتاجين حصر مين الخاضع في كشف سكرية' },
-        { name: 'البندان التاسع والسادس: الإنهاء المبكر = مصادرة التأمين', what: 'قاعدة تسوية عند خروج مستأجر', source: 'نص البندين', calc: 'مرحلة قادمة: شاشة «تسوية خروج» (رد/خصم من التأمين بمستنداته) — مسجّلة في خارطة الطريق', example: '42 المنتهي بلا تجديد: Q16 بيسأل عن تسوية تأمينه' },
+        { name: 'البند السادس: لا تأجير من الباطن ولا تغيير استخدام', what: 'خطر تشغيلي يُتابَع ميدانيًا', source: 'نص البند', calc: 'ملاحظة الوحدة + الشكاوى مكانهما الطبيعي لأي مخالفة تُرصد', example: 'صف «الميزان 2» المزدوج (الدقة/العنوان) — Q2 بيسأل: مين العميل الفعلي؟' },
+        { name: 'البند العاشر: ض.ق.م على العميل وتُسدَّد مع الإيجار', what: 'إضافة الضريبة لاستحقاق الخاضعين', source: 'نص البند', calc: 'علامة «خاضع» بكل عقد ⇒ الاستحقاق × (1 + النسبة من الإعدادات)', example: 'Q19: لسه محتاجين حصر مين الخاضع في كشف سكرية' },
+        { name: 'البندان التاسع والسادس: الإنهاء المبكر = مصادرة التأمين', what: 'قاعدة تسوية عند خروج عميل', source: 'نص البندين', calc: 'مرحلة قادمة: شاشة «تسوية خروج» (رد/خصم من التأمين بمستنداته) — مسجّلة في خارطة الطريق', example: '42 المنتهي بلا تجديد: Q16 بيسأل عن تسوية تأمينه' },
       ]);
 
     /* توثيق الشاشات */
@@ -6474,7 +6601,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
 
     const otherDocs = docSection('متبقّي الشاشات — باختصار', null, [
       { name: 'التحليلات', what: 'الإنسايتس المكتوبة + تحليل العقود + الالتزام + التوزيعات', source: 'كل ما سبق', calc: 'كل بطاقة إنسايت جملة محسوبة بشرطها (مثلًا: منحدر الإيراد يظهر فقط لو النصف الثاني أقل 15٪+) وتنقلك لمكان الإجراء', example: '' },
-      { name: 'الوحدات / العقود / المستأجرون', what: 'ملفات الكيانات: بطاقات بالكشف، جانت زمني بخط «اليوم»، أرصدة لحظية', source: 'العقود والدفعات', calc: 'حالة الوحدة محسوبة من عقودها — عمرها ما بتتكتب يدويًا', example: '' },
+      { name: 'الوحدات / العقود / العملاء', what: 'ملفات الكيانات: بطاقات بالكشف، جانت زمني بخط «اليوم»، أرصدة لحظية', source: 'العقود والدفعات', calc: 'حالة الوحدة محسوبة من عقودها — عمرها ما بتتكتب يدويًا', example: '' },
       { name: 'الشكاوى', what: 'سجل بالتصنيف والتكلفة ومن يتحمّلها وزمن الإغلاق', source: 'إدخال يدوي — السجل بيبدأ من أول يوم تشغيل', calc: 'متوسط زمن الإغلاق = متوسط (تاريخ الإغلاق − الفتح) · مؤشر «بعد التسليم» محتاج تواريخ تسليم (Q20)', example: '' },
       { name: 'جودة البيانات', what: 'كل تناقض/نقص في الورقة بنصه الحرفي وقرار تفسيره وسؤاله للمالك', source: 'التفريغ + شيت درجة الثقة + صور الورقة والعقد', calc: 'الحسم بيتسجّل بنصه في السجل — عمره ما بيتمسح', example: `${Store.state.issues.filter(q => q.status === 'open').length} ملاحظة مفتوحة الآن` },
       { name: 'الإعدادات', what: 'كل افتراض معلن هنا: أساس الإيجار، السماح، الزيادة، الضريبة + إدارة الكشوف + التصدير', source: '—', calc: 'أي تغيير يعيد حساب كل الأرقام فورًا', example: '' },
@@ -6483,6 +6610,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     return h('div.view', [
       pageHead('دليل الشرح', 'المرجع الكامل: خريطة العملية، ومنطق كل رقم — من الورقة للإنسايت.'),
       sectionCard('خريطة العملية الكاملة — من الورقة للقرار', flowNode),
+      codesCard(),
       entryTypesCard(),
       chain,
       contractMap,
@@ -6503,22 +6631,22 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     filteredUnits, fset,
   };
 
-  /* ترجمة ملف المستأجر واقتراحات البحث */
+  /* ترجمة ملف العميل واقتراحات البحث */
   I18N.extend({
-    'ملف المستأجر': 'Tenant profile',
+    'ملف العميل': 'Client profile',
     'حفظ البيانات': 'Save details',
     'تعديل البيانات': 'Edit details',
     'آخر سداد مسجَّل': 'Last recorded payment',
     'عن شهر': 'for',
     'لا مدفوعات مسجَّلة بمبلغ وتاريخ': 'No payments recorded with an amount and date',
     'آخر شهر مؤشَّر ✓ في ورقة المالك:': 'last month ticked ✓ on the owner’s paper:',
-    'لا سداد مسجَّل لهذا المستأجر إطلاقًا': 'No payment recorded for this tenant at all',
+    'لا سداد مسجَّل لهذا العميل إطلاقًا': 'No payment recorded for this client at all',
     'إجمالي المتأخرات': 'Total arrears',
     'بقيمة مجهولة': 'of unknown value',
     'لا شيء': 'None',
     'سجل السداد شهرًا بشهر': 'Payment history, month by month',
-    'أشهر هذا المستأجر فقط، الأحدث أولًا — كل سطر يفتح خلية الشهر نفسها للتفصيل أو تسجيل دفعة.':
-      'This tenant’s months only, newest first — each row opens that month’s cell to inspect or record a payment.',
+    'أشهر هذا العميل فقط، الأحدث أولًا — كل سطر يفتح خلية الشهر نفسها للتفصيل أو تسجيل دفعة.':
+      'This client’s months only, newest first — each row opens that month’s cell to inspect or record a payment.',
     'الشهر': 'Month', 'الوحدة': 'Unit', 'المستحق': 'Due', 'المسدَّد': 'Paid',
     'تاريخ السداد': 'Payment date', 'الحالة': 'Status',
     'لا أشهر مسجَّلة بعد': 'No months recorded yet',
@@ -6529,8 +6657,45 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'عقد من': 'Contract from', 'إلى': 'to', 'الإيجار الحالي': 'current rent', 'منتهٍ': 'ended',
     'تسجيل دفعة في جدول التحصيل': 'Record a payment in the collection sheet',
     'الهاتف': 'Phone', 'غير مسجّل': 'not recorded',
-    'مستأجر': 'Tenant', 'وحدة': 'Unit', 'مشروع': 'Project', 'نوع': 'Type', 'دور': 'Floor',
+    'عميل': 'Client', 'وحدة': 'Unit', 'مشروع': 'Project', 'نوع': 'Type', 'دور': 'Floor',
+    /* الأكواد وفورم العقد الجديد */
+    'ابحث بالاسم أو الرقم القومي…': 'Search by name or national ID…',
+    'اكتب حرفين من الاسم أو أرقامًا من الكود': 'Type part of the name or a few digits of the code',
+    'كود العميل — الرقم القومي': 'Client code — national ID',
+    'هو ما ستبحث به عن العميل لاحقًا في أي شاشة': 'It is what you will search the client by later, from any screen',
+    'به تبحث عن العميل من أي شاشة': 'You can search the client by it from any screen',
+    'هاتف العميل': 'Client phone',
+    'الاسم كما في البطاقة أو السجل': 'The name as on the ID card or registry',
+    'الرقم القومي (14 رقمًا) — أو السجل التجاري للشركات': 'National ID (14 digits) — or commercial registry for companies',
+    'المشروع': 'Project',
+    'الوحدة — الشاغرة فقط': 'Unit — vacant only',
+    'عرض كل الوحدات (لتسجيل تجديد على وحدة عليها عقد)': 'Show all units (to record a renewal on an occupied unit)',
+    'لا وحدات شاغرة في هذا المشروع بهذا التاريخ — علِّم «عرض كل الوحدات» إن كان تجديدًا':
+      'No vacant units in this project on this date — tick “Show all units” if this is a renewal',
+    'كود العميل': 'Client code',
+    'كود الوحدة': 'Unit code',
+    'الكود (الرقم القومي)': 'Code (national ID)',
+    'غير مسجَّل': 'Not recorded',
+    'غير مسجَّل — أضفه من «تعديل البيانات» بالأسفل': 'Not recorded — add it from “Edit details” below',
+    /* بطاقة الأكواد في دليل الشرح */
+    'الأكواد — كيف تجد أي شيء في ثانية': 'Codes — how to find anything in a second',
+    'لكل مشروع ووحدة كود قصير يولِّده النظام تلقائيًا، وللعميل كود تُدخله أنت هو رقمه القومي. اكتب أي كود في خانة البحث أعلى الشاشة وستصل مباشرة.':
+      'Every project and unit gets a short code generated automatically, and every client gets a code you enter — their national ID. Type any code into the search box at the top of the screen to jump straight to it.',
+    'الكود': 'Code', 'شكله': 'Format', 'من أين يأتي': 'Where it comes from', 'مثال من بياناتك': 'Example from your data',
+    'كود المشروع': 'Project code', 'P ثم رقم': 'P then a number',
+    'يُولَّد تلقائيًا عند إضافة مشروع': 'Generated automatically when a project is added',
+    'كود المشروع ثم رقم متسلسل': 'The project code then a serial number',
+    'يُولَّد تلقائيًا عند إضافة وحدة': 'Generated automatically when a unit is added',
+    'الرقم القومي (14 رقمًا) أو السجل التجاري': 'National ID (14 digits) or commercial registry',
+    'تُدخله عند تسجيل العميل — والنظام يمنع تكراره لعميلَين': 'You enter it when registering the client — the system prevents two clients sharing one code',
+    'العميل (بالاسم أو الرقم القومي) ← المشروع ← وحدة شاغرة ← البداية وقيمة السنة الأولى — جدول السنوات يتولَّد':
+      'Client (by name or national ID) → project → a vacant unit → start date and first-year rent — the year schedule is generated',
   });
+  I18N.addPatterns([
+    [/^(\d+) من (\d+) وحدة شاغرة في تاريخ البداية المختار$/, function (m) { return m[1] + ' of ' + m[2] + ' units are vacant on the chosen start date'; }],
+    [/^كل وحدات المشروع \((\d+)\) — التي عليها عقد معلَّمة بجوار اسمها$/, function (m) { return 'All project units (' + m[1] + ') — occupied ones are marked next to their name'; }],
+  ]);
+  I18N.addTokens([[/— عليها عقد قائم/g, '— has an active contract']]);
 })();
 
 </script>
@@ -6669,7 +6834,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       }, [
         h('div.proj-head', [
           h('div', [
-            h('h3.proj-name', b.name),
+            h('h3.proj-name', [b.name, b.code ? h('code.code-chip', ' ' + b.code) : null]),
             h('div.proj-owner', (b.owner ? 'المالك: ' + b.owner : '') + (b.demo ? ' · بيانات تجريبية' : '')),
           ]),
           b.demo ? h('span.chip.chip-neutral', 'تجريبي') : h('span.chip.chip-good-soft', 'فعلي'),
@@ -6797,7 +6962,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
           openDrawer('التأمينات عند المالك', [
             h('p.step-hint', 'التأمين ≈ شهر إيجار (البند الخامس) — بيترد بالكامل عند التسليم أو بيتخصم منه الإصلاحات. مش بيدخل في حسابات الدخل.'),
             h('table.table.table-mini', [
-              h('thead', h('tr', [h('th', 'المشروع'), h('th', 'الوحدة'), h('th', 'المستأجر'), h('th', 'المبلغ')])),
+              h('thead', h('tr', [h('th', 'المشروع'), h('th', 'الوحدة'), h('th', 'العميل'), h('th', 'المبلغ')])),
               h('tbody', rows.map(x => h('tr', [
                 h('td', bName(Store.unit(x.contract.unitId).buildingId)),
                 h('td', (Store.unit(x.contract.unitId) || {}).name),
@@ -6809,7 +6974,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
         },
       }),
       tile({
-        label: 'التزام المستأجرين',
+        label: 'التزام العملاء',
         value: comp.perTenant.length ? `${comp.punctual} ملتزم` : '—',
         ic: 'check', tone: 'good',
         sub: comp.perTenant.length
@@ -6817,10 +6982,10 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
           : 'يُحسب من الدفعات المسجَّلة بتاريخ — يظهر بعد أول أشهر التشغيل',
         onclick: () => {
           if (!comp.perTenant.length) { go('#insights', { b: F.b }); return; }
-          openDrawer('التزام المستأجرين — بالأسماء والنقاط', [
+          openDrawer('التزام العملاء — بالأسماء والنقاط', [
             h('p.step-hint', 'النقاط = نسبة الدفعات التي وصلت في ميعادها (يوم الاستحقاق + أيام السماح) من سجل السداد الفعلي المُوثَّق.'),
             h('table.table.table-mini', [
-              h('thead', h('tr', [h('th', 'المستأجر'), h('th', 'دفعات'), h('th', 'في الميعاد'), h('th', 'النقاط'), h('th', 'التقييم')])),
+              h('thead', h('tr', [h('th', 'العميل'), h('th', 'دفعات'), h('th', 'في الميعاد'), h('th', 'النقاط'), h('th', 'التقييم')])),
               h('tbody', comp.perTenant.map(x => h('tr', [
                 h('td', x.tenant.name),
                 h('td', String(x.n)),
@@ -7006,7 +7171,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'سداد يحتاج تأكيد': 'Payments needing confirmation', 'لا شيء بانتظار التأكيد': 'All confirmed',
     'تأمينات عند المالك': 'Deposits held by owner',
     'ليست دخلًا — التزام يُرَدُّ عند نهاية العقد (خارج الإيرادات)': 'Not income — a liability returned at contract end (kept out of revenue)',
-    'التزام المستأجرين': 'Tenant punctuality',
+    'التزام العملاء': 'Client punctuality',
     'الدخل المتوقع 12 شهر (من العقود — التأمينات غير محسوبة)': 'Expected income, 12 months (from contracts — deposits excluded)',
     'حركة الوحدات (دخول/خروج) وأثرها': 'Move-ins / move-outs and their impact',
     ' — جارٍ': ' — in progress',
@@ -7074,7 +7239,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       m2 => `Collection — ${I18N.tt(m2[1])} ${m2[2] === 'انخفض' ? 'down' : 'up'} ${m2[3]} pts`],
     [/^تحصيل (\d+)\/40 · إشغال (\d+)\/25 · خصم عدم التأكيد (\d+) · خصم تعمّر المتأخرات (\d+) · خصم الانتهاءات (\d+)$/,
       m2 => `Collection ${m2[1]}/40 · occupancy ${m2[2]}/25 · unconfirmed −${m2[3]} · arrears aging −${m2[4]} · expiries −${m2[5]}`],
-    [/^من دخل الشهر معتمد على مستأجر واحد: (.+)$/, m2 => "of this month's income depends on a single tenant: " + I18N.tt(m2[1])],
+    [/^من دخل الشهر معتمد على عميل واحد: (.+)$/, m2 => "of this month's income depends on a single tenant: " + I18N.tt(m2[1])],
     [/^(\d+) vacant units · avg vacancy ([\d.]+) شهر · lost so far ≈([\d,]+)$/,
       m2 => `${m2[1]} vacant units · avg vacancy ${m2[2]} mo · lost so far ≈${m2[3]}`],
     [/^غير مشمول: (\d+) أشهر قيمتها غير معروفة \(لا يوجد عقد مسجّل\)\.$/,
@@ -7094,7 +7259,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
   I18N.addPatterns([
     [/^المشروع: (.+)$/, m2 => 'Project: ' + I18N.tt(m2[1])],
     [/^النوع: (.+)$/, m2 => 'Type: ' + I18N.tt(m2[1])],
-    [/^المستأجر: (.+)$/, m2 => 'Tenant: ' + I18N.tt(m2[1])],
+    [/^العميل: (.+)$/, m2 => 'Tenant: ' + I18N.tt(m2[1])],
     [/^الحالة: (.+)$/, m2 => 'State: ' + I18N.tt(m2[1])],
     [/^بحث: (.+)$/, m2 => 'Search: ' + m2[1]],
   ]);
@@ -7111,11 +7276,11 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'حدِّد من سدَّدوا ← تاريخ وطريقة موحَّدان ← حفظ': 'Tick who paid → one date & method → save',
     'عقد جديد أو تجديد': 'New contract or renewal',
     'العقود ← «عقد جديد» أو زر «+ إدخال»': 'Contracts → “New contract” or the “+ Add” button',
-    'وحدة + مستأجر + بداية وقيمة سنة أولى — الجدول يتولَّد': 'Unit + tenant + start & year-1 rent — the schedule generates itself',
+    'وحدة + عميل + بداية وقيمة سنة أولى — الجدول يتولَّد': 'Unit + tenant + start & year-1 rent — the schedule generates itself',
     'وحدة داخل مشروع قائم': 'A unit inside an existing project', 'الوحدات ← «وحدة جديدة»': 'Units → “New unit”',
     'اختر المشروع ← الاسم والنوع': 'Pick the project → name & type',
-    'مستأجر أو تعديل بياناته': 'A tenant, or editing one', 'المستأجرون': 'Tenants',
-    'اضغط الصف للتعديل أو «مستأجر جديد»': 'Click a row to edit, or “New tenant”',
+    'عميل أو تعديل بياناته': 'A tenant, or editing one', 'العملاء': 'Tenants',
+    'اضغط الصف للتعديل أو «عميل جديد»': 'Click a row to edit, or “New tenant”',
     'شكوى صيانة': 'A maintenance complaint', 'الشكاوى ← «شكوى جديدة»': 'Complaints → “New complaint”',
     'الوحدة ← التصنيف والتكلفة ومن يتحمَّلها': 'Unit → category, cost and who bears it',
     'رد المالك على سؤال مراجعة': 'Owner’s answer to a review question', 'مراجعات مطلوبة': 'Reviews Needed',
@@ -7128,7 +7293,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       'Every incoming paper = an independent project named after its owner. Type the owner name exactly as written on it.',
     'الدخل السنوي المتوقع لكل مشروع (التأمينات مفصولة — ليست دخلًا)': 'Expected annual income per project (deposits separated — not income)',
     'التأمينات التزام يُرَد — اعرف سيولتك الحقيقية بدونها.': 'Deposits are a returnable liability — know your real liquidity without them.',
-    'توزيع صحي للدخل على المستأجرين.': 'Healthy income spread across tenants.',
+    'توزيع صحي للدخل على العملاء.': 'Healthy income spread across tenants.',
     'مراجعات مطلوبة — أسئلة للمالك': 'Reviews needed — questions for the owner',
     'تركيز المخاطر والتقييم العام': 'Risk concentration & portfolio health',
     'التقييم العام — مؤشر مجمَّع': 'Portfolio health — composite index',
@@ -7149,7 +7314,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'هذه الأشهر داخل مدة العقد لكن الورقة القديمة لم تضع عليها ✓ ولا ✗ — لا تُعتبر سدادًا ولا متأخرات قبل سؤال المالك. اضغط أي سطر لفتح خلية الشهر وتسجيل الحقيقة.':
       'These months fall inside the contract term but the old paper carries neither ✓ nor ✗ — they count as neither payment nor arrears until the owner answers. Click any row to open that month’s cell and record the truth.',
     'الإجمالي غير المحسوم: ': 'Total unresolved: ',
-    'التزام المستأجرين — بالأسماء والنقاط': 'Tenant punctuality — names and points',
+    'التزام العملاء — بالأسماء والنقاط': 'Client punctuality — names and points',
     'النقاط = نسبة الدفعات التي وصلت في ميعادها (يوم الاستحقاق + أيام السماح) من سجل السداد الفعلي المُوثَّق.':
       'Points = the share of documented payments that arrived on time (due day + grace days).',
     'دفعات': 'Payments', 'النقاط': 'Points', 'يتأخر أحيانًا': 'Sometimes late',
@@ -7208,7 +7373,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     { id: 'intake',     label: 'إضافة مشروع جديد',  path: 'M4 2.5h5L11.5 5v3M4 2.5V13.5h4.5M9 2.5V5h2.5M11.5 9.5v4M9.5 11.5h4' },
     { id: 'units',      label: 'الوحدات',          path: 'M3 13.5V6l5-3.5L13 6v7.5M6.5 13.5v-4h3v4' },
     { id: 'contracts',  label: 'العقود',           path: 'M4 2.5h6l2.5 2.5v8.5H4zM10 2.5V5h2.5M6 8h4M6 10.5h4' },
-    { id: 'tenants',    label: 'المستأجرون',       path: 'M5.5 7a2.2 2.2 0 100-4.4A2.2 2.2 0 005.5 7zM1.8 13.2c0-2 1.7-3.6 3.7-3.6s3.7 1.6 3.7 3.6M11 6.8a1.9 1.9 0 100-3.8M10.6 9.7c1.9.2 3.4 1.7 3.4 3.5' },
+    { id: 'tenants',    label: 'العملاء',       path: 'M5.5 7a2.2 2.2 0 100-4.4A2.2 2.2 0 005.5 7zM1.8 13.2c0-2 1.7-3.6 3.7-3.6s3.7 1.6 3.7 3.6M11 6.8a1.9 1.9 0 100-3.8M10.6 9.7c1.9.2 3.4 1.7 3.4 3.5' },
     { id: 'complaints', label: 'الشكاوى',          path: 'M13.5 7.5a5.5 5.5 0 01-8 4.9L2.5 13.5l1.1-3a5.5 5.5 0 119.9-3zM8 5.5v2.5M8 10.4v.1' },
     { id: 'quality',    label: 'مراجعات مطلوبة',    path: 'M8 1.8l5.5 2v4c0 3.2-2.3 5.6-5.5 6.4-3.2-.8-5.5-3.2-5.5-6.4v-4zM8 5.2v3M8 10.6v.1' },
     { id: 'guide',      label: 'دليل الشرح',       path: 'M8 3c-1.4-.9-3.2-1.2-5.5-1v10c2.3-.2 4.1.1 5.5 1 1.4-.9 3.2-1.2 5.5-1V2c-2.3-.2-4.1.1-5.5 1zM8 3v10' },
@@ -7259,7 +7424,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       ['عقد جديد', () => Views.openAddContract()],
       ['كشف جديد (ورقة كاملة)', () => { location.hash = '#intake'; }],
       ['وحدة جديدة', () => Views.openAddUnit()],
-      ['مستأجر جديد', () => Views.openTenantDrawer(null)],
+      ['عميل جديد', () => Views.openTenantDrawer(null)],
       ['شكوى جديدة', () => Views.openAddComplaint()],
     ].map(([label, fn]) => h('button.qa-item', { onclick: () => { closeQa(); fn(); } }, label)));
     const wrap = h('div.qa-wrap', [
@@ -7309,7 +7474,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       const items = [];
       if (F.b) items.push(chip('المشروع: ' + ((Store.building(F.b) || {}).name || ''), 'b'));
       if (F.ty) items.push(chip('النوع: ' + F.ty, 'ty'));
-      if (F.tn) items.push(chip('المستأجر: ' + ((Store.tenant(F.tn) || {}).name || ''), 'tn'));
+      if (F.tn) items.push(chip('العميل: ' + ((Store.tenant(F.tn) || {}).name || ''), 'tn'));
       if (F.st) items.push(chip('الحالة: ' + (ST_LBL[F.st] || F.st), 'st'));
       if ((F.q || '').trim()) items.push(chip('بحث: ' + F.q.trim(), 'q'));
       chipsEl = h('div.fchips', [

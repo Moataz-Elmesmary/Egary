@@ -62,11 +62,46 @@
       const raw = localStorage.getItem(LS_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.seedVersion === SEED.version) { STATE = parsed; return; }
+        if (parsed && parsed.seedVersion === SEED.version) { STATE = parsed; ensureCodes(); return; }
       }
     } catch (e) { /* تخزين تالف → بذرة جديدة */ }
     STATE = freshFromSeed();
+    ensureCodes();
     save();
+  }
+
+  /* أكواد قصيرة ثابتة قابلة للبحث: المشروع P1 والوحدة P1-01 —
+     تُولَّد مرة واحدة للبيانات القائمة (ترقية بلا مسح) وكود العميل = رقمه القومي يُدخل يدويًا */
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function ensureCodes() {
+    let changed = false;
+    STATE.buildings.forEach((b, i) => { if (!b.code) { b.code = 'P' + (i + 1); changed = true; } });
+    for (const b of STATE.buildings) {
+      let n = 0;
+      for (const u of STATE.units.filter(u => u.buildingId === b.id)) {
+        n++;
+        if (!u.code) { u.code = b.code + '-' + pad2(n); changed = true; }
+      }
+    }
+    if (changed) save();
+  }
+  function nextUnitCode(buildingId) {
+    const b = building(buildingId);
+    if (!b || !b.code) return null;
+    const used = new Set(STATE.units.filter(u => u.buildingId === buildingId).map(u => u.code));
+    let n = STATE.units.filter(u => u.buildingId === buildingId).length + 1;
+    while (used.has(b.code + '-' + pad2(n))) n++;
+    return b.code + '-' + pad2(n);
+  }
+  function nextBuildingCode() {
+    const used = new Set(STATE.buildings.map(b => b.code));
+    let n = STATE.buildings.length + 1;
+    while (used.has('P' + n)) n++;
+    return 'P' + n;
+  }
+  function tenantByCode(code) {
+    const c = String(code || '').trim();
+    return c ? STATE.tenants.find(t => (t.code || '') === c) || null : null;
   }
   function save() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) { /* تخزين ممتلئ */ }
@@ -657,22 +692,22 @@
   }
 
   function addTenant(rec) {
-    const t = { id: genId('T'), name: rec.name, kind: rec.kind || 'فرد', phone: rec.phone || '', note: rec.note || '' };
+    const t = { id: genId('T'), name: rec.name, code: (rec.code || '').trim() || null, kind: rec.kind || 'فرد', phone: rec.phone || '', note: rec.note || '' };
     STATE.tenants.push(t); commit(); return t;
   }
   function updateTenant(id, patch) {
     const t = tenant(id); if (t) { Object.assign(t, patch); commit(); }
   }
   function addUnit(rec) {
-    const u = { id: genId('U'), buildingId: rec.buildingId, name: rec.name, type: rec.type || 'غير محدد', floor: rec.floor || '', note: rec.note || '' };
+    const u = { id: genId('U'), buildingId: rec.buildingId, code: nextUnitCode(rec.buildingId), name: rec.name, type: rec.type || 'غير محدد', floor: rec.floor || '', note: rec.note || '' };
     STATE.units.push(u);
-    logAct(`وحدة جديدة — ${rec.name}`);
+    logAct(`وحدة جديدة — ${rec.name} (${u.code || ''})`);
     commit(); return u;
   }
   function addBuilding(rec) {
-    const b = { id: genId('B'), name: rec.name, owner: rec.owner || '', area: rec.area || '', note: rec.note || '', demo: false };
+    const b = { id: genId('B'), code: nextBuildingCode(), name: rec.name, owner: rec.owner || '', area: rec.area || '', note: rec.note || '', demo: false };
     STATE.buildings.push(b);
-    logAct(`كشف/مبنى جديد — ${rec.name}`);
+    logAct(`كشف/مبنى جديد — ${rec.name} (${b.code})`);
     commit(); return b;
   }
   /* حذف البيانات التوضيحية عند بدء الاستخدام الفعلي */
@@ -753,6 +788,7 @@
     projectStats, allProjectsStats, vacancyInfo, inOutForecast,
     consecutiveLateAlarms, complianceBuckets, healthScore,
     topTenantShare, annualByProject, unitIsEarning,
+    tenantByCode,
     // إدخال
     addPayment, addPaymentsBulk, deletePayment, setMark, addContract, addTenant, updateTenant,
     addUnit, addBuilding, removeDemoData, addComplaint, closeComplaint,

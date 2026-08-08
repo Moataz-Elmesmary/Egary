@@ -13,7 +13,7 @@
   };
   var MONTH_RE = 'يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر';
 
-  /* خريطة الأسماء: مباني/ملاك/مناطق/مستأجرين/وحدات/أدوار — تُرتَّب الأطول أولًا */
+  /* خريطة الأسماء: مباني/ملاك/مناطق/عميلين/وحدات/أدوار — تُرتَّب الأطول أولًا */
   var NAMES = [
     // كشوف وملاك ومناطق
     ['بيان عبدالمنعم سكرية', 'Abdelmoneim Sokareya Statement'],
@@ -27,7 +27,7 @@
     ['الدقي — الجيزة', 'Dokki — Giza'],
     ['المهندسين — الجيزة', 'Mohandessin — Giza'],
     ['الهرم — الجيزة', 'Haram — Giza'],
-    // مستأجرو الكشف الفعلي
+    // عملاء الكشف الفعلي
     ['علاء الدين محمد حافظ', 'Alaa El-Din Mohamed Hafez'],
     ['صالون علاء', 'Alaa Salon'],
     ['حسام سنوسي', 'Hossam Senoussi'],
@@ -37,7 +37,7 @@
     ['عز الدين', 'Ezz El-Din'],
     ['مصطفى عثمان', 'Mostafa Osman'],
     ['غير مسجّل', 'Not recorded'],
-    // مستأجرو المبنيين التوضيحيين
+    // عملاء المبنيين التوضيحيين
     ['مطعم بيت الكشري', 'Beit El-Koshary Restaurant'],
     ['صيدلية الرحمة', 'El-Rahma Pharmacy'],
     ['مكتب النخبة للمحاماة', 'Elite Law Office'],
@@ -128,11 +128,11 @@
       'The “Alaa El-Din Mohamed Hafez” row is ✗ every month from January to June, with no contract data or rent amount. The arrears certainly exist, but their value cannot be computed from the statement.',
     'إحضار عقد الوحدة أو تحديد القيمة المتفق عليها لتسجيل المتأخرات بقيمتها.':
       'Obtain the unit contract, or establish the agreed amount, so the arrears can be recorded at their actual amount.',
-    'الميزان 2 واردة في صفّين لمستأجرَين مختلفَين': 'Mezzanine 2 appears in two rows under two different tenants',
+    'الميزان 2 واردة في صفّين لعميلَين مختلفَين': 'Mezzanine 2 appears in two rows under two different clients',
     'صفّ باسم «الدقة» وصفّ باسم «العنوان» وكلاهما على نفس الوحدة وعليهما ✓ من يناير إلى يونيو — لا يمكن أن يسدِّد اثنان لوحدة واحدة. اعتُمدت بيانات صف «العنوان» لوجود عقود به.':
-      'One row named “El-Dekka” and one named “El-Enwan”, both for the same unit and both marked ✓ from January to June — two tenants cannot both be paying for one unit. The “El-Enwan” row was used because it has contract data on file.',
-    'تحديد المستأجر الفعلي للوحدة، وتوضيح علاقة «الدقة» بها.':
-      'Identify the unit’s actual tenant, and clarify how “El-Dekka” relates to it.',
+      'One row named “El-Dekka” and one named “El-Enwan”, both for the same unit and both marked ✓ from January to June — two clients cannot both be paying for one unit. The “El-Enwan” row was used because it has contract data on file.',
+    'تحديد العميل الفعلي للوحدة، وتوضيح علاقة «الدقة» بها.':
+      'Identify the unit’s actual client, and clarify how “El-Dekka” relates to it.',
     '61: تواريخ العقد الأصلية متناقضة (النهاية قبل البداية)': '61: original contract dates contradict each other (end before start)',
     'المدوَّن حرفيًا: من «2026/4/1 و2028/4/1» إلى «2026/3/31 و2027/3/31». فُسِّر الأرجح: عقد 2026/4/1 حتى 2027/3/31 بقيمة 25,325 وتجديد 2027/4/1 حتى 2028/3/31 بقيمة 40,000.':
       'Written verbatim: from “2026/4/1 and 2028/4/1” to “2026/3/31 and 2027/3/31”. The most likely reading was adopted: a contract 2026/4/1–2027/3/31 at 25,325, renewed 2027/4/1–2028/3/31 at 40,000.',
@@ -147,11 +147,11 @@
       'Written: from 2025/5/1 to 2026/4/30 with two values, 30,500 and 39,000. Interpreted as a two-year contract to 2027/4/30. The 27.9% increase is outside the usual 10% pattern.',
     'مراجعة أصل العقد: هل المدة سنتان فعلًا؟ وهل القيمة الثانية 39,000 صحيحة؟':
       'Review the original contract: is the term really two years? And is 39,000 correct for year 2?',
-    'جراج الهدم: سداد منتظم بلا عقد ولا مستأجر مسجّل': 'Demolition Garage: regular payments with no contract and no tenant on file',
-    'المدوَّن حرفيًا: «جراج الهدم» في عمود اسم العميل وعمود الوحدة فارغ — كصف تقوى عبدالمنعم تمامًا — مع ✓ ستة أشهر وقيمة 9,000 بلا أي تواريخ عقد. فُسِّر الاسم اسمَ وحدة (جراج) لا اسمَ شخص، فسُجِّلت وحدة «جراج الهدم» ومستأجر «غير مسجّل». التفريغ يصنّف هذا الصف «خارج ترتيب الجدول — ثقة منخفضة جدًا». لا يُحتسب ضمن الإشغال الموثَّق ولا المستحقات إلى أن يُسجَّل عقد.':
-      'Written verbatim: “Demolition Garage” in the client-name column with the unit column empty — exactly like the Taqwa Abdelmoneim row — with ✓ for six months and a value of 9,000, and no contract dates. The name was interpreted as a unit name (a garage), not a person, so a “Demolition Garage” unit and a “Not recorded” tenant were created. The transcription flags this row “out of table order — very low confidence”. It is excluded from documented occupancy and dues until a contract is recorded.',
-    'تسجيل اسم المستأجر وبيانات الاتفاق (القيمة 9,000 شهري؟ سنوي؟ ومنذ متى؟).':
-      'Record the tenant name and the terms of the agreement (is 9,000 monthly? annual? and since when?).',
+    'جراج الهدم: سداد منتظم بلا عقد ولا عميل مسجّل': 'Demolition Garage: regular payments with no contract and no client on file',
+    'المدوَّن حرفيًا: «جراج الهدم» في عمود اسم العميل وعمود الوحدة فارغ — كصف تقوى عبدالمنعم تمامًا — مع ✓ ستة أشهر وقيمة 9,000 بلا أي تواريخ عقد. فُسِّر الاسم اسمَ وحدة (جراج) لا اسمَ شخص، فسُجِّلت وحدة «جراج الهدم» وعميل «غير مسجّل». التفريغ يصنّف هذا الصف «خارج ترتيب الجدول — ثقة منخفضة جدًا». لا يُحتسب ضمن الإشغال الموثَّق ولا المستحقات إلى أن يُسجَّل عقد.':
+      'Written verbatim: “Demolition Garage” in the client-name column with the unit column empty — exactly like the Taqwa Abdelmoneim row — with ✓ for six months and a value of 9,000, and no contract dates. The name was interpreted as a unit name (a garage), not a person, so a “Demolition Garage” unit and a “Not recorded” client were created. The transcription flags this row “out of table order — very low confidence”. It is excluded from documented occupancy and dues until a contract is recorded.',
+    'تسجيل اسم العميل وبيانات الاتفاق (القيمة 9,000 شهري؟ سنوي؟ ومنذ متى؟).':
+      'Record the client name and the terms of the agreement (is 9,000 monthly? annual? and since when?).',
     'تقوى عبدالمنعم: يناير–مارس داخل مدة العقد بلا أي علامة': 'Taqwa Abdelmoneim: January–March fall within the contract term with no mark at all',
     'العقد من 2025/10/1 والعلامات تبدأ من أبريل. الورق لا يفرِّق بين «متأخر» و«لم يُسجَّل» — الأشهر الثلاثة معلَّمة في النظام «يحتاج تأكيدًا» لحين الحسم.':
       'The contract runs from 2025/10/1 while the marks start in April. Paper cannot distinguish “late” from “not recorded” — the three months are flagged “Needs confirmation” in the system until resolved.',
@@ -212,26 +212,27 @@
       'Clause 4 of the contract stipulates a monthly maintenance charge paid with the rent, yet it leaves no trace in the statement. (The system is ready: a maintenance field on every contract feeds dues automatically.)',
     'تحديد قيمة الصيانة لكل وحدة.': 'Establish the maintenance amount for each unit.',
     'ضريبة القيمة المضافة: غير محدَّد مَن الخاضع لها': 'VAT: it is unclear who is subject to it',
-    'البند العاشر يُحمِّل المستأجر الضريبة. يلزم تحديد العقود الخاضعة لتظهر في الاستحقاق والإيصالات. (النظام جاهز: علامة خضوع في كل عقد.)':
-      'Clause 10 puts the tax on the tenant. The VAT-applicable contracts must be identified so it shows in dues and receipts. (The system is ready: a VAT flag on every contract.)',
-    'حصر المستأجرين الخاضعين للضريبة.': 'Inventory the VAT-applicable tenants.',
+    'البند العاشر يُحمِّل العميل الضريبة. يلزم تحديد العقود الخاضعة لتظهر في الاستحقاق والإيصالات. (النظام جاهز: علامة خضوع في كل عقد.)':
+      'Clause 10 puts the tax on the client. The VAT-applicable contracts must be identified so it shows in dues and receipts. (The system is ready: a VAT flag on every contract.)',
+    'حصر العملاء الخاضعين للضريبة.': 'Inventory the VAT-applicable clients.',
     'تواريخ تسليم الوحدات غير مسجَّلة': 'Unit handover dates are unrecorded',
     'بدونها لا يمكن حساب مؤشر «الشكاوى خلال 30 يومًا من التسليم».': 'Without them, the “complaints within 30 days of handover” KPI cannot be computed.',
     'إدخال تاريخ التسليم لكل وحدة.': 'Enter the handover date for each unit.',
-    'بيانات التواصل غائبة بالكامل (الكشف الحقيقي)': 'Contact details are entirely missing (the real statement)',
-    'لا هاتف ولا رقم بطاقة لأي مستأجر — لازمة للتنبيهات وللتوثيق القانوني.': 'No phone or ID number for any tenant — needed for reminders and legal documentation.',
-    'استكمال بيانات المستأجرين.': 'Complete the tenants’ details.',
+    'بيانات التواصل وأكواد العملاء غائبة (الكشف الحقيقي)': 'Contact details and client codes are missing (the real statement)',
+    'لا هاتف ولا رقم قومي لأي عميل في كشف سكرية — الرقم القومي هو كود العميل الذي يُبحث به، ولازم للتنبيهات وللتوثيق القانوني.':
+      'No phone or national ID for any client in the Sokareya statement — the national ID is the client code you search by, and it is needed for reminders and legal documentation.',
+    'استكمال أسماء العملاء بأرقامهم القومية وهواتفهم من صور العقود.': 'Complete the client names with their national IDs and phones from the contract photos.',
     'أرقام الإيجار شهرية أم سنوية؟ — عقد العينة يحسمها «شهريًا»': 'Are the rent figures monthly or annual? — the sample contract settles it: “monthly”',
     'البند الثالث في عقد العينة ينص حرفيًا: «القيمة الإيجارية للمكان … جنيه شهريًا (فقط لا غير) شهريًا»، والبند الخامس: التأمين «بواقع شهر» (يطابق 41: تأمين 35,000 ≈ شهر من 36,000). النظام محسوب على «شهري». يتبقى التأكيد أن كل العقود على نفس النموذج.':
       'Clause 3 of the sample contract reads verbatim: “the rental value of the premises … pounds monthly (and no more) monthly”, and Clause 5 sets the deposit “at one month” (matching 41: a 35,000 deposit ≈ one month of 36,000). The system is computed on “monthly”. It remains to confirm all contracts follow the same form.',
     'تأكيد أن جميع العقود بنفس نموذج العينة، ثم تعليم «تم التأكيد» في الإعدادات.':
       'Confirm all contracts follow the sample form, then tick “Confirmed” in Settings.',
     /* ---------- بذرة: ملاحظات وسجل وشكاوى ---------- */
-    'مستأجر لأكثر من وحدة': 'Tenant of more than one unit',
-    'مستأجر جراج الهدم — الاسم غير وارد في الكشف': 'Demolition Garage tenant — name not given in the statement',
+    'عميل لأكثر من وحدة': 'Client of more than one unit',
+    'عميل جراج الهدم — الاسم غير وارد في الكشف': 'Demolition Garage client — name not given in the statement',
     'ورد في الكشف باسم «محل» — رُقِّم مؤقتًا': 'Listed in the statement as “Shop” — numbered provisionally',
-    'وردت في صفّين بمستأجرَين مختلفَين': 'Appears in two rows with two different tenants',
-    'بلا عقد ولا مستأجر مسجّل': 'No contract and no tenant on file',
+    'وردت في صفّين بعميلَين مختلفَين': 'Appears in two rows with two different clients',
+    'بلا عقد ولا عميل مسجّل': 'No contract and no client on file',
     'وحدة تقوى عبدالمنعم — غير مذكورة في الكشف': 'Taqwa Abdelmoneim’s unit — not named in the statement',
     '— الوحيد المسجّل في الكشف': '— the only one recorded in the statement',
     'الوحيد المسجّل في الكشف': 'The only one recorded in the statement',
@@ -326,14 +327,14 @@
     'البند السادس: لا تأجير من الباطن ولا تغيير استخدام': 'Clause 6: no subletting and no change of use',
     'خطر تشغيلي يُتابَع ميدانيًا': 'An operational risk followed up in the field',
     'ملاحظة الوحدة + الشكاوى مكانهما الطبيعي لأي مخالفة تُرصد': 'The unit note + Complaints are the natural home for any observed violation',
-    'صف «الميزان 2» المزدوج (الدقة/العنوان) — Q2 بيسأل: مين المستأجر الفعلي؟':
-      'The duplicated “Mezzanine 2” row (El-Dekka/El-Enwan) — Q2 asks: who is the actual tenant?',
-    'البند العاشر: ض.ق.م على المستأجر وتُسدَّد مع الإيجار': 'Clause 10: VAT on the tenant, paid with the rent',
+    'صف «الميزان 2» المزدوج (الدقة/العنوان) — Q2 بيسأل: مين العميل الفعلي؟':
+      'The duplicated “Mezzanine 2” row (El-Dekka/El-Enwan) — Q2 asks: who is the actual client?',
+    'البند العاشر: ض.ق.م على العميل وتُسدَّد مع الإيجار': 'Clause 10: VAT on the client, paid with the rent',
     'إضافة الضريبة لاستحقاق الخاضعين': 'Adds the tax to dues on VAT-applicable contracts',
     'علامة «خاضع» بكل عقد ⇒ الاستحقاق × (1 + النسبة من الإعدادات)': 'A “VAT applicable” flag per contract ⇒ dues × (1 + the rate from Settings)',
     'Q19: لسه محتاجين حصر مين الخاضع في كشف سكرية': 'Q19: we still need to identify who is VAT-applicable in the Sokareya statement',
     'البندان التاسع والسادس: الإنهاء المبكر = مصادرة التأمين': 'Clauses 9 & 6: early termination = deposit forfeiture',
-    'قاعدة تسوية عند خروج مستأجر': 'A settlement rule on tenant exit',
+    'قاعدة تسوية عند خروج عميل': 'A settlement rule on client exit',
     'مرحلة قادمة: شاشة «تسوية خروج» (رد/خصم من التأمين بمستنداته) — مسجّلة في خارطة الطريق':
       'A coming phase: an “exit settlement” screen (refund / documented deduction from the deposit) — on the roadmap',
     '42 المنتهي بلا تجديد: Q16 بيسأل عن تسوية تأمينه': '42, ended with no renewal: Q16 asks about settling its deposit',
@@ -423,7 +424,7 @@
     'كل ما سبق': 'All of the above',
     'كل بطاقة إنسايت جملة محسوبة بشرطها (مثلًا: منحدر الإيراد يظهر فقط لو النصف الثاني أقل 15٪+) وتنقلك لمكان الإجراء':
       'Every insight card is a computed sentence with its own condition (e.g. the revenue slope shows only if H2 is 15%+ lower) and links you to where you act',
-    'الوحدات / العقود / المستأجرون': 'Units / Contracts / Tenants',
+    'الوحدات / العقود / العملاء': 'Units / Contracts / Clients',
     'ملفات الكيانات: بطاقات بالكشف، جانت زمني بخط «اليوم»، أرصدة لحظية':
       'Entity files: cards per statement, a Gantt timeline with a “today” line, live balances',
     'العقود والدفعات': 'Contracts and payments',
@@ -462,7 +463,7 @@
     'لا وحدات ضمن الترشيح الحالي': 'No units match the current filter',
     'لا وحدات ضمن الترشيح': 'No units match the filter',
     'لا عقود ضمن الترشيح': 'No contracts match the filter',
-    'لا مستأجرين ضمن الترشيح': 'No tenants match the filter',
+    'لا عميلين ضمن الترشيح': 'No clients match the filter',
     'لا ملاحظات ضمن هذا الترشيح': 'No notes match this filter',
     'لا انتهاءات خلال 12 شهرًا': 'No expiries within 12 months',
     'لا مستحقات غير مسدَّدة لهذا الشهر ضمن الترشيح': 'No unpaid dues this month within the filter',
@@ -482,8 +483,8 @@
     'لا استحقاق': 'No dues',
     'الشهر عليه دفعات مسجَّلة — أطفئ وضع التفريغ لتعديلها':
       'This month has recorded payments — turn off Transcribe mode to edit them',
-    'علامات ✓/✗ بتتعلّم على صفوف الورقة (وحدة + مستأجر + عقد). أضف صفوف الورقة الأول، وبعدين ارجع هنا فرّغ العلامات.':
-      '✓/✗ marks attach to paper rows (unit + tenant + contract). Add the paper’s rows first, then come back here to transcribe the marks.',
+    'علامات ✓/✗ بتتعلّم على صفوف الورقة (وحدة + عميل + عقد). أضف صفوف الورقة الأول، وبعدين ارجع هنا فرّغ العلامات.':
+      '✓/✗ marks attach to paper rows (unit + client + contract). Add the paper’s rows first, then come back here to transcribe the marks.',
     'وسّع الترشيح من السلايسرز فوق، أو امسح البحث.': 'Widen the filter from the slicers above, or clear the search.',
     /* ---------- الأدراج ---------- */
     'سداد جماعي — شهر كامل': 'Bulk collection — a whole month',
@@ -509,7 +510,7 @@
     'حُذفت الدفعة': 'Payment deleted',
     'حذف': 'Delete',
     'خاضع لض.ق.م': 'VAT applicable',
-    'بيانات المستأجر': 'Tenant details',
+    'بيانات العميل': 'Client details',
     'الاسم': 'Name', 'الوحدات': 'Units',
     'لازم للتنبيهات لاحقًا (واتساب)': 'Needed for reminders later (WhatsApp)',
     'أدخل الاسم': 'Enter the name',
@@ -521,8 +522,8 @@
     'م² — اختياري': 'm² — optional',
     'المبنى / الكشف': 'Building / Statement',
     'اسم الوحدة': 'Unit name',
-    '+ مستأجر جديد…': '+ New tenant…',
-    'اسم المستأجر الجديد': 'New tenant name',
+    '+ عميل جديد…': '+ New client…',
+    'اسم العميل الجديد': 'New client name',
     'النهاية تُحسب تلقائيًا — يستحيل عقد نهايته قبل بدايته': 'The end is computed automatically — an end-before-start contract is impossible',
     'أساس الحساب الحالي: شهري': 'Current basis: monthly',
     'أساس الحساب الحالي: سنوي': 'Current basis: annual',
@@ -535,7 +536,7 @@
     'أدخل قيمة السنة الأولى لتوليد الجدول.': 'Enter the year-1 value to generate the schedule.',
     'أكمل الوحدة والبداية وقيمة سنة أولى موجبة': 'Complete the unit, the start, and a positive year-1 value',
     'لا تُقبل قيم سالبة': 'Negative values are not accepted',
-    'أدخل اسم المستأجر الجديد': 'Enter the new tenant’s name',
+    'أدخل اسم العميل الجديد': 'Enter the new client’s name',
     'سُجِّل العقد وبدأ حساب الاستحقاق فورًا': 'Contract recorded — dues computation started instantly',
     'أُغلقت الشكوى': 'Complaint closed',
     'سُجِّلت الشكوى': 'Complaint logged',
@@ -635,11 +636,11 @@
     'عقود نشطة بتأمين مسجّل': 'Active contracts with a recorded deposit',
     'البند الخامس: التأمين «بواقع شهر» — الناقص فجوة توثيق': 'Clause 5: the deposit “at one month” — what’s missing is a documentation gap',
     'بصيانة / خاضعة للضريبة': 'With maintenance / VAT-applicable',
-    'البند الرابع (صيانة شهرية مع الإيجار) والعاشر (ض.ق.م على المستأجر)':
-      'Clause 4 (monthly maintenance with the rent) and 10 (VAT on the tenant)',
+    'البند الرابع (صيانة شهرية مع الإيجار) والعاشر (ض.ق.م على العميل)':
+      'Clause 4 (monthly maintenance with the rent) and 10 (VAT on the client)',
     'تقويم انتهاءات العقود — 12 شهرًا (بلا تجديد مسجّل)': 'Contract expiry calendar — 12 months (no renewal on file)',
     'عدد العقود المنتهية شهريًا': 'Contracts expiring per month',
-    'التزام السداد بالمستأجر (من الدفعات الموثَّقة فقط)': 'Payment punctuality by tenant (documented payments only)',
+    'التزام السداد بالعميل (من الدفعات الموثَّقة فقط)': 'Payment punctuality by client (documented payments only)',
     'يُحسب من الدفعات الموثَّقة فقط': 'Computed from documented payments only',
     'كشف سكرية كله علامات ✓ بلا تواريخ — أول شهر توثيق حقيقي سيُظهر هذا الجدول':
       'The Sokareya statement is all undated ✓ marks — the first real month of documentation will populate this table',
@@ -654,7 +655,7 @@
     'الحقيقة 1: العقد (من/إلى + قيم السنوات 1-2-3)': 'Fact 1: the contract (from/to + year values 1-2-3)',
   };
 
-  /* حروف أوائل الأسماء (أفاتار المستأجرين) → حروف لاتينية */
+  /* حروف أوائل الأسماء (أفاتار العملاء) → حروف لاتينية */
   var INITIAL = {
     'ا': 'A', 'أ': 'A', 'إ': 'E', 'آ': 'A', 'ء': 'A', 'ى': 'A', 'ئ': 'Y', 'ؤ': 'W', 'ة': 'H',
     'ب': 'B', 'ت': 'T', 'ث': 'T', 'ج': 'G', 'ح': 'H', 'خ': 'K', 'د': 'D', 'ذ': 'Z',
