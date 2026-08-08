@@ -1320,7 +1320,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
         action: 'تسجيل اسم المستأجر وبيانات الاتفاق (القيمة 9,000 شهري؟ سنوي؟ ومنذ متى؟).' },
       { id: 'Q7', severity: 'high', refType: 'contract', refId: 'C12', status: 'open',
         title: 'تقوى عبدالمنعم: يناير–مارس داخل مدة العقد بلا أي علامة',
-        detail: 'العقد من 2025/10/1 والعلامات تبدأ من أبريل. الورق لا يفرِّق بين «متأخر» و«لم يُسجَّل» — الأشهر الثلاثة معلَّمة في النظام «غير موثَّق» لحين الحسم.',
+        detail: 'العقد من 2025/10/1 والعلامات تبدأ من أبريل. الورق لا يفرِّق بين «متأخر» و«لم يُسجَّل» — الأشهر الثلاثة معلَّمة في النظام «يحتاج تأكيدًا» لحين الحسم.',
         action: 'الحسم: هل يناير–مارس مسدَّدة (تُوثَّق) أم متأخرات (تُسجَّل بقيمتها 3 × 66,000)؟' },
       { id: 'Q8', severity: 'high', refType: 'unit', refId: 'U11', status: 'open',
         title: 'وحدة تقوى عبدالمنعم غير مذكورة في الكشف',
@@ -2549,8 +2549,8 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'العمود الفاتح = المستحق، الغامق = المحصَّل — الفرق بينهما هو الفجوة':
       'The light bar = due, the dark = collected — the difference is the gap',
     'إجماليات كل شهر': 'Each month’s totals',
-    'آخر 12 شهرًا حتى شهر التقرير + «؟» تحت الشهور الفيها لم يُحسم أمرها: زر «عرض كجدول»':
-      'The last 12 months up to the report month + “?” under months holding undocumented cells + a “View as table” button',
+    'آخر 12 شهرًا حتى شهر التقرير + «؟» تحت الشهور التي فيها سداد يحتاج تأكيدًا + زر «عرض كجدول»':
+      'The last 12 months up to the report month + “?” under months holding payments needing confirmation + a “View as table” button',
     'يوليو: عمود فاتح كامل بلا تعبئة = 0٪': 'July: a full light bar with no fill = 0%',
     'أعمار المتأخرات': 'Arrears aging',
     'قد إيه المتأخرات قديمة — الأقدم أصعب تحصيلًا': 'How old the arrears are — the older, the harder to collect',
@@ -2935,7 +2935,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     [/^([\d,]+) ج\.م في أول 6 أشهر مقابل ([\d,]+) ج\.م في التالية — عقود تنتهي بلا تجديد مسجّل\. راجع خط العقود الزمني\.$/, function (m) {
       return m[1] + ' EGP in the first 6 months versus ' + m[2] + ' EGP in the next — contracts ending with no renewal on file. See the contracts timeline.';
     }],
-    [/^يحتاج تأكيدًا \+ (.+) متأخرة بقيمة مجهولة$/, function (m) { return 'Needs confirmation + ' + months(m[1]) + ' late of unknown value'; }],
+    [/^لم يُحسم أمرها: (.+) متأخرة بقيمة مجهولة$/, function (m) { return 'Unresolved: ' + months(m[1]) + ' late of unknown value'; }],
     [/^فاقد إيراد شهري تقديري من (\d+) وحدات بلا عقد نشط$/, function (m) {
       return 'Estimated monthly revenue loss from ' + m[1] + ' units with no active contract';
     }],
@@ -6224,7 +6224,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       { name: 'الإشغال / التجديدات / التأمينات', what: 'وحدات بعقد نشط اليوم · عقود تنتهي ≤90 يوم بلا لاحق · مجموع التأمينات المحتجزة', source: 'تواريخ العقود + خانات التأمين', calc: 'مقارنات تواريخ مباشرة — «منتهٍ بلا تجديد» يعني آخر عقد للوحدة انتهى ومفيش عقد مربوط به', example: '42 انتهى 2026/7/30 بلا تجديد ⇒ تنبيه أحمر' },
       { name: 'حالة المباني (الواجهات)', what: 'كل وحدة مربع بلون حالتها في شهر التقرير — نظرة واحدة تعرف منها مين واقف فين', source: 'محرك الحالات لكل وحدة×الشهر', calc: 'نفس ألوان المصفوفة: أخضر محصَّل، كهرماني جزئي/متأخر السداد، أحمر متأخر، مقلّم يحتاج تأكيدًا', example: 'صف سكرية أحمر كامل — 6 أشهر ✗' },
       { name: 'من لم يسدِّد؟', what: 'الإجابة المباشرة لسؤالك: أسماء ومبالغ الشهر المختار، مرتّبة بالأكبر', source: 'حالات الشهر المختار', calc: 'كل وحدة حالتها متأخر/جزئي/يحتاج تأكيدًا/في السماح + المتبقي عليها — الضغط يفتح خلية التسجيل', example: 'يوليو: 9 وحدات لم تسدِّد بإجمالي 453,254' },
-      { name: 'التحصيل الشهري (رسم)', what: 'العمود الفاتح = المستحق، الغامق = المحصَّل — الفرق بينهما هو الفجوة', source: 'إجماليات كل شهر', calc: 'آخر 12 شهرًا حتى شهر التقرير + «؟» تحت الشهور الفيها لم يُحسم أمرها: زر «عرض كجدول»', example: 'يوليو: عمود فاتح كامل بلا تعبئة = 0٪' },
+      { name: 'التحصيل الشهري (رسم)', what: 'العمود الفاتح = المستحق، الغامق = المحصَّل — الفرق بينهما هو الفجوة', source: 'إجماليات كل شهر', calc: 'آخر 12 شهرًا حتى شهر التقرير + «؟» تحت الشهور التي فيها سداد يحتاج تأكيدًا + زر «عرض كجدول»', example: 'يوليو: عمود فاتح كامل بلا تعبئة = 0٪' },
       { name: 'أعمار المتأخرات', what: 'قد إيه المتأخرات قديمة — الأقدم أصعب تحصيلًا', source: 'عمر كل شهر متأخر باليوم', calc: 'شرائح 1–30 / 31–60 / 61–90 / +90 من يوم الاستحقاق', example: `أقدم شريحة حاليًا: ${money(ar.buckets.b90p, { bare: true })} فوق 90 يومًا` },
     ]);
 

@@ -383,8 +383,8 @@
     'العمود الفاتح = المستحق، الغامق = المحصَّل — الفرق بينهما هو الفجوة':
       'The light bar = due, the dark = collected — the difference is the gap',
     'إجماليات كل شهر': 'Each month’s totals',
-    'آخر 12 شهرًا حتى شهر التقرير + «؟» تحت الشهور الفيها لم يُحسم أمرها: زر «عرض كجدول»':
-      'The last 12 months up to the report month + “?” under months holding undocumented cells + a “View as table” button',
+    'آخر 12 شهرًا حتى شهر التقرير + «؟» تحت الشهور التي فيها سداد يحتاج تأكيدًا + زر «عرض كجدول»':
+      'The last 12 months up to the report month + “?” under months holding payments needing confirmation + a “View as table” button',
     'يوليو: عمود فاتح كامل بلا تعبئة = 0٪': 'July: a full light bar with no fill = 0%',
     'أعمار المتأخرات': 'Arrears aging',
     'قد إيه المتأخرات قديمة — الأقدم أصعب تحصيلًا': 'How old the arrears are — the older, the harder to collect',
@@ -769,7 +769,7 @@
     [/^([\d,]+) ج\.م في أول 6 أشهر مقابل ([\d,]+) ج\.م في التالية — عقود تنتهي بلا تجديد مسجّل\. راجع خط العقود الزمني\.$/, function (m) {
       return m[1] + ' EGP in the first 6 months versus ' + m[2] + ' EGP in the next — contracts ending with no renewal on file. See the contracts timeline.';
     }],
-    [/^يحتاج تأكيدًا \+ (.+) متأخرة بقيمة مجهولة$/, function (m) { return 'Needs confirmation + ' + months(m[1]) + ' late of unknown value'; }],
+    [/^لم يُحسم أمرها: (.+) متأخرة بقيمة مجهولة$/, function (m) { return 'Unresolved: ' + months(m[1]) + ' late of unknown value'; }],
     [/^فاقد إيراد شهري تقديري من (\d+) وحدات بلا عقد نشط$/, function (m) {
       return 'Estimated monthly revenue loss from ' + m[1] + ' units with no active contract';
     }],
