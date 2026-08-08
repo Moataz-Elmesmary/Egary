@@ -153,8 +153,8 @@
     'تسجيل اسم المستأجر وبيانات الاتفاق (القيمة 9,000 شهري؟ سنوي؟ ومنذ متى؟).':
       'Record the tenant name and the terms of the agreement (is 9,000 monthly? annual? and since when?).',
     'تقوى عبدالمنعم: يناير–مارس داخل مدة العقد بلا أي علامة': 'Taqwa Abdelmoneim: January–March fall within the contract term with no mark at all',
-    'العقد من 2025/10/1 والعلامات تبدأ من أبريل. الورق لا يفرِّق بين «متأخر» و«لم يُسجَّل» — الأشهر الثلاثة معلَّمة في النظام «غير موثَّق» لحين الحسم.':
-      'The contract runs from 2025/10/1 while the marks start in April. Paper cannot distinguish “late” from “not recorded” — the three months are flagged “Undocumented” in the system until resolved.',
+    'العقد من 2025/10/1 والعلامات تبدأ من أبريل. الورق لا يفرِّق بين «متأخر» و«لم يُسجَّل» — الأشهر الثلاثة معلَّمة في النظام «يحتاج تأكيدًا» لحين الحسم.':
+      'The contract runs from 2025/10/1 while the marks start in April. Paper cannot distinguish “late” from “not recorded” — the three months are flagged “Needs confirmation” in the system until resolved.',
     'الحسم: هل يناير–مارس مسدَّدة (تُوثَّق) أم متأخرات (تُسجَّل بقيمتها 3 × 66,000)؟':
       'Resolve: were January–March paid (to be documented) or arrears (to be recorded at 3 × 66,000)?',
     'وحدة تقوى عبدالمنعم غير مذكورة في الكشف': 'Taqwa Abdelmoneim’s unit is not named in the statement',
@@ -256,7 +256,7 @@
     'بيان ورقي من مالك عقار (زي «بيان عبدالمنعم سكرية») + نموذج عقد. الورقة = كشف مستقل في المنظومة.':
       'A paper statement from a property owner (like the “Abdelmoneim Sokareya Statement”) + a contract form. Each paper = an independent statement in the suite.',
     'شاشة «إدخال كشف جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من المصفوفة بوضع نقل الورقة. الخانة الفارغة تُسجَّل «يحتاج تأكيد» — الفراغ معلومة.':
-      'The “New Statement Intake” screen: owner details → the paper’s rows with its exact columns (client name / unit / from / values 1-2-3 / notes) → ✓/✗ marks from the matrix in Transcribe mode. Empty cells register as “Undocumented” — a blank is information.',
+      'The “New Statement Intake” screen: owner details → the paper’s rows with its exact columns (client name / unit / from / values 1-2-3 / notes) → ✓/✗ marks from the matrix in Transcribe mode. Empty cells register as “Needs confirmation” — a blank is information.',
     'كل تناقض أو نقص يتسجّل تلقائيًا في «جودة البيانات» بنص المصدر الحرفي. تقعد مع المالك جلسة واحدة تقفل الأسئلة (تليفونات، تأمينات، قيم ناقصة، فراغات = سداد ولا تأخير؟).':
       'Every contradiction or gap is logged automatically in “Data Quality” with the source’s verbatim text. One sitting with the owner closes the questions (phones, deposits, missing values, blanks = paid or late?).',
     'التحصيل الجديد يتسجّل دفعة كاملة (مبلغ+تاريخ+طريقة+إيصال) من خلية المصفوفة أو بالسداد الجماعي. عقد جديد/تجديد من زر «+ إدخال». شكوى تتسجّل بتصنيفها وتكلفتها.':
@@ -280,8 +280,8 @@
     '✓ = حصل سداد (بلا تفاصيل) · ✗ = متأخر مؤكد · الشاغرة = لا نعرف':
       '✓ = a payment happened (no details) · ✗ = confirmed late · blank = we don’t know',
     'شبكة الشهور في الورقة، بتتفرّغ كما هي بوضع نقل الورقة': 'The paper’s month grid, transcribed as-is in Transcribe mode',
-    '✓ تُحسب سدادًا كاملًا بقيمة الاستحقاق (افتراض مُعلَن لحد ما تتوثّق) · ✗ يدخل المتأخرات · الشاغرة يتعلّم «غير موثَّق» ولا يدخل أي إجمالي إلا بقيمته المحتملة منفصلة':
-      '✓ counts as full payment at the due amount (a declared assumption until documented) · ✗ enters the arrears · blank is flagged “Undocumented” and enters no total except as a separate potential value',
+    '✓ تُحسب سدادًا كاملًا بقيمة الاستحقاق (افتراض مُعلَن لحد ما تتوثّق) · ✗ يدخل المتأخرات · الشاغرة يتعلّم «يحتاج تأكيدًا» ولا يدخل أي إجمالي إلا بقيمته المحتملة منفصلة':
+      '✓ counts as full payment at the due amount (a declared assumption until documented) · ✗ enters the arrears · blank is flagged “Needs confirmation” and enters no total except as a separate potential value',
     'الحقيقة 3: التاريخ الجاري (النهارده)': 'Fact 3: the current date (today)',
     'بيحوّل الجدول لحالات: مدفوع/مستحق/متأخر/لم يستحق': 'Turns the schedule into states: paid / due / late / not yet due',
     'ساعة الجهاز + يوم الاستحقاق في العقد (أول الشهر بنص بنود العقد) + أيام السماح من الإعدادات':
@@ -369,21 +369,21 @@
     'كل وحدة مربع بلون حالتها في شهر التقرير — نظرة واحدة تعرف منها مين واقف فين':
       'Each unit is a square colored by its report-month state — one glance shows where every unit stands',
     'محرك الحالات لكل وحدة×الشهر': 'The state engine per unit × month',
-    'نفس ألوان المصفوفة: أخضر محصَّل، كهرماني جزئي/متأخر السداد، أحمر متأخر، مقلّم غير موثَّق':
+    'نفس ألوان المصفوفة: أخضر محصَّل، كهرماني جزئي/متأخر السداد، أحمر متأخر، مقلّم يحتاج تأكيدًا':
       'Same matrix colors: green collected, amber partial/paid-late, red late, striped undocumented',
     'صف سكرية أحمر كامل — 6 أشهر ✗': 'The Sokareya row is solid red — 6 months of ✗',
     'من لم يسدِّد؟': 'Who has not paid?',
     'الإجابة المباشرة لسؤالك: أسماء ومبالغ الشهر المختار، مرتّبة بالأكبر':
       'The direct answer to your question: names and amounts for the chosen month, largest first',
     'حالات الشهر المختار': 'The chosen month’s states',
-    'كل وحدة حالتها متأخر/جزئي/غير موثَّق/في السماح + المتبقي عليها — الضغط يفتح خلية التسجيل':
+    'كل وحدة حالتها متأخر/جزئي/يحتاج تأكيدًا/في السماح + المتبقي عليها — الضغط يفتح خلية التسجيل':
       'Every unit that is late / partial / undocumented / in grace + its remaining balance — clicking opens the recording cell',
     'يوليو: 9 وحدات لم تسدِّد بإجمالي 453,254': 'July: 9 units unpaid, totaling 453,254',
     'التحصيل الشهري (رسم)': 'Monthly collection (chart)',
     'العمود الفاتح = المستحق، الغامق = المحصَّل — الفرق بينهما هو الفجوة':
       'The light bar = due, the dark = collected — the difference is the gap',
     'إجماليات كل شهر': 'Each month’s totals',
-    'آخر 12 شهرًا حتى شهر التقرير + «؟» تحت الشهور الفيها غير موثَّق + زر «عرض كجدول»':
+    'آخر 12 شهرًا حتى شهر التقرير + «؟» تحت الشهور الفيها لم يُحسم أمرها: زر «عرض كجدول»':
       'The last 12 months up to the report month + “?” under months holding undocumented cells + a “View as table” button',
     'يوليو: عمود فاتح كامل بلا تعبئة = 0٪': 'July: a full light bar with no fill = 0%',
     'أعمار المتأخرات': 'Arrears aging',
@@ -399,7 +399,7 @@
     'المنقّط بيفضل «يحتاج توثيق» لحد ما تسجّل مبلغه وتاريخه الفعليين من خليته':
       'A dotted mark stays “needs documentation” until you record the actual amount and date from its cell',
     '½ / ✗ / ؟ / • / – / ·': '½ / ✗ / ? / • / – / ·',
-    'جزئي / متأخر / غير موثَّق / مستحق في السماح / خارج مدة العقد / قبل تغطية الورقة':
+    'جزئي / متأخر / يحتاج تأكيدًا / مستحق في السماح / خارج مدة العقد / قبل تغطية الورقة':
       'Partial / late / undocumented / due in grace / outside the contract term / before the paper’s range',
     'محرك الحالات': 'The state engine',
     '«≈» جنب الرمز = القيمة تقديرية (+10٪ غير مدوَّنة في الورقة)':
@@ -443,8 +443,8 @@
     '1,519,345 ج.م + 6 أشهر مجهولة': '1,519,345 EGP + 6 unknown months',
     '198,000 ج.م (تقوى: يناير–مارس)': '198,000 EGP (Taqwa: Jan–Mar)',
     'أقدم شريحة حاليًا: 80,200 ج.م فوق 90 يومًا': 'Oldest bucket currently: 80,200 EGP past 90 days',
-    'تقوى عبدالمنعم: يناير–مارس فارغة في الورقة = 198,000 ج.م «غير موثَّق» — ليست متأخرات وليست تحصيلًا':
-      'Taqwa Abdelmoneim: January–March blank on the paper = 198,000 EGP “Undocumented” — neither arrears nor collection',
+    'تقوى عبدالمنعم: يناير–مارس فارغة في الورقة = 198,000 ج.م «يحتاج تأكيدًا» — ليست متأخرات وليست تحصيلًا':
+      'Taqwa Abdelmoneim: January–March blank on the paper = 198,000 EGP “Needs confirmation” — neither arrears nor collection',
     'يوليو 2026 كله بلا أي علامة في الورقة ⇒ 453,254 ج.م متأخرات مؤكدة عمرها 31–60 يومًا':
       'July 2026 has no marks at all on the paper ⇒ 453,254 EGP confirmed arrears aged 31–60 days',
     /* ---------- عام / لوحة / مصفوفة / تلميحات ---------- */
@@ -613,19 +613,19 @@
     'أُضيف الصف ناقصًا — سيظهر «بلا عقد مسجّل» حتى تُستكمل بياناته':
       'Row added incomplete — it will show “No contract on file” like the Demolition Garage row, to be completed once its data is known',
     'بلا عقد': 'No contract',
-    'افتح المصفوفة بوضع نقل الورقة: كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فارغ — بسرعة الورقة نفسها. الخانة اللي الورقة ساكتة عنها سيبها فارغة وسيعلّمها النظام «غير موثَّق».':
-      'Open the matrix in Transcribe mode: each click cycles a cell ✓ → ✗ → blank — as fast as the paper itself. Leave blank whatever the paper is silent about; the system flags it “Undocumented”.',
+    'افتح المصفوفة بوضع نقل الورقة: كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فارغ — بسرعة الورقة نفسها. الخانة اللي الورقة ساكتة عنها سيبها فارغة وسيعلّمها النظام «يحتاج تأكيدًا».':
+      'Open the matrix in Transcribe mode: each click cycles a cell ✓ → ✗ → blank — as fast as the paper itself. Leave blank whatever the paper is silent about; the system flags it “Needs confirmation”.',
     'العلامات بتتعلّم على صفوف الورقة — أضف الصفوف في الخطوة 2 الأول وبعدها الزر هيظهر هنا.':
       'Marks attach to the paper’s rows — add the rows in Step 2 first, and the button will appear here.',
     /* ---------- التحليلات ---------- */
     'الإيراد المتعاقد عليه ينخفض في النصف الثاني من السنة القادمة':
       'Contracted revenue drops in the second half of the coming year',
-    'أكبر فجوة معرفية في البيانات — كل بند له سؤال محدد في شاشة جودة البيانات، وإجابته تدخل النظام وتقفل البند.':
+    'كل بند منها له سؤال جاهز للمالك في «مراجعات مطلوبة» — إجابته تضع المبلغ في مكانه الصحيح: سداد يُوثَّق أو متأخرات تُسجَّل.':
       'The portfolio’s biggest knowledge gap — every item has a specific question on the Data Quality screen; each answer enters the system and closes its item.',
     'محسوب من متوسط إيجار النوع المماثل — كل شهر تأخير في التأجير أو التجديد يكلّف هذا الرقم.':
       'Computed from the average rent of the same type — every month of leasing or renewal delay costs this figure.',
     'كل كشف ورقي = كيان مستقل بمؤشراته': 'Every paper statement = an independent entity with its own KPIs',
-    'بمبلغ وتاريخ وإيصال — كشف سكرية كله علامات غير موثَّقة حتى الآن':
+    'بمبلغ وتاريخ وإيصال — كشف سكرية كله علامات يحتاج تأكيدًاة حتى الآن':
       'With amount, date & receipt — the Sokareya statement is still all undocumented marks',
     'تحليل العقود — من نموذج العقد الفعلي وبياناته': 'Contract analysis — from the actual contract form and its data',
     'متوسط مدة العقد': 'Average contract term',
@@ -714,7 +714,7 @@
     [/^المستحق: ([\d,]+) ج\.م$/, function (m) { return 'Due: ' + m[1] + ' EGP'; }],
     [/^المحصَّل: ([\d,]+) ج\.م$/, function (m) { return 'Collected: ' + m[1] + ' EGP'; }],
     [/^النسبة: (.+)$/, function (m) { return 'Rate: ' + en(m[1]); }],
-    [/^غير موثَّق: ([\d,]+) ج\.م \((\d+) شهر×وحدة\)$/, function (m) { return 'Undocumented: ' + m[1] + ' EGP (' + m[2] + ' unit-months)'; }],
+    [/^يحتاج تأكيدًا: ([\d,]+) ج\.م \((\d+) شهر×وحدة\)$/, function (m) { return 'Needs confirmation: ' + m[1] + ' EGP (' + m[2] + ' unit-months)'; }],
     [/^المسدَّد: ([\d,]+) ج\.م(?: في ([\d/]+))?$/, function (m) { return 'Paid: ' + m[1] + ' EGP' + (m[2] ? ' on ' + m[2] : ''); }],
     [/^أيام التأخير: (\d+)$/, function (m) { return 'Days late: ' + m[1]; }],
     [/^\(منها صيانة ([\d,]+)\)$/, function (m) { return '(incl. maintenance ' + m[1] + ')'; }],
@@ -769,7 +769,7 @@
     [/^([\d,]+) ج\.م في أول 6 أشهر مقابل ([\d,]+) ج\.م في التالية — عقود تنتهي بلا تجديد مسجّل\. راجع خط العقود الزمني\.$/, function (m) {
       return m[1] + ' EGP in the first 6 months versus ' + m[2] + ' EGP in the next — contracts ending with no renewal on file. See the contracts timeline.';
     }],
-    [/^غير موثَّق \+ (.+) متأخرة بقيمة مجهولة$/, function (m) { return 'Undocumented + ' + months(m[1]) + ' late of unknown value'; }],
+    [/^يحتاج تأكيدًا \+ (.+) متأخرة بقيمة مجهولة$/, function (m) { return 'Needs confirmation + ' + months(m[1]) + ' late of unknown value'; }],
     [/^فاقد إيراد شهري تقديري من (\d+) وحدات بلا عقد نشط$/, function (m) {
       return 'Estimated monthly revenue loss from ' + m[1] + ' units with no active contract';
     }],

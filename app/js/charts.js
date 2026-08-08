@@ -132,7 +132,7 @@
           `المستحق: ${UI.money(m.due)}${m.estimatedPart ? ' <i>(جزء تقديري)</i>' : ''}<br>` +
           `المحصَّل: ${UI.money(m.collected)}<br>` +
           `النسبة: ${m.rate == null ? '—' : UI.pct(m.rate)}`;
-        if (m.unknownDue) html += `<br>غير موثَّق: ${UI.money(m.unknownDue)} (${m.unknownCount} شهر×وحدة)`;
+        if (m.unknownDue) html += `<br>يحتاج تأكيدًا: ${UI.money(m.unknownDue)} (${m.unknownCount} شهر×وحدة)`;
         return html;
       });
       svg.appendChild(g);

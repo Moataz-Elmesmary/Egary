@@ -98,7 +98,7 @@
     /* شرح التقييم العام بأرقامه الفعلية — الرقم لازم يفسّر نفسه */
     function openHealthDrawer(hh) {
       const rows = [
-        ['نسبة التحصيل الشهرية', hh.parts.collectScore, 40, 'كلما حصَّلت أكثر من المستحق ارتفعت النقاط'],
+        ['نسبة التحصيل الشهرية', hh.parts.collectScore, 40, 'كلما اقتربت نسبة تحصيلك من 100٪ ارتفعت النقاط'],
         ['نسبة الإشغال', hh.parts.occScore, 25, 'الوحدات المؤجَّرة من إجمالي الوحدات'],
         ['اكتمال التأكيد', 15 - hh.parts.unknownPenalty, 15, 'تنخفض كلما زادت المبالغ التي لم يُحسم أمرها (سداد أم تأخير؟)'],
         ['حداثة المتأخرات', 10 - hh.parts.agingPenalty, 10, 'تنخفض كلما تقادمت المتأخرات فوق 90 يومًا'],
@@ -195,7 +195,28 @@
         sub: vac.count
           ? `${vac.count} وحدة شاغرة · متوسط مدة الشغور ${vac.avgMonths != null ? vac.avgMonths + ' شهر' : '—'} · إجمالي الفاقد ≈${money(vac.totalAccum, { bare: true })}`
           : 'لا توجد وحدات شاغرة',
-        onclick: () => go('#units', { st: 'notEarning', b: F.b }),
+        onclick: () => {
+          if (!vac.count) return;
+          openDrawer('خسائر الوحدات الشاغرة — وحدة بوحدة وأساس الحساب', [
+            h('p.step-hint', 'الخسارة الشهرية تقدير مُعلَن الأساس: آخر إيجار دفعته الوحدة نفسها، وإن لم تُؤجَّر من قبل فمتوسط إيجار وحدات نوعها. اضغط أي سطر لفتح ملف الوحدة.'),
+            h('div.mini-scroll', h('table.table.table-mini', [
+              h('thead', h('tr', [h('th', 'الوحدة'), h('th', 'شاغرة منذ'), h('th', 'خسارة/شهر'), h('th', 'أساس الحساب'), h('th', 'الفاقد حتى الآن')])),
+              h('tbody', vac.rows.map(r => keyClickable(h('tr.row-click', {
+                onclick: () => { closeDrawer(); Views.openUnitDrawer(r.unit); },
+              }, [
+                h('td', [h('b', r.unit.name), h('span.exp-proj', ' — ' + bName(r.unit.buildingId))]),
+                h('td', r.months != null ? r.months + ' شهر' : 'لم تؤجَّر من قبل'),
+                h('td', r.estMonthly != null ? h('b.val-warning', '≈' + money(r.estMonthly, { bare: true })) : '—'),
+                h('td', r.src || 'لا أساس متاح'),
+                h('td', r.accumLoss != null ? h('span.val-critical', '≈' + money(r.accumLoss, { bare: true })) : '—'),
+              ])))),
+            ])),
+            h('p.unpaid-total', ['إجمالي الخسارة الشهرية: ', h('b.val-warning', '≈' + money(vac.totalMonthly))]),
+          ], [
+            h('button.btn.btn-primary', { onclick: () => { closeDrawer(); go('#units', { st: 'notEarning', b: F.b }); } }, 'افتح الوحدات الشاغرة'),
+            h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إغلاق'),
+          ]);
+        },
       }),
       tile({
         label: 'سداد قديم يحتاج تأكيدًا',
@@ -583,7 +604,7 @@
       'One number out of 100 summarising your projects — the sum of five components computed from your actual data:',
     'المكوِّن': 'Component', 'نقاطك': 'Your points', 'المعنى': 'Meaning',
     'نسبة التحصيل الشهرية': 'Monthly collection rate',
-    'كلما حصَّلت أكثر من المستحق ارتفعت النقاط': 'The more of the dues you collect, the higher the points',
+    'كلما اقتربت نسبة تحصيلك من 100٪ ارتفعت النقاط': 'The closer your collection gets to 100%, the higher the points',
     'نسبة الإشغال': 'Occupancy rate', 'الوحدات المؤجَّرة من إجمالي الوحدات': 'Rented units out of all units',
     'اكتمال التأكيد': 'Confirmation completeness',
     'تنخفض كلما زادت المبالغ التي لم يُحسم أمرها (سداد أم تأخير؟)': 'Drops as more amounts remain unresolved (paid or late?)',
@@ -597,6 +618,16 @@
     'اضغط للتفاصيل': 'Click for details',
     '«إضافة مشروع جديد»': '“Add New Project”',
     'وحدات داخلة': 'Moving in', 'وحدات خارجة': 'Moving out', 'دخل الشهر': 'Month income', 'الأثر': 'Impact',
+    'خسائر الوحدات الشاغرة — وحدة بوحدة وأساس الحساب': 'Vacancy losses — unit by unit, with the calculation basis',
+    'الخسارة الشهرية تقدير مُعلَن الأساس: آخر إيجار دفعته الوحدة نفسها، وإن لم تُؤجَّر من قبل فمتوسط إيجار وحدات نوعها. اضغط أي سطر لفتح ملف الوحدة.':
+      'The monthly loss is an estimate with a declared basis: the unit’s own last rent, or the average rent of its type if never rented. Click any row to open the unit.',
+    'شاغرة منذ': 'Vacant since', 'خسارة/شهر': 'Loss/mo', 'أساس الحساب': 'Calculation basis',
+    'الفاقد حتى الآن': 'Lost so far', 'لم تؤجَّر من قبل': 'Never rented', 'لا أساس متاح': 'No basis available',
+    'آخر إيجار للوحدة': 'The unit’s own last rent', 'متوسط النوع المماثل': 'Average of similar type',
+    'إجمالي الخسارة الشهرية: ': 'Total monthly loss: ', 'افتح الوحدات الشاغرة': 'Open vacant units',
+    'مبالغ لم يُحسم أمرها': 'Unresolved amounts',
+    'كل بند منها له سؤال جاهز للمالك في «مراجعات مطلوبة» — إجابته تضع المبلغ في مكانه الصحيح: سداد يُوثَّق أو متأخرات تُسجَّل.':
+      'Each item has a ready question for the owner under Reviews Needed — the answer files the amount where it belongs: a documented payment or recorded arrears.',
     'الكشف يذكر تأمينًا واحدًا (35,000 للوحدة 41). قيم تأمين باقي العقود غير معروفة رغم أنها التزام مالي يجب أن يظهر.':
       'The paper records a single deposit (35,000 for unit 41). Deposits of the remaining contracts are unknown although they are a financial liability that must be visible in the figures.',
   });
