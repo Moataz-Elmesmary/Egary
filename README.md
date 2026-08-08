@@ -46,7 +46,7 @@ open app/index.html        # or just double-click it
 
 Works from `file://` or any static host. To share with a non-technical person, send them the single self-contained `Egary.html` (login-free by design).
 
-Default users (edit them at the top of the first `<script>` in `app/login.html`): `moataz` / `egary@2026` (manager), `office` / `office@2026` (staff), `zaer` / `1234` (view-only).
+Default users (edit them at the top of the first `<script>` in `app/login.html`): `admin` / `admin@2026` (manager), `office` / `office@2026` (staff), `zaer` / `1234` (view-only).
 
 ### Deploy
 
