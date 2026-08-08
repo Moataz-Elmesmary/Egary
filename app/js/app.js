@@ -61,7 +61,7 @@
   /* قائمة الإدخال السريع — مكان إدخال البيانات واضح من أي شاشة */
   function quickAdd() {
     const menu = h('div.qa-menu', [
-      ['تسجيل دفعة', () => { location.hash = '#matrix'; UI.toast('دوس على خلية الشهر المطلوب لتسجيل الدفعة'); }],
+      ['تسجيل دفع', () => { location.hash = '#matrix'; UI.toast('دوس على خلية الشهر المطلوب لتسجيل الدفع'); }],
       ['عقد جديد', () => Views.openAddContract()],
       ['كشف جديد (ورقة كاملة)', () => { location.hash = '#intake'; }],
       ['وحدة جديدة', () => Views.openAddUnit()],

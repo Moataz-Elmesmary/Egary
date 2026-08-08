@@ -591,7 +591,7 @@
     'إعادة تعيين كل البيانات إلى بذرة الكشف الأصلية؟ ستفقد الدفعات والعقود المُدخلة.':
       'Reset all data to the original statement seed? Entered payments and contracts will be lost.',
     'أُعيدت البيانات للأصل': 'Data reset to the original',
-    'دوس على خلية الشهر المطلوب لتسجيل الدفعة': 'Click the desired month cell to record the payment',
+    'دوس على خلية الشهر المطلوب لتسجيل الدفع': 'Click the desired month cell to record the payment',
     /* ---------- إدخال كشف جديد ---------- */
     'اكتب اسم المالك': 'Type the owner’s name',
     'الكشف:': 'Statement:',

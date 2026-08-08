@@ -673,17 +673,22 @@
     commit();
   }
 
-  function addContract(rec) {
+  /* جدول السنوات بتواريخها من تاريخ بداية العقد — سنة العقد لا السنة الميلادية */
+  function buildYears(startIso, list) {
     const years = [];
-    let from = rec.start;
-    for (let i = 0; i < rec.years.length; i++) {
+    let from = startIso;
+    for (let i = 0; i < list.length; i++) {
       const [y, m, dd] = from.split('-').map(Number);
       const toDate = new Date(Date.UTC(y + 1, m - 1, dd));
       toDate.setUTCDate(toDate.getUTCDate() - 1);
-      years.push({ from, to: iso(toDate), rent: rec.years[i].rent, estimated: !!rec.years[i].estimated });
-      const nf = new Date(Date.UTC(y + 1, m - 1, dd));
-      from = iso(nf);
+      years.push({ from, to: iso(toDate), rent: list[i].rent, estimated: !!list[i].estimated });
+      from = iso(new Date(Date.UTC(y + 1, m - 1, dd)));
     }
+    return years;
+  }
+
+  function addContract(rec) {
+    const years = buildYears(rec.start, rec.years);
     const c = {
       id: genId('C'), unitId: rec.unitId, tenantId: rec.tenantId,
       start: rec.start, end: years[years.length - 1].to,
@@ -698,6 +703,63 @@
     logAct(`عقد جديد — ${unit(rec.unitId) ? unit(rec.unitId).name : ''} / ${tenant(rec.tenantId) ? tenant(rec.tenantId).name : ''}`);
     commit();
     return c;
+  }
+
+  /* تعديل عقد قائم — يُعاد بناء جدول السنوات من البداية والقيم الجديدة */
+  function updateContract(id, rec) {
+    const c = contract(id);
+    if (!c) return null;
+    if (rec.years && rec.years.length) {
+      c.years = buildYears(rec.start || c.start, rec.years);
+      c.start = rec.start || c.start;
+      c.end = c.years[c.years.length - 1].to;
+    } else if (rec.start && rec.start !== c.start) {
+      c.years = buildYears(rec.start, c.years);
+      c.start = rec.start;
+      c.end = c.years[c.years.length - 1].to;
+    }
+    if (rec.unitId) c.unitId = rec.unitId;
+    if (rec.tenantId) c.tenantId = rec.tenantId;
+    if (rec.dueDay != null) c.dueDay = Math.min(28, Math.max(1, Number(rec.dueDay) || 1));
+    if (rec.maintenance != null) c.maintenance = Math.max(0, Number(rec.maintenance) || 0);
+    if (rec.vat != null) c.vat = !!rec.vat;
+    if ('deposit' in rec) {
+      c.deposit = rec.deposit ? { amount: Number(rec.deposit), status: (c.deposit && c.deposit.status) || 'held', note: (c.deposit && c.deposit.note) || '' } : null;
+    }
+    logAct(`تعديل عقد — ${unit(c.unitId) ? unit(c.unitId).name : ''} / ${tenant(c.tenantId) ? tenant(c.tenantId).name : ''}`);
+    commit();
+    return c;
+  }
+  /* حذف عقد: ممنوع ما دامت عليه دفعات مسجَّلة حتى لا تصبح الدفعات بلا سند */
+  function contractPayments(id) {
+    return STATE.payments.filter(p => p.contractId === id);
+  }
+  function deleteContract(id) {
+    const c = contract(id);
+    if (!c) return { ok: false, reason: 'not_found' };
+    const pays = contractPayments(id);
+    if (pays.length) return { ok: false, reason: 'has_payments', count: pays.length };
+    STATE.contracts = STATE.contracts.filter(x => x.id !== id);
+    STATE.contracts.forEach(x => { if (x.prevId === id) x.prevId = null; });
+    logAct(`حذف عقد — ${unit(c.unitId) ? unit(c.unitId).name : ''}`);
+    commit();
+    return { ok: true };
+  }
+  function updateUnit(id, patch) {
+    const u = unit(id);
+    if (!u) return null;
+    Object.assign(u, patch);
+    logAct(`تعديل وحدة — ${u.name}`);
+    commit();
+    return u;
+  }
+  function updateBuilding(id, patch) {
+    const b = building(id);
+    if (!b) return null;
+    Object.assign(b, patch);
+    logAct(`تعديل مشروع — ${b.name}`);
+    commit();
+    return b;
   }
 
   function addTenant(rec) {
@@ -838,6 +900,7 @@
     tenantByCode, foldCode,
     // إدخال
     addPayment, addPaymentsBulk, deletePayment, setMark, addContract, addTenant, updateTenant,
+    updateContract, deleteContract, contractPayments, updateUnit, updateBuilding,
     addUnit, addBuilding, removeDemoData, addComplaint, closeComplaint,
     setIssueStatus, updateSettings,
     // تصدير

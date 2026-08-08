@@ -84,7 +84,7 @@
     'وضع نقل الورقة شغّال: ': 'Paper-transfer mode is ON: ',
     'كل ضغطة على خلية تقلّبها ✓ ← ✗ ← فارغ. اترك ما سكتت عنه الورقة فارغًا، وعُد لوضع «تسجيل دفعات» للدفعات الموثَّقة.':
       'Each click cycles the cell ✓ → ✗ → blank. Leave blank whatever the paper is silent about. Switch back to “Record payments” for documented entries.',
-    'تسجيل دفعة': 'Record payment', 'توثيق دفعة الكشف (مبلغ وتاريخ فعليان)': 'Document the paper payment (real amount & date)',
+    'تسجيل دفع': 'Record payment', 'توثيق دفعة الكشف (مبلغ وتاريخ فعليان)': 'Document the paper payment (real amount & date)',
     'المبلغ (ج.م)': 'Amount (EGP)', 'تاريخ السداد': 'Payment date', 'طريقة السداد': 'Payment method',
     'رقم الإيصال': 'Receipt no.', 'نقدًا': 'Cash', 'إنستاباي': 'InstaPay', 'تحويل بنكي': 'Bank transfer', 'شيك': 'Cheque',
     'حفظ الدفعة': 'Save payment', 'اختياري': 'Optional',

@@ -928,7 +928,7 @@
     const receiptIn = input({ type: 'text', placeholder: 'اختياري' });
     const notesIn = input({ type: 'text', placeholder: 'اختياري' });
 
-    body.push(h('h4.drawer-sec', ci.status === 'paid_imported' ? 'توثيق دفعة الكشف (مبلغ وتاريخ فعليان)' : 'تسجيل دفعة'));
+    body.push(h('h4.drawer-sec', ci.status === 'paid_imported' ? 'توثيق دفعة الكشف (مبلغ وتاريخ فعليان)' : 'تسجيل دفع'));
     body.push(h('div.form-grid', [
       field('المبلغ (ج.م)', amountIn, remaining != null ? `المتبقي: ${money(remaining)}` : 'المستحق غير محسوب — لا عقد'),
       field('تاريخ السداد', dateIn),
@@ -1080,6 +1080,7 @@
         ]))),
       ]),
       c.deposit ? h('p.note-line', [icon('check'), ` تأمين محتجز: ${money(c.deposit.amount)}${c.deposit.note ? ' — ' + c.deposit.note : ''}`]) : null,
+      App.canEdit() ? h('button.btn.btn-ghost.btn-sm', { onclick: () => { closeDrawer(); openEditContract(c); } }, 'تعديل هذا العقد') : null,
     ]))));
     const issues = Store.state.issues.filter(q => q.status === 'open' &&
       ((q.refType === 'unit' && q.refId === u.id) ||
@@ -1089,29 +1090,63 @@
       body.push(h('ul.issue-mini', issues.map(q => h('li', [severityChip(q.severity), ' ', q.title]))));
     }
     openDrawer(u.name + ' — ' + bLabel(u.buildingId), body, [
-      h('button.btn.btn-primary', { onclick: () => { closeDrawer(); openAddContract(u.id); } }, [icon('plus'), ' عقد جديد لهذه الوحدة']),
+      App.canEdit() ? h('button.btn.btn-primary', { onclick: () => { closeDrawer(); openAddContract(u.id); } }, [icon('plus'), ' عقد جديد لهذه الوحدة']) : null,
+      App.canEdit() ? h('button.btn.btn-ghost', { onclick: () => { closeDrawer(); openEditUnit(u); } }, 'تعديل بيانات الوحدة') : null,
       h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إغلاق'),
     ]);
   }
 
-  function openAddUnit() {
-    const bIn = select({}, Store.state.buildings.map(b => ({ value: b.id, label: b.name })), F().b || Store.state.buildings[0].id);
-    const nameIn = input({ type: 'text', placeholder: 'مثال: محل 3' });
-    const typeIn = select({}, ['محل', 'مكتب', 'شقة', 'جراج', 'مخزن', 'غير محدد'].map(x => ({ value: x, label: x })), 'محل');
-    const floorIn = input({ type: 'text', placeholder: 'أرضي / الأول / …' });
-    const areaIn = input({ type: 'number', min: 0, placeholder: 'م² — اختياري' });
-    const noteIn = input({ type: 'text', placeholder: 'اختياري' });
-    openDrawer('وحدة جديدة', [h('div.form-grid', [
-      field('المبنى / الكشف', bIn), field('اسم الوحدة', nameIn), field('النوع', typeIn),
-      field('الدور', floorIn), field('المساحة', areaIn), field('ملاحظة', noteIn),
-    ])], [
+  function openEditUnit(u) { openAddUnit(u); }
+
+  function openAddUnit(editU) {
+    const types = [...new Set([...Store.state.units.map(x => x.type), 'محل', 'مكتب', 'شقة', 'جراج', 'مخزن', 'غير محدد'])].filter(Boolean);
+    const bIn = select({}, Store.state.buildings.map(b => ({ value: b.id, label: (b.code ? b.code + ' · ' : '') + b.name })),
+      editU ? editU.buildingId : (F().b || Store.state.buildings[0].id));
+    const nameIn = input({ type: 'text', placeholder: 'مثال: محل 3', value: editU ? editU.name : '' });
+    const typeIn = select({}, types.map(x => ({ value: x, label: x })), editU ? editU.type : 'محل');
+    const floorIn = input({ type: 'text', placeholder: 'أرضي / الأول / …', value: editU ? (editU.floor || '') : '' });
+    const areaIn = input({ type: 'number', min: 0, placeholder: 'م² — اختياري', value: editU && editU.area ? editU.area : '' });
+    const noteIn = input({ type: 'text', placeholder: 'اختياري', value: editU ? (editU.note || '') : '' });
+    if (editU) bIn.disabled = true;
+    openDrawer(editU ? 'تعديل بيانات الوحدة' : 'وحدة جديدة', [
+      editU ? h('p.field-hint', ['كود الوحدة ', h('code.code-chip', editU.code || '—'),
+        ' ثابت لا يتغير — والمشروع لا يُنقَل إليه العقود والدفعات المرتبطة.']) : null,
+      h('div.form-grid', [
+        field('المشروع', bIn), field('اسم الوحدة', nameIn), field('النوع', typeIn),
+        field('الدور', floorIn), field('المساحة', areaIn), field('ملاحظة', noteIn),
+      ]),
+    ], [
       h('button.btn.btn-primary', {
         onclick: () => {
           if (!nameIn.value.trim()) { toast('أدخل اسم الوحدة', 'warning'); return; }
-          Store.addUnit({ buildingId: bIn.value, name: nameIn.value.trim(), type: typeIn.value, floor: floorIn.value.trim(), area: Number(areaIn.value) || null, note: noteIn.value });
-          closeDrawer(); toast('أُضيفت الوحدة');
+          const patch = { name: nameIn.value.trim(), type: typeIn.value, floor: floorIn.value.trim(), area: Number(areaIn.value) || null, note: noteIn.value };
+          if (editU) { Store.updateUnit(editU.id, patch); closeDrawer(); toast('حُفظ تعديل الوحدة'); }
+          else { Store.addUnit({ buildingId: bIn.value, ...patch }); closeDrawer(); toast('أُضيفت الوحدة'); }
         },
-      }, 'حفظ'),
+      }, editU ? 'حفظ التعديل' : 'حفظ'),
+      h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إلغاء'),
+    ]);
+  }
+
+  function openEditBuilding(b) {
+    const nameIn = input({ type: 'text', value: b.name });
+    const ownerIn = input({ type: 'text', value: b.owner || '', placeholder: 'اسم المالك كما في الورقة' });
+    const areaIn = input({ type: 'text', value: b.area || '', placeholder: 'المنطقة / العنوان' });
+    const noteIn = input({ type: 'text', value: b.note || '', placeholder: 'اختياري' });
+    openDrawer('تعديل بيانات المشروع', [
+      h('p.field-hint', ['كود المشروع ', h('code.code-chip', b.code || '—'), ' ثابت لا يتغير.']),
+      h('div.form-grid', [
+        field('اسم المشروع', nameIn), field('المالك', ownerIn),
+        field('المنطقة', areaIn), field('ملاحظة', noteIn),
+      ]),
+    ], [
+      h('button.btn.btn-primary', {
+        onclick: () => {
+          if (!nameIn.value.trim()) { toast('أدخل اسم المشروع', 'warning'); return; }
+          Store.updateBuilding(b.id, { name: nameIn.value.trim(), owner: ownerIn.value.trim(), area: areaIn.value.trim(), note: noteIn.value.trim() });
+          closeDrawer(); toast('حُفظ تعديل المشروع');
+        },
+      }, 'حفظ التعديل'),
       h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إلغاء'),
     ]);
   }
@@ -1186,6 +1221,9 @@
         h('td', c.deposit ? money(c.deposit.amount, { bare: true }) : '—'),
         h('td', contractStatusChip(c, asOf)),
         h('td', c.prevId ? 'تجديد' : '—'),
+        h('td', App.canEdit() ? h('button.btn.btn-ghost.btn-sm', {
+          onclick: e => { e.stopPropagation(); openEditContract(c); },
+        }, 'تعديل') : '—'),
       ]));
     });
 
@@ -1220,8 +1258,8 @@
       ])) : null,
       h('div.table-wrap', h('table.table', [
         h('thead', h('tr', [h('th', 'المبنى'), h('th', 'الوحدة'), h('th', 'العميل'), h('th', 'من'), h('th', 'إلى'),
-          h('th', 'قيمة السنة الجارية'), h('th', 'صيانة'), h('th', 'التأمين'), h('th', 'الحالة'), h('th', 'النوع')])),
-        h('tbody', rows.length ? rows : h('tr', h('td', { colspan: 10 }, emptyState('لا عقود ضمن الترشيح')))),
+          h('th', 'قيمة السنة الجارية'), h('th', 'صيانة'), h('th', 'التأمين'), h('th', 'الحالة'), h('th', 'النوع'), h('th', '')])),
+        h('tbody', rows.length ? rows : h('tr', h('td', { colspan: 11 }, emptyState('لا عقود ضمن الترشيح')))),
       ])),
     ]);
   }
@@ -1243,12 +1281,14 @@
     Store.download('العقود.csv', Store.toCSV(rows));
   }
 
-  /* معالج عقد جديد — الترتيب الطبيعي للمكتب: العميل ← المشروع ← وحداته الشاغرة فقط */
-  function openAddContract(presetUnitId, presetTenantId) {
+  /* معالج العقد — إنشاء أو تعديل. الترتيب الطبيعي للمكتب: العميل ← التواريخ ← المشروع ← وحدة متاحة */
+  function openEditContract(c) { openAddContract(c.unitId, c.tenantId, c); }
+
+  function openAddContract(presetUnitId, presetTenantId, editC) {
     const s = Store.state.settings;
     const presetU = presetUnitId ? Store.unit(presetUnitId) : null;
     const presetT = presetTenantId ? Store.tenant(presetTenantId) : null;
-    const startIn = input({ type: 'date', value: Store.iso(Store.today()) });
+    const startIn = input({ type: 'date', value: editC ? editC.start : Store.iso(Store.today()) });
 
     /* 1) العميل — بحث بالاسم أو الكود، أو تسجيل عميل جديد في نفس الخطوة */
     let tenantVal = presetT ? presetT.id : '';
@@ -1286,17 +1326,18 @@
       e.setUTCDate(e.getUTCDate() - 1);
       return e.toISOString().slice(0, 10);
     }
-    /* التعارض تداخل مدتين لا مجرد «انتهى بعد كذا» — عقد مستقبلي يشغل الوحدة أيضًا */
+    /* التعارض تداخل مدتين لا مجرد «انتهى بعد كذا» — عقد مستقبلي يشغل الوحدة أيضًا.
+       وفي وضع التعديل لا يتعارض العقد مع نفسه بالطبع */
     function clashingContract(u, startIso, nYears) {
       const to = termEnd(startIso, nYears);
-      return Store.unitContracts(u.id).find(c => c.start <= to && c.end >= startIso) || null;
+      return Store.unitContracts(u.id).find(c => (!editC || c.id !== editC.id) && c.start <= to && c.end >= startIso) || null;
     }
     /* عميل ساكن بلا عقد مسجَّل: الوحدة ليست شاغرة حقيقة (سكرية، جراج الهدم) */
     function sittingClient(u) {
       return unitStatusKey(u, Store.today()) === 'noContract' ? (ORPHAN_TENANT[u.id] ? Store.tenant(ORPHAN_TENANT[u.id]) : null) || true : null;
     }
     const isFree = (u, st, ny) => !clashingContract(u, st, ny) && !sittingClient(u);
-    if (presetU && !isFree(presetU, Store.iso(Store.today()), 1)) showAllChk.checked = true;
+    if (editC || (presetU && !isFree(presetU, Store.iso(Store.today()), 1))) showAllChk.checked = true;
 
     let presetApplied = false;
     function refreshUnits() {
@@ -1344,49 +1385,72 @@
     const vatIn = h('input', { type: 'checkbox' });
     const depIn = input({ type: 'number', min: 0, step: 'any', placeholder: 'اختياري' });
     const preview = h('div.years-preview');
+    const rentField = field('قيمة السنة الأولى', rentIn, 'أساس الحساب الحالي: ' + (s.rentBasis === 'monthly' ? 'شهري' : 'سنوي'));
+    const incField = field('نسبة الزيادة السنوية ٪', incIn, 'النمط الملاحظ في عقودكم: 10٪');
 
-    /* جدول السنوات: يُملأ بالنسبة تلقائيًا، وأي سنة تكتبها بيدك تُحترم ولا تُدهس */
-    let yearVals = [], manual = [];
-    function recalcYears() {
-      const n = Number(yearsIn.value) || 1, r0 = Number(rentIn.value) || 0, inc = Number(incIn.value) / 100;
-      const out = [];
+    /* طريقتان لقيم السنوات — يختار المستخدم واحدة صراحةً:
+       (أ) زيادة سنوية بنسبة: يكتب قيمة السنة الأولى والنسبة فتُولَّد الباقي.
+       (ب) قيمة كل سنة يدويًا: خانة لكل سنة بعدد السنوات المختارة فوق. */
+    let yearVals = [];
+    const manualBox = h('div.manual-years');
+    const modeIncRadio = h('input', { type: 'radio', name: 'rentmode', value: 'inc', checked: true });
+    const modeManRadio = h('input', { type: 'radio', name: 'rentmode', value: 'manual' });
+    const isManual = () => modeManRadio.checked;
+
+    function manualInputs() { return [...manualBox.querySelectorAll('input')]; }
+    function syncManualBox() {
+      const n = Number(yearsIn.value) || 1;
+      const old = manualInputs().map(x => x.value);
+      manualBox.innerHTML = '';
       for (let i = 0; i < n; i++) {
-        if (i === 0) out.push(r0);
-        else if (manual[i] && yearVals[i] > 0) out.push(yearVals[i]);
-        else out.push(Math.round(out[i - 1] * (1 + inc)));
+        const el = input({ type: 'number', min: 0, step: 'any', value: old[i] != null ? old[i] : '',
+          placeholder: 'قيمة السنة ' + (i + 1), 'aria-label': 'قيمة السنة ' + (i + 1) });
+        el.addEventListener('input', refreshPreview);
+        manualBox.appendChild(field('قيمة السنة ' + (i + 1), el));
       }
-      yearVals = out;
-      manual.length = n;
+    }
+    function applyMode() {
+      const man = isManual();
+      manualBox.style.display = man ? '' : 'none';
+      rentField.style.display = man ? 'none' : '';
+      incField.style.display = man ? 'none' : '';
+      if (man) syncManualBox();
+      refreshPreview();
+    }
+    modeIncRadio.addEventListener('change', applyMode);
+    modeManRadio.addEventListener('change', applyMode);
+
+    function recalcYears() {
+      const n = Number(yearsIn.value) || 1;
+      if (isManual()) {
+        yearVals = manualInputs().slice(0, n).map(x => Number(x.value) || 0);
+        while (yearVals.length < n) yearVals.push(0);
+      } else {
+        const r0 = Number(rentIn.value) || 0, inc = Number(incIn.value) / 100;
+        yearVals = [];
+        for (let i = 0; i < n; i++) yearVals.push(i === 0 ? r0 : Math.round(yearVals[i - 1] * (1 + inc)));
+      }
     }
 
     function refreshPreview() {
       preview.innerHTML = '';
       recalcYears();
-      const n = yearVals.length;
-      if (!yearVals[0]) { preview.appendChild(h('p.field-hint', 'أدخل قيمة السنة الأولى لتوليد الجدول.')); return; }
-      const anyManual = manual.some(Boolean);
-      const rowsEl = yearVals.map((v, i) => {
-        if (i === 0) return h('tr', [h('td', 'سنة 1'), h('td', money(v)), h('td', h('span.mut', 'من خانة قيمة السنة الأولى'))]);
-        const cell = input({ type: 'number', min: 0, step: 'any', value: v, 'aria-label': 'قيمة سنة ' + (i + 1) });
-        cell.addEventListener('input', () => {
-          const nv = Number(cell.value);
-          manual[i] = cell.value !== '' && nv > 0;
-          yearVals[i] = nv;
-          refreshPreview();
-        });
-        return h('tr' + (manual[i] ? '.yr-manual' : ''), [
-          h('td', 'سنة ' + (i + 1)), h('td', cell),
-          h('td', manual[i] ? h('span.chip.chip-warning', 'قيمة مكتوبة') : h('span.mut', 'بزيادة ' + (Number(incIn.value) || 0) + '٪')),
-        ]);
-      });
+      if (!yearVals[0]) {
+        preview.appendChild(h('p.field-hint', isManual()
+          ? 'اكتب قيمة كل سنة في الخانات أعلاه ليظهر الجدول.'
+          : 'أدخل قيمة السنة الأولى لتوليد الجدول.'));
+        return;
+      }
       preview.appendChild(h('table.table.table-mini.years-table', [
         h('thead', h('tr', [h('th', 'السنة'), h('th', 'القيمة (' + (s.rentBasis === 'monthly' ? 'شهري' : 'سنوي') + ')'), h('th', 'مصدرها')])),
-        h('tbody', rowsEl),
+        h('tbody', yearVals.map((v, i) => h('tr' + (isManual() ? '.yr-manual' : ''), [
+          h('td', 'سنة ' + (i + 1)),
+          h('td', v ? money(v) : h('span.val-warning', 'غير مكتوبة')),
+          h('td', isManual()
+            ? h('span.chip.chip-warning', 'قيمة مكتوبة')
+            : (i === 0 ? h('span.mut', 'قيمة السنة الأولى') : h('span.mut', 'بزيادة ' + (Number(incIn.value) || 0) + '٪'))),
+        ]))),
       ]));
-      preview.appendChild(h('p.field-hint', 'اكتب قيمة أي سنة كما وردت في العقد ولن يعيد النظام حسابها — والسنوات التي تليها تُبنى عليها.'));
-      if (anyManual) preview.appendChild(h('button.btn.btn-ghost', {
-        onclick: () => { manual = []; refreshPreview(); },
-      }, 'أعِد حساب كل السنوات بالنسبة'));
       const uid = unitIn.value, st = startIn.value;
       const uSel = uid ? Store.unit(uid) : null;
       if (st && uSel) {
@@ -1402,11 +1466,26 @@
       }
     }
     [rentIn, incIn].forEach(el => el.addEventListener('input', refreshPreview));
-    yearsIn.addEventListener('change', refreshUnits);
+    yearsIn.addEventListener('change', () => { if (isManual()) syncManualBox(); refreshUnits(); });
     unitIn.addEventListener('change', refreshPreview);
+
+    /* وضع التعديل: نملأ الفورم من العقد القائم قبل أول رسم */
+    if (editC) {
+      yearsIn.value = String((editC.years || []).length || 1);
+      dueDayIn.value = editC.dueDay || 1;
+      mntIn.value = editC.maintenance || '';
+      vatIn.checked = !!editC.vat;
+      depIn.value = editC.deposit ? editC.deposit.amount : '';
+      // القيم المسجَّلة تُعرض كما هي: وضع «أكتب قيمة كل سنة» هو الأمين لعقد قائم
+      modeManRadio.checked = true;
+      syncManualBox();
+      manualInputs().forEach((el, i) => { el.value = editC.years[i] ? editC.years[i].rent : ''; });
+      rentIn.value = editC.years[0] ? editC.years[0].rent : '';
+    }
+    applyMode();
     refreshUnits();
 
-    openDrawer('عقد جديد', [
+    openDrawer(editC ? 'تعديل العقد' : 'عقد جديد', [
       h('div.form-grid', [
         field('العميل', tenantIn, 'اكتب حرفين من الاسم أو أرقامًا من الكود'),
         newTenantBox,
@@ -1416,8 +1495,14 @@
         field('الوحدة', unitIn), unitHint,
         h('label.radio-row', [showAllChk, h('span', 'أظهر أيضًا الوحدات المشغولة')]),
         h('p.field-hint', 'القائمة أعلاه تعرض الوحدات المتاحة في المدة المطلوبة فقط. علِّم هذا الخيار إن كنت تريد الاختيار من كل وحدات المشروع — مع سبب انشغال كل وحدة بجوار اسمها.'),
-        field('قيمة السنة الأولى', rentIn, 'أساس الحساب الحالي: ' + (s.rentBasis === 'monthly' ? 'شهري' : 'سنوي')),
-        field('نسبة الزيادة السنوية ٪', incIn, 'النمط الملاحظ في عقودكم: 10٪'),
+        h('div.mode-box', [
+          h('div.mode-title', 'كيف تُحسب قيمة كل سنة؟'),
+          h('label.radio-row', [modeIncRadio, h('span', 'زيادة سنوية بنسبة — أكتب قيمة السنة الأولى والنسبة، والباقي يُحسب')]),
+          h('label.radio-row', [modeManRadio, h('span', 'أكتب قيمة كل سنة بنفسي — تظهر خانة لكل سنة بعدد سنوات العقد')]),
+        ]),
+        rentField,
+        incField,
+        manualBox,
         field('يوم الاستحقاق في الشهر', dueDayIn, 'التأخير يُحسب من هذا اليوم'),
         field('الصيانة الشهرية (ج.م)', mntIn, 'تُضاف للاستحقاق الشهري تلقائيًا'),
         h('label.radio-row', [vatIn, h('span', 'خاضع لضريبة القيمة المضافة (تُضاف للاستحقاق)')]),
@@ -1428,10 +1513,9 @@
     ], [
       h('button.btn.btn-primary', {
         onclick: () => {
-          const r0 = Number(rentIn.value);
           if (!tenantVal) { toast('اختر العميل أولًا — أو سجِّل عميلًا جديدًا من نفس القائمة', 'warning'); return; }
           if (!unitIn.value) { toast('اختر الوحدة — غيِّر المشروع أو علِّم «أظهر أيضًا الوحدات المشغولة»', 'warning'); return; }
-          if (!r0 || r0 <= 0 || !startIn.value) { toast('أكمل تاريخ البداية وقيمة سنة أولى موجبة', 'warning'); return; }
+          if (!startIn.value) { toast('أدخل تاريخ بداية العقد', 'warning'); return; }
           if (Number(depIn.value) < 0 || Number(mntIn.value) < 0 || Number(incIn.value) < 0) { toast('لا تُقبل قيم سالبة', 'warning'); return; }
           // عقدان متداخلان على وحدة واحدة يجعلان أشهر التداخل تُحسب على الأقدم وحده — نمنعه صراحةً
           const uSel = Store.unit(unitIn.value);
@@ -1454,8 +1538,20 @@
             tenantId = Store.addTenant({ name: nm, code, phone: ntPhone.value.trim() }).id;
           }
           recalcYears();
-          if (yearVals.some(v => !v || v <= 0)) { toast('أكمل قيمة كل سنة في جدول السنوات', 'warning'); return; }
+          if (yearVals.some(v => !v || v <= 0)) {
+            toast(isManual() ? 'أكمل قيمة كل سنة في الخانات' : 'أدخل قيمة سنة أولى موجبة', 'warning');
+            return;
+          }
           const years = yearVals.map(v => ({ rent: v }));
+          if (editC) {
+            Store.updateContract(editC.id, {
+              unitId: unitIn.value, tenantId, start: startIn.value, years,
+              dueDay: dueDayIn.value, maintenance: mntIn.value, vat: vatIn.checked,
+              deposit: depIn.value || null,
+            });
+            closeDrawer(); toast('حُفظ التعديل — أُعيد حساب الاستحقاق على المدة الجديدة');
+            return;
+          }
           const prev = Store.unitContracts(unitIn.value).slice(-1)[0];
           Store.addContract({
             unitId: unitIn.value, tenantId, start: startIn.value, years,
@@ -1465,9 +1561,28 @@
           });
           closeDrawer(); toast('سُجِّل العقد وبدأ حساب الاستحقاق فورًا');
         },
-      }, 'حفظ العقد'),
+      }, editC ? 'حفظ التعديل' : 'حفظ العقد'),
+      editC ? h('button.btn.btn-danger', {
+        onclick: () => {
+          const pays = Store.contractPayments(editC.id);
+          if (pays.length) {
+            toast(`لا يمكن حذف عقد عليه ${pluralPayments(pays.length)} مسجَّلة — احذف الدفعات أولًا من خلايا الأشهر`, 'warning');
+            return;
+          }
+          if (!confirm('حذف هذا العقد نهائيًا؟ ستعود الوحدة «بلا عقد مسجّل» لهذه المدة.')) return;
+          const r = Store.deleteContract(editC.id);
+          if (r.ok) { closeDrawer(); toast('حُذف العقد'); }
+        },
+      }, 'حذف العقد') : null,
       h('button.btn.btn-ghost', { onclick: closeDrawer }, 'إلغاء'),
     ]);
+  }
+
+  function pluralPayments(n) {
+    if (n === 1) return 'دفعة واحدة';
+    if (n === 2) return 'دفعتين';
+    if (n >= 3 && n <= 10) return n + ' دفعات';
+    return n + ' دفعة';
   }
 
   /* ========================================================
@@ -1695,7 +1810,7 @@
       ...unitLines,
       facts,
       h('h4.tp-sub', 'سجل السداد شهرًا بشهر'),
-      h('p.step-hint', 'أشهر هذا العميل فقط، الأحدث أولًا — كل سطر يفتح خلية الشهر نفسها للتفصيل أو تسجيل دفعة.'),
+      h('p.step-hint', 'أشهر هذا العميل فقط، الأحدث أولًا — كل سطر يفتح خلية الشهر نفسها للتفصيل أو تسجيل دفع.'),
       h('div.mini-scroll', h('table.table.table-mini', [
         h('thead', h('tr', [h('th', 'الشهر'), multiUnit ? h('th', 'الوحدة') : null, h('th', 'المستحق'), h('th', 'المسدَّد'), h('th', 'تاريخ السداد'), h('th', 'الحالة')])),
         h('tbody', rows.length ? rows : h('tr', h('td', { colspan: multiUnit ? 6 : 5 }, 'لا أشهر مسجَّلة بعد'))),
@@ -1711,7 +1826,7 @@
               App.filters = { b: u0 ? u0.buildingId : '', ty: '', tn: t.id, st: '', q: '' };
               location.hash = '#matrix'; App.render();
             },
-          }, 'تسجيل دفعة في جدول التحصيل')
+          }, 'تسجيل دفع في جدول التحصيل')
         : h('button.btn.btn-primary', {
             onclick: () => { closeDrawer(); openAddContract(null, t.id); },
           }, 'سجِّل له عقدًا')) : null,
@@ -2044,13 +2159,15 @@
     /* إدارة المباني/الكشوف */
     const bNameIn = input({ type: 'text', placeholder: 'اسم المبنى / الكشف' });
     const bAreaIn = input({ type: 'text', placeholder: 'المنطقة — اختياري' });
-    const buildingsCard = sectionCard('المباني / الكشوف', h('div', [
+    const buildingsCard = sectionCard('المشاريع', h('div', [
       h('table.table.table-mini', [
-        h('thead', h('tr', [h('th', 'المبنى'), h('th', 'المنطقة'), h('th', 'الوحدات'), h('th', 'النوع')])),
+        h('thead', h('tr', [h('th', 'الكود'), h('th', 'المشروع'), h('th', 'المالك'), h('th', 'المنطقة'), h('th', 'الوحدات'), h('th', 'النوع'), h('th', '')])),
         h('tbody', Store.state.buildings.map(b => h('tr', [
-          h('td', b.name), h('td', b.area || '—'),
+          h('td', b.code ? h('code.code-chip', b.code) : '—'),
+          h('td', b.name), h('td', b.owner || '—'), h('td', b.area || '—'),
           h('td', String(Store.state.units.filter(u => u.buildingId === b.id).length)),
           h('td', b.demo ? h('span.chip.chip-neutral', 'تجريبي') : h('span.chip.chip-unknown', 'فعلي')),
+          h('td', h('button.btn.btn-ghost.btn-sm', { onclick: () => openEditBuilding(b) }, 'تعديل')),
         ]))),
       ]),
       h('div.form-inline', [
@@ -2587,6 +2704,22 @@
     ]));
   }
 
+  function rentModesCard() {
+    return sectionCard('قيمة كل سنة في العقد — طريقتان', h('div', [
+      h('p.step-hint', 'عند تسجيل عقد تختار كيف تُحسب قيمة كل سنة، والاختيار يظهر في الفورم نفسه:'),
+      h('div.mini-scroll', h('table.table.table-mini', [
+        h('thead', h('tr', [h('th', 'الطريقة'), h('th', 'متى تستخدمها'), h('th', 'ماذا تُدخل'), h('th', 'مثال')])),
+        h('tbody', [
+          ['زيادة سنوية بنسبة', 'العقد ينص على زيادة ثابتة سنويًا (النمط السائد عندكم: 10٪)',
+            'قيمة السنة الأولى + النسبة — والباقي يُحسب', '10,000 ← 11,000 ← 12,100 (زيادة 10٪)'],
+          ['أكتب قيمة كل سنة بنفسي', 'العقد يدوِّن قيمة مختلفة لكل سنة بلا نسبة منتظمة',
+            'خانة لكل سنة بعدد سنوات العقد (حتى عشر)', '25,000 · 27,000 · 30,000 · 30,000 · 35,000'],
+        ].map(r => h('tr', [h('td', h('b', r[0])), h('td', r[1]), h('td', r[2]), h('td', r[3])]))),
+      ])),
+      h('p.field-hint', 'مدة العقد تصل إلى عشر سنوات، وعدد الخانات في الطريقة اليدوية يتبع المدة التي تختارها.'),
+    ]));
+  }
+
   function entryTypesCard() {
     return sectionCard('أنواع الإدخال في النظام — ماذا تُدخل ومن أين', h('div.mini-scroll', h('table.table.table-mini', [
       h('thead', h('tr', [h('th', 'ماذا تريد أن تُدخل؟'), h('th', 'من أين'), h('th', 'الخطوات باختصار')])),
@@ -2597,7 +2730,11 @@
         ['عقد جديد أو تجديد', 'العقود ← «عقد جديد» أو زر «+ إدخال»', 'العميل (بالاسم أو الرقم القومي) ← البداية والمدة (حتى 10 سنوات) ← المشروع ← وحدة متاحة ← قيمة السنة الأولى — وباقي السنوات تتولَّد بالنسبة أو تكتبها بيدك'],
         ['تقرير شامل للمالك', 'الإعدادات ← «التقرير الشامل (Excel)»', 'ملف Excel واحد بأوراق منسَّقة: المشاريع والعقود والعملاء والمتأخرات والتحصيل والدفعات والشواغر والمراجعات'],
         ['وحدة داخل مشروع قائم', 'الوحدات ← «وحدة جديدة»', 'اختر المشروع ← الاسم والنوع'],
-        ['عميل أو تعديل بياناته', 'العملاء', 'اضغط الصف للتعديل أو «عميل جديد»'],
+        ['عميل أو تعديل بياناته', 'العملاء', 'اضغط الصف ليفتح ملفه ← «تعديل البيانات» بالأسفل — أو زر «عميل جديد»'],
+        ['تعديل عقد قائم', 'العقود ← زر «تعديل» في آخر الصف', 'غيِّر المدة أو القيم أو الصيانة والتأمين — ويُعاد حساب الاستحقاق فورًا'],
+        ['حذف عقد سُجِّل بالخطأ', 'العقود ← «تعديل» ← «حذف العقد»', 'مسموح ما لم تكن عليه دفعات مسجَّلة — احذف الدفعات أولًا إن وُجدت'],
+        ['تعديل بيانات وحدة', 'الوحدات ← اضغط الوحدة ← «تعديل بيانات الوحدة»', 'الاسم والنوع والدور والمساحة — والكود ثابت لا يتغير'],
+        ['تعديل بيانات مشروع', 'الإعدادات ← جدول «المشاريع» ← «تعديل»', 'الاسم والمالك والمنطقة — والكود ثابت لا يتغير'],
         ['شكوى صيانة', 'الشكاوى ← «شكوى جديدة»', 'الوحدة ← التصنيف والتكلفة ومن يتحمَّلها'],
         ['رد المالك على سؤال مراجعة', 'مراجعات مطلوبة', '«سجّل رد المالك» ← اكتب الإجابة — يُغلق البند'],
       ].map(r => h('tr', [h('td', h('b', r[0])), h('td', r[1]), h('td', r[2])]))),
@@ -2717,6 +2854,7 @@
       sectionCard('خريطة العملية الكاملة — من الورقة للقرار', flowNode),
       codesCard(),
       entryTypesCard(),
+      rentModesCard(),
       chain,
       contractMap,
       dashDocs,
@@ -2731,8 +2869,8 @@
     quality: viewQuality, settings: viewSettings,
     insights: viewInsights, intake: viewIntake, guide: viewGuide,
     slicerBar,
-    openAddContract, openAddUnit, openTenantDrawer, openAddComplaint,
-    openCellDrawer, openUnitDrawer,
+    openAddContract, openEditContract, openAddUnit, openEditUnit, openEditBuilding,
+    openTenantDrawer, openAddComplaint, openCellDrawer, openUnitDrawer,
     filteredUnits, fset,
   };
 
@@ -2750,7 +2888,7 @@
     'بقيمة مجهولة': 'of unknown value',
     'لا شيء': 'None',
     'سجل السداد شهرًا بشهر': 'Payment history, month by month',
-    'أشهر هذا العميل فقط، الأحدث أولًا — كل سطر يفتح خلية الشهر نفسها للتفصيل أو تسجيل دفعة.':
+    'أشهر هذا العميل فقط، الأحدث أولًا — كل سطر يفتح خلية الشهر نفسها للتفصيل أو تسجيل دفع.':
       'This client’s months only, newest first — each row opens that month’s cell to inspect or record a payment.',
     'الشهر': 'Month', 'الوحدة': 'Unit', 'المستحق': 'Due', 'المسدَّد': 'Paid',
     'تاريخ السداد': 'Payment date', 'الحالة': 'Status',
@@ -2760,7 +2898,7 @@
     'سداد جزئي': 'Partial payment', 'مستحق هذا الشهر': 'Due this month',
     'متأخر — القيمة غير معروفة': 'Late — amount unknown', 'متأخر': 'Late',
     'عقد من': 'Contract from', 'إلى': 'to', 'الإيجار الحالي': 'current rent', 'منتهٍ': 'ended',
-    'تسجيل دفعة في جدول التحصيل': 'Record a payment in the collection sheet',
+    'تسجيل دفع في جدول التحصيل': 'Record a payment in the collection sheet',
     'الهاتف': 'Phone', 'غير مسجّل': 'not recorded',
     'عميل': 'Client', 'وحدة': 'Unit', 'مشروع': 'Project', 'نوع': 'Type', 'دور': 'Floor',
     /* الأكواد وفورم العقد الجديد */
@@ -2823,6 +2961,58 @@
     'أقصى مدة عشر سنوات': 'Ten years is the maximum term',
     'املأ باقي السنوات بزيادة 10٪ (النمط السائد)': 'Fill the remaining years with a 10% increase (the common pattern)',
     'أدخل قيمة السنة 1 أولًا': 'Enter the year-1 value first',
+    /* خيارا قيم السنوات + التعديل */
+    'كيف تُحسب قيمة كل سنة؟': 'How is each year’s value determined?',
+    'زيادة سنوية بنسبة — أكتب قيمة السنة الأولى والنسبة، والباقي يُحسب':
+      'Annual increase by percentage — enter the first-year value and the percentage, the rest is computed',
+    'أكتب قيمة كل سنة بنفسي — تظهر خانة لكل سنة بعدد سنوات العقد':
+      'I will enter each year myself — a field appears for every year of the term',
+    'اكتب قيمة كل سنة في الخانات أعلاه ليظهر الجدول.': 'Enter each year’s value in the fields above to see the schedule.',
+    'قيمة السنة الأولى': 'First-year value', 'غير مكتوبة': 'Not entered',
+    'أكمل قيمة كل سنة في الخانات': 'Complete every year’s value in the fields',
+    'أدخل قيمة سنة أولى موجبة': 'Enter a positive first-year value',
+    'أدخل تاريخ بداية العقد': 'Enter the contract start date',
+    'تعديل': 'Edit', 'تعديل العقد': 'Edit contract', 'حفظ التعديل': 'Save changes',
+    'تعديل هذا العقد': 'Edit this contract', 'حذف العقد': 'Delete contract', 'حُذف العقد': 'Contract deleted',
+    'حُفظ التعديل — أُعيد حساب الاستحقاق على المدة الجديدة': 'Changes saved — dues recomputed over the new term',
+    'حذف هذا العقد نهائيًا؟ ستعود الوحدة «بلا عقد مسجّل» لهذه المدة.':
+      'Delete this contract permanently? The unit will go back to “no registered contract” for this term.',
+    'تعديل بيانات الوحدة': 'Edit unit details', 'حُفظ تعديل الوحدة': 'Unit details saved',
+    'تعديل بيانات المشروع': 'Edit project details', 'حُفظ تعديل المشروع': 'Project details saved',
+    'اسم المشروع': 'Project name', 'المالك': 'Owner', 'المنطقة': 'Area',
+    'كود المشروع': 'Project code', 'ثابت لا يتغير.': 'is permanent and never changes.',
+    'المشاريع': 'Projects',
+    /* بطاقة طريقتَي قيم السنوات في الدليل */
+    'قيمة كل سنة في العقد — طريقتان': 'Each year’s value in a contract — two ways',
+    'عند تسجيل عقد تختار كيف تُحسب قيمة كل سنة، والاختيار يظهر في الفورم نفسه:':
+      'When recording a contract you choose how each year’s value is determined; the choice appears in the form itself:',
+    'الطريقة': 'Method', 'متى تستخدمها': 'When to use it', 'ماذا تُدخل': 'What you enter', 'مثال': 'Example',
+    'زيادة سنوية بنسبة': 'Annual increase by percentage',
+    'العقد ينص على زيادة ثابتة سنويًا (النمط السائد عندكم: 10٪)': 'The contract states a fixed yearly increase (your common pattern: 10%)',
+    'قيمة السنة الأولى + النسبة — والباقي يُحسب': 'The first-year value + the percentage — the rest is computed',
+    'أكتب قيمة كل سنة بنفسي': 'I enter each year myself',
+    'العقد يدوِّن قيمة مختلفة لكل سنة بلا نسبة منتظمة': 'The contract lists a different value per year with no regular percentage',
+    'خانة لكل سنة بعدد سنوات العقد (حتى عشر)': 'A field per year, matching the contract term (up to ten)',
+    '10,000 ← 11,000 ← 12,100 (زيادة 10٪)': '10,000 → 11,000 → 12,100 (10% increase)',
+    'مدة العقد تصل إلى عشر سنوات، وعدد الخانات في الطريقة اليدوية يتبع المدة التي تختارها.':
+      'A term can reach ten years, and the number of fields in the manual method follows the term you choose.',
+    /* صفوف التعديل في جدول أنواع الإدخال */
+    'تعديل عقد قائم': 'Editing an existing contract',
+    'العقود ← زر «تعديل» في آخر الصف': 'Contracts → the “Edit” button at the end of the row',
+    'غيِّر المدة أو القيم أو الصيانة والتأمين — ويُعاد حساب الاستحقاق فورًا':
+      'Change the term, the values, maintenance or deposit — dues are recomputed instantly',
+    'حذف عقد سُجِّل بالخطأ': 'Deleting a contract recorded by mistake',
+    'العقود ← «تعديل» ← «حذف العقد»': 'Contracts → “Edit” → “Delete contract”',
+    'مسموح ما لم تكن عليه دفعات مسجَّلة — احذف الدفعات أولًا إن وُجدت':
+      'Allowed unless payments are recorded against it — delete those first if any',
+    'تعديل بيانات وحدة': 'Editing a unit',
+    'الوحدات ← اضغط الوحدة ← «تعديل بيانات الوحدة»': 'Units → click the unit → “Edit unit details”',
+    'الاسم والنوع والدور والمساحة — والكود ثابت لا يتغير': 'Name, type, floor and area — the code never changes',
+    'تعديل بيانات مشروع': 'Editing a project',
+    'الإعدادات ← جدول «المشاريع» ← «تعديل»': 'Settings → the “Projects” table → “Edit”',
+    'الاسم والمالك والمنطقة — والكود ثابت لا يتغير': 'Name, owner and area — the code never changes',
+    'اضغط الصف ليفتح ملفه ← «تعديل البيانات» بالأسفل — أو زر «عميل جديد»':
+      'Click the row to open their profile → “Edit details” at the bottom — or the “New client” button',
     'تقرير شامل للمالك': 'A full report for the owner',
     'الإعدادات ← «التقرير الشامل (Excel)»': 'Settings → “Full report (Excel)”',
     'ملف Excel واحد بأوراق منسَّقة: المشاريع والعقود والعملاء والمتأخرات والتحصيل والدفعات والشواغر والمراجعات':
@@ -2833,6 +3023,10 @@
     [/^كل وحدات المشروع \((\d+)\) — غير المتاحة معلَّم سببها بجوار اسمها$/, function (m) { return 'All project units (' + m[1] + ') — unavailable ones show the reason next to their name'; }],
     [/^«(.+)» لم تعد متاحة بهذه المدة — اختر وحدة أخرى$/, function (m) { return '“' + I18N.tt(m[1]) + '” is no longer available for this term — choose another unit'; }],
     [/^عملاء مسجَّلون بلا عقود بعد \((\d+)\)$/, function (m) { return 'Clients registered with no contract yet (' + m[1] + ')'; }],
+    [/^قيمة السنة (\d+)$/, function (m) { return 'Year ' + m[1] + ' value'; }],
+    [/^لا يمكن حذف عقد عليه (.+) مسجَّلة — احذف الدفعات أولًا من خلايا الأشهر$/,
+      function (m) { return 'A contract with ' + I18N.tt(m[1]) + ' recorded cannot be deleted — remove the payments from the month cells first'; }],
+    [/^«(.+)» لم تعد متاحة بهذه المدة — اختر وحدة أخرى$/, function (m) { return '“' + I18N.tt(m[1]) + '” is no longer available for this term — choose another unit'; }],
     [/^بزيادة (\d+(?:\.\d+)?)٪$/, function (m) { return '+' + m[1] + '%'; }],
     [/^سنة (\d+)$/, function (m) { return 'Year ' + m[1]; }],
     [/^قيمة سنة (\d+)$/, function (m) { return 'Year ' + m[1] + ' value'; }],
