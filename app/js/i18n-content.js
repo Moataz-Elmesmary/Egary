@@ -256,15 +256,15 @@
     'التقارير والقرار': 'Reports & decisions',
     'بيان ورقي من مالك عقار (زي «بيان عبدالمنعم سكرية») + نموذج عقد. الورقة = كشف مستقل في المنظومة.':
       'A paper statement from a property owner (like the “Abdelmoneim Sokareya Statement”) + a contract form. Each paper = an independent statement in the suite.',
-    'شاشة «إدخال كشف جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من جدول التحصيل بوضع نقل الورقة. الخانة الفارغة تُسجَّل «يحتاج تأكيد» — الفراغ معلومة.':
+    'شاشة «إضافة مشروع جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من جدول التحصيل بوضع نقل الورقة. الخانة الفارغة تُسجَّل «يحتاج تأكيد» — الفراغ معلومة.':
       'The “New Statement Intake” screen: owner details → the paper’s rows with its exact columns (client name / unit / from / values 1-2-3 / notes) → ✓/✗ marks from the collection sheet in Transcribe mode. Empty cells register as “Needs confirmation” — a blank is information.',
-    'كل تناقض أو نقص يتسجّل تلقائيًا في «جودة البيانات» بنص المصدر الحرفي. تقعد مع المالك جلسة واحدة تقفل الأسئلة (تليفونات، تأمينات، قيم ناقصة، فراغات = سداد ولا تأخير؟).':
+    'كل تناقض أو نقص يتسجّل تلقائيًا في «مراجعات مطلوبة» بنص المصدر الحرفي. تقعد مع المالك جلسة واحدة تقفل الأسئلة (تليفونات، تأمينات، قيم ناقصة، فراغات = سداد ولا تأخير؟).':
       'Every contradiction or gap is logged automatically in “Data Quality” with the source’s verbatim text. One sitting with the owner closes the questions (phones, deposits, missing values, blanks = paid or late?).',
     'التحصيل الجديد يتسجّل دفعة كاملة (مبلغ+تاريخ+طريقة+إيصال) من خلية جدول التحصيل أو بالسداد الجماعي. عقد جديد/تجديد من زر «+ إدخال». شكوى تتسجّل بتصنيفها وتكلفتها.':
       'New collections are logged as full payments (amount + date + method + receipt) from a collection sheet cell or via bulk collection. A new contract/renewal via the “+ Add” button. Complaints are logged with category and cost.',
     'مش بتراجع 1000 وحدة — بتفتح «من لم يسدِّد؟» والتنبيهات والتحليلات: بيوروك بس اللي محتاج قرار (متأخر، عقد بينتهي، فجوة توثيق).':
       'You don’t review 1,000 units — you open “Who has not paid?”, the alerts, and Insights: they show only what needs a decision (a late payer, an expiring contract, a documentation gap).',
-    'تصدير CSV للمالك (متأخرات/جدول التحصيل/عقود/دفعات) + التحليلات للقرارات: مين نطارده، إمتى نجدد، فين الفاقد.':
+    'التقرير الشامل (Excel) للمالك — ثماني أوراق منسَّقة، وبجانبه تصديرات CSV مفردة + التحليلات للقرارات: مين نطارده، إمتى نجدد، فين الفاقد.':
       'CSV exports for the owner (arrears / collection sheet / contracts / payments) + Insights for decisions: whom to chase, when to renew, where the loss is.',
     /* ---------- دليل الشرح: سلسلة الاشتقاق ---------- */
     'من الورقة إلى الإنسايتس — سلسلة الاشتقاق كاملة': 'From paper to insights — the full derivation chain',
@@ -406,7 +406,7 @@
     '«≈» جنب الرمز = القيمة تقديرية (+10٪ غير مدوَّنة في الورقة)':
       '“≈” next to the symbol = an estimated value (+10%, not written on the paper)',
     'وضعا العمل': 'The two modes',
-    '«تسجيل دفعات»: الضغطة تفتح دفعة كاملة · «تفريغ ورقة»: الضغطة تقلّب ✓/✗/فارغ':
+    '«تسجيل دفعات»: الضغطة تفتح دفعة كاملة · «نقل ورقة قديمة»: الضغطة تقلّب ✓/✗/فارغ':
       '“Record payments”: a click opens a full payment · “Transcribe paper”: a click cycles ✓/✗/blank',
     'التفريغ للتاريخ القديم من الورق، والدفعات للتشغيل اليومي':
       'Transcription is for paper history; payments are for daily operations',

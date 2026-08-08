@@ -2613,15 +2613,15 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'التقارير والقرار': 'Reports & decisions',
     'بيان ورقي من مالك عقار (زي «بيان عبدالمنعم سكرية») + نموذج عقد. الورقة = كشف مستقل في المنظومة.':
       'A paper statement from a property owner (like the “Abdelmoneim Sokareya Statement”) + a contract form. Each paper = an independent statement in the suite.',
-    'شاشة «إدخال كشف جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من جدول التحصيل بوضع نقل الورقة. الخانة الفارغة تُسجَّل «يحتاج تأكيد» — الفراغ معلومة.':
+    'شاشة «إضافة مشروع جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من جدول التحصيل بوضع نقل الورقة. الخانة الفارغة تُسجَّل «يحتاج تأكيد» — الفراغ معلومة.':
       'The “New Statement Intake” screen: owner details → the paper’s rows with its exact columns (client name / unit / from / values 1-2-3 / notes) → ✓/✗ marks from the collection sheet in Transcribe mode. Empty cells register as “Needs confirmation” — a blank is information.',
-    'كل تناقض أو نقص يتسجّل تلقائيًا في «جودة البيانات» بنص المصدر الحرفي. تقعد مع المالك جلسة واحدة تقفل الأسئلة (تليفونات، تأمينات، قيم ناقصة، فراغات = سداد ولا تأخير؟).':
+    'كل تناقض أو نقص يتسجّل تلقائيًا في «مراجعات مطلوبة» بنص المصدر الحرفي. تقعد مع المالك جلسة واحدة تقفل الأسئلة (تليفونات، تأمينات، قيم ناقصة، فراغات = سداد ولا تأخير؟).':
       'Every contradiction or gap is logged automatically in “Data Quality” with the source’s verbatim text. One sitting with the owner closes the questions (phones, deposits, missing values, blanks = paid or late?).',
     'التحصيل الجديد يتسجّل دفعة كاملة (مبلغ+تاريخ+طريقة+إيصال) من خلية جدول التحصيل أو بالسداد الجماعي. عقد جديد/تجديد من زر «+ إدخال». شكوى تتسجّل بتصنيفها وتكلفتها.':
       'New collections are logged as full payments (amount + date + method + receipt) from a collection sheet cell or via bulk collection. A new contract/renewal via the “+ Add” button. Complaints are logged with category and cost.',
     'مش بتراجع 1000 وحدة — بتفتح «من لم يسدِّد؟» والتنبيهات والتحليلات: بيوروك بس اللي محتاج قرار (متأخر، عقد بينتهي، فجوة توثيق).':
       'You don’t review 1,000 units — you open “Who has not paid?”, the alerts, and Insights: they show only what needs a decision (a late payer, an expiring contract, a documentation gap).',
-    'تصدير CSV للمالك (متأخرات/جدول التحصيل/عقود/دفعات) + التحليلات للقرارات: مين نطارده، إمتى نجدد، فين الفاقد.':
+    'التقرير الشامل (Excel) للمالك — ثماني أوراق منسَّقة، وبجانبه تصديرات CSV مفردة + التحليلات للقرارات: مين نطارده، إمتى نجدد، فين الفاقد.':
       'CSV exports for the owner (arrears / collection sheet / contracts / payments) + Insights for decisions: whom to chase, when to renew, where the loss is.',
     /* ---------- دليل الشرح: سلسلة الاشتقاق ---------- */
     'من الورقة إلى الإنسايتس — سلسلة الاشتقاق كاملة': 'From paper to insights — the full derivation chain',
@@ -2763,7 +2763,7 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     '«≈» جنب الرمز = القيمة تقديرية (+10٪ غير مدوَّنة في الورقة)':
       '“≈” next to the symbol = an estimated value (+10%, not written on the paper)',
     'وضعا العمل': 'The two modes',
-    '«تسجيل دفعات»: الضغطة تفتح دفعة كاملة · «تفريغ ورقة»: الضغطة تقلّب ✓/✗/فارغ':
+    '«تسجيل دفعات»: الضغطة تفتح دفعة كاملة · «نقل ورقة قديمة»: الضغطة تقلّب ✓/✗/فارغ':
       '“Record payments”: a click opens a full payment · “Transcribe paper”: a click cycles ✓/✗/blank',
     'التفريغ للتاريخ القديم من الورق، والدفعات للتشغيل اليومي':
       'Transcription is for paper history; payments are for daily operations',
@@ -7265,11 +7265,11 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     /* خريطة العملية الكاملة */
     const FLOW = [
       ['1. استلام الورقة', 'بيان ورقي من مالك عقار (زي «بيان عبدالمنعم سكرية») + نموذج عقد. الورقة = كشف مستقل في المنظومة.'],
-      ['2. تفريغ الكشف', 'شاشة «إدخال كشف جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من جدول التحصيل بوضع نقل الورقة. الخانة الفارغة تُسجَّل «يحتاج تأكيد» — الفراغ معلومة.'],
-      ['3. مراجعة الجودة', 'كل تناقض أو نقص يتسجّل تلقائيًا في «جودة البيانات» بنص المصدر الحرفي. تقعد مع المالك جلسة واحدة تقفل الأسئلة (تليفونات، تأمينات، قيم ناقصة، فراغات = سداد ولا تأخير؟).'],
+      ['2. تفريغ الكشف', 'شاشة «إضافة مشروع جديد»: بيانات المالك ← صفوف الورقة بنفس أعمدتها (اسم العميل/الوحدة/من/قيم 1-2-3/ملاحظات) ← علامات ✓/✗ من جدول التحصيل بوضع نقل الورقة. الخانة الفارغة تُسجَّل «يحتاج تأكيد» — الفراغ معلومة.'],
+      ['3. مراجعة الجودة', 'كل تناقض أو نقص يتسجّل تلقائيًا في «مراجعات مطلوبة» بنص المصدر الحرفي. تقعد مع المالك جلسة واحدة تقفل الأسئلة (تليفونات، تأمينات، قيم ناقصة، فراغات = سداد ولا تأخير؟).'],
       ['4. التشغيل اليومي', 'التحصيل الجديد يتسجّل دفعة كاملة (مبلغ+تاريخ+طريقة+إيصال) من خلية جدول التحصيل أو بالسداد الجماعي. عقد جديد/تجديد من زر «+ إدخال». شكوى تتسجّل بتصنيفها وتكلفتها.'],
       ['5. المتابعة بالاستثناء', 'مش بتراجع 1000 وحدة — بتفتح «من لم يسدِّد؟» والتنبيهات والتحليلات: بيوروك بس اللي محتاج قرار (متأخر، عقد بينتهي، فجوة توثيق).'],
-      ['6. التقارير والقرار', 'تصدير CSV للمالك (متأخرات/جدول التحصيل/عقود/دفعات) + التحليلات للقرارات: مين نطارده، إمتى نجدد، فين الفاقد.'],
+      ['6. التقارير والقرار', 'التقرير الشامل (Excel) للمالك — ثماني أوراق منسَّقة، وبجانبه تصديرات CSV مفردة + التحليلات للقرارات: مين نطارده، إمتى نجدد، فين الفاقد.'],
     ];
     const flowNode = h('div.flow', FLOW.map(([t, d], i) =>
       h('div.flow-step', [h('span.flow-num', String(i + 1)), h('div', [h('b.flow-t', t.replace(/^\d+\. /, '')), h('p.flow-d', d)])])));
@@ -7314,31 +7314,62 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
       ]);
 
     /* توثيق الشاشات */
+    const health = Store.healthScore(asOf);
+    const vacAll = Store.vacancyInfo(asOf);
+    const alarmsAll = Store.consecutiveLateAlarms(asOf);
+    const unpaidNow = Store.allCellInfos(m, asOf).filter(ci =>
+      ci.due && ['late', 'partial', 'due', 'unknown'].includes(ci.status));
+    const unpaidSum = unpaidNow.reduce((s2, ci) => s2 + Math.max(0, ci.due.amount - ci.paid), 0);
+
     const dashDocs = docSection('لوحة المؤشرات — كارد كارد', null, [
+      { name: 'التقييم العام /100 (في سطر مشاريعك)',
+        what: 'رقم واحد يلخّص وضع مشاريعك كلها — أول ما تشوفه فوق',
+        source: 'التحصيل والإشغال والمبالغ التي تحتاج تأكيدًا وأعمار المتأخرات وتواريخ انتهاء العقود',
+        calc: 'نسبة التحصيل (40 نقطة) + نسبة الإشغال (25) + اكتمال التأكيد (15) + حداثة المتأخرات (10) + أمان العقود (10) = 100. اضغط الرقم ليفتح درجًا بجدول فيه نقاطك في كل مكوّن ومن كام ومعناه',
+        example: `تقييمك الآن ${health.score} من 100` },
+      { name: 'شهر التقرير (الشريط فوق الكروت)',
+        what: 'يحدد أي شهر تتكلم عنه أرقام التحصيل و«من لم يسدِّد؟» وإيجارات المشاريع',
+        source: 'اختيارك بالسهمين، أو زر «آخر شهر مكتمل»',
+        calc: 'مقفول عند الشهر الجاري — لا تقرير عن شهر لم يبدأ بعد (مستحقاته صفر فيبدو زورًا محصَّلًا بالكامل)، والشهر الجاري معلَّم «— جارٍ». بقية المؤشرات (المتأخرات والشواغر والتجديدات والتقييم) محسوبة دائمًا حتى اليوم مهما غيّرت الشهر',
+        example: `الشهر المعروض الآن: ${Store.periodLabel(m, true)}` },
+      { name: '🚨 متأخرون شهرين متتاليين — يلزم إجراء',
+        what: 'كارت أحمر أول اللوحة بكل عميل عليه شهران متتاليان أو أكثر بلا سداد: اسمه، وحدته ومشروعه، عدد الشهور، والمبلغ',
+        source: 'حالة كل شهر × وحدة بالترتيب الزمني',
+        calc: 'شهور «يحتاج تأكيدًا» لا تقطع السلسلة ولا تزوّدها — معلومة ناقصة لا اتهام. والضغط على الصف يفتح ملف العميل كاملًا بسجل سداده شهرًا بشهر',
+        example: alarmsAll.length ? `${alarmsAll.length} حالة الآن — أطولها ${Math.max(...alarmsAll.map(a => a.months))} أشهر متتالية` : 'لا حالات حاليًا' },
       { name: 'تحصيل الشهر + ▲▼', what: 'نسبة المحصَّل من المستحق لشهر التقرير، والسهم فرقها عن الشهر السابق بالنقاط', source: 'الدفعات + العقود', calc: 'Σ المحصَّل ÷ Σ المستحق (السداد المستورد ✓ يُحسب كاملًا — افتراض معلن)', example: `${Store.periodLabel(m, true)}: ${mt.rate == null ? '—' : pct(mt.rate)}` },
+      { name: 'خسائر الوحدات الشاغرة',
+        what: 'الفلوس التي تضيع كل شهر من وحدات غير مؤجَّرة',
+        source: 'الوحدات بلا عقد نشط + آخر إيجار للوحدة نفسها أو متوسط إيجار وحدات نوعها',
+        calc: 'خسارة الوحدة الشهرية × مدة شغورها. والضغط يفتح درجًا وحدة بوحدة مكتوب فيه أساس تقدير كل وحدة صراحةً — تقدير مُعلَن الأساس لا رقم مخفي، وفي آخره زر «افتح الوحدات الشاغرة»',
+        example: vacAll.count ? `${vacAll.count} وحدة شاغرة · ${money(vacAll.totalMonthly)} شهريًا` : 'لا وحدات شاغرة' },
       { name: 'المتأخرات', what: 'فلوس مستحقة وثابت عدم سدادها', source: '✗ الورقة + الشهور المتجاوزة للسماح بلا سداد', calc: 'Σ (مستحق − مسدَّد) لكل شهر×وحدة متأخر — والمجهول القيمة (سكرية) يُعد منفصلًا ولا يُخلَط', example: `${money(ar.total)} + ${ar.unknowns.length} أشهر مجهولة` },
       { name: 'يحتاج تأكيدًا', what: 'خانات فارغة داخل تغطية الورقة — سداد أم تأخير؟ غير معروف', source: 'الفراغات في شبكة شهور الورقة', calc: 'Σ استحقاق الشهور الفارغة داخل التغطية — يُعرض كنطاق عدم يقين مش كمتأخرات', example: `${money(ar.undocumentedTotal)} (تقوى: يناير–مارس)` },
       { name: 'الإشغال / التجديدات / التأمينات', what: 'وحدات بعقد نشط اليوم · عقود تنتهي ≤90 يوم بلا لاحق · مجموع التأمينات المحتجزة', source: 'تواريخ العقود + خانات التأمين', calc: 'مقارنات تواريخ مباشرة — «منتهٍ بلا تجديد» يعني آخر عقد للوحدة انتهى ومفيش عقد مربوط به', example: '42 انتهى 2026/7/30 بلا تجديد ⇒ تنبيه أحمر' },
-      { name: 'حالة المباني (الواجهات)', what: 'كل وحدة مربع بلون حالتها في شهر التقرير — نظرة واحدة تعرف منها مين واقف فين', source: 'محرك الحالات لكل وحدة×الشهر', calc: 'نفس ألوان جدول التحصيل: أخضر محصَّل، كهرماني جزئي/متأخر السداد، أحمر متأخر، مقلّم يحتاج تأكيدًا', example: 'صف سكرية أحمر كامل — 6 أشهر ✗' },
-      { name: 'من لم يسدِّد؟', what: 'الإجابة المباشرة لسؤالك: أسماء ومبالغ الشهر المختار، مرتّبة بالأكبر', source: 'حالات الشهر المختار', calc: 'كل وحدة حالتها متأخر/جزئي/يحتاج تأكيدًا/في السماح + المتبقي عليها — الضغط يفتح خلية التسجيل', example: 'يوليو: 9 وحدات لم تسدِّد بإجمالي 453,254' },
-      { name: 'التحصيل الشهري (رسم)', what: 'العمود الفاتح = المستحق، الغامق = المحصَّل — الفرق بينهما هو الفجوة', source: 'إجماليات كل شهر', calc: 'آخر 12 شهرًا حتى شهر التقرير + «؟» تحت الشهور التي فيها سداد يحتاج تأكيدًا + زر «عرض كجدول»', example: 'يوليو: عمود فاتح كامل بلا تعبئة = 0٪' },
+      { name: 'بطاقات المشاريع', what: 'لكل مشروع: مالكه، شريط مؤجَّر/شاغر، إيجارات الشهر ونسبة تحصيله، متأخراته، وخسارة شواغره', source: 'وحدات المشروع وعقودها ودفعاتها', calc: 'ضغطة واحدة على البطاقة تركّز كل أرقام المنظومة على هذا المشروع (نفس أثر مرشِّح المشروع فوق)', example: `${Store.state.buildings.length} مشاريع معروضة الآن` },
+      { name: 'من لم يسدِّد؟', what: 'الإجابة المباشرة لسؤالك: أسماء ومبالغ الشهر المختار، مرتّبة بالأكبر', source: 'حالات الشهر المختار', calc: 'كل وحدة حالتها متأخر/جزئي/يحتاج تأكيدًا/في السماح + المتبقي عليها — يُعرَض أعلى ثمانية والضغط يفتح خلية التسجيل', example: `${Store.periodLabel(m, true)}: ${unpaidNow.length} وحدة لم تسدِّد بإجمالي ${money(unpaidSum)}` },
+      { name: 'التحصيل الشهري (رسم)', what: 'العمود الفاتح = المستحق، الغامق = المحصَّل — الفرق بينهما هو الفجوة', source: 'إجماليات كل شهر', calc: 'آخر 12 شهرًا حتى شهر التقرير، و«؟» تحت الشهور التي فيها سداد يحتاج تأكيدًا', example: `${Store.periodLabel(m, true)}: ${mt.rate == null ? '—' : pct(mt.rate)} من المستحق` },
       { name: 'أعمار المتأخرات', what: 'قد إيه المتأخرات قديمة — الأقدم أصعب تحصيلًا', source: 'عمر كل شهر متأخر باليوم', calc: 'شرائح 1–30 / 31–60 / 61–90 / +90 من يوم الاستحقاق', example: `أقدم شريحة حاليًا: ${money(ar.buckets.b90p, { bare: true })} فوق 90 يومًا` },
     ]);
 
     const matrixDocs = docSection('جدول التحصيل — لغة الخلايا', 'هي نفسها ورقتك، بس كل رمز وراه بيانات:', [
       { name: '✓ أخضر غامق / ✓ منقّط / ✓ كهرماني', what: 'مدفوع موثَّق (بمبلغ وتاريخ) / مدفوع من الورقة بلا تفاصيل / مدفوع بعد ميعاده', source: 'الدفعات المدخلة أو علامات الورقة', calc: 'المنقّط بيفضل «يحتاج توثيق» لحد ما تسجّل مبلغه وتاريخه الفعليين من خليته', example: '' },
       { name: '½ / ✗ / ؟ / • / – / ·', what: 'جزئي / متأخر / يحتاج تأكيدًا / مستحق في السماح / خارج مدة العقد / قبل تغطية الورقة', source: 'محرك الحالات', calc: '«≈» جنب الرمز = القيمة تقديرية (+10٪ غير مدوَّنة في الورقة)', example: '' },
-      { name: 'وضعا العمل', what: '«تسجيل دفعات»: الضغطة تفتح دفعة كاملة · «تفريغ ورقة»: الضغطة تقلّب ✓/✗/فارغ', source: '—', calc: 'التفريغ للتاريخ القديم من الورق، والدفعات للتشغيل اليومي', example: '' },
+      { name: '✓ رمادي — سداد بلا عقد مسجّل', what: 'الوحدة تُسدِّد فعلًا لكن لا عقد لها في النظام', source: 'دفعة أو علامة على وحدة بلا عقد', calc: 'لا تدخل نسبة التحصيل لأن المستحق نفسه غير معروف — تُحسم بتسجيل عقد الوحدة', example: 'جراج الهدم في كشف سكرية' },
+      { name: 'وضعا العمل', what: '«تسجيل دفعات»: الضغطة تفتح دفعة كاملة · «نقل ورقة قديمة»: الضغطة تقلّب ✓/✗/فارغ', source: '—', calc: 'النقل للتاريخ القديم من الورق، والدفعات للتشغيل اليومي. وضع النقل يرفض قلب شهر عليه دفعات مسجَّلة حتى لا تُمحى بالخطأ', example: '' },
       { name: 'سداد جماعي', what: 'شهر كامل بضغطة — لما تبقى مأجّر مئات', source: 'المستحق غير المسدَّد للشهر المختار', calc: 'قائمة بكل المستحق عليهم + تعليم، والحفظ يسجّل دفعة كاملة لكل معلَّم بتاريخ وطريقة موحّدين — الاستثناءات من خلاياها', example: '' },
       { name: 'عمود «متأخرات» آخر الصف', what: 'رصيد الوحدة المتأخر الكلي عبر كل الشهور', source: 'تجميع صف الوحدة', calc: 'Σ متبقي الشهور المتأخرة + «؟×n» للمجهول', example: '' },
     ]);
 
     const otherDocs = docSection('متبقّي الشاشات — باختصار', null, [
       { name: 'التحليلات', what: 'الإنسايتس المكتوبة + تحليل العقود + الالتزام + التوزيعات', source: 'كل ما سبق', calc: 'كل بطاقة إنسايت جملة محسوبة بشرطها (مثلًا: منحدر الإيراد يظهر فقط لو النصف الثاني أقل 15٪+) وتنقلك لمكان الإجراء', example: '' },
-      { name: 'الوحدات / العقود / العملاء', what: 'ملفات الكيانات: بطاقات بالكشف، جانت زمني بخط «اليوم»، أرصدة لحظية', source: 'العقود والدفعات', calc: 'حالة الوحدة محسوبة من عقودها — عمرها ما بتتكتب يدويًا', example: '' },
+      { name: 'الوحدات / العقود', what: 'بطاقات الوحدات بحالتها وكودها، وخط زمني (جانت) للعقود بخط «اليوم»', source: 'العقود والدفعات', calc: 'حالة الوحدة محسوبة من عقودها — عمرها ما بتتكتب يدويًا. والجانت يعرض أهم ثماني وحدات (ما يحتاج قرارًا أولًا) وتحته زر يعرض الكل', example: '' },
+      { name: 'ملف العميل (شاشة العملاء)', what: 'كل ما يخص عميلًا في مكان واحد', source: 'عقوده ودفعاته وعلامات الورقة', calc: 'وحداته وعقوده · آخر سداد مسجَّل (ويميّز بين دفعة موثَّقة بمبلغ وتاريخ وبين آخر شهر مؤشَّر ✓ في ورقة المالك) · إجمالي متأخراته · سجل سداد شهرًا بشهر كل سطر فيه يفتح خلية ذلك الشهر. ويُفتح أيضًا من ضغطة على سطر في ألارم اللوحة', example: '' },
+      { name: 'عملاء مسجَّلون بلا عقود بعد', what: 'قسم أسفل شاشة العملاء لمن أدخلتَ بياناتهم ولم تُسجَّل لهم عقود', source: 'العملاء غير المرتبطين بأي وحدة', calc: 'يظهر دائمًا مهما كان الترشيح حتى لا يبدو أن تسجيلهم ضاع — وبجانب كل واحد زر «سجِّل له عقدًا» يفتح المعالج والعميل محدَّد', example: '' },
       { name: 'الشكاوى', what: 'سجل بالتصنيف والتكلفة ومن يتحمّلها وزمن الإغلاق', source: 'إدخال يدوي — السجل بيبدأ من أول يوم تشغيل', calc: 'متوسط زمن الإغلاق = متوسط (تاريخ الإغلاق − الفتح) · مؤشر «بعد التسليم» محتاج تواريخ تسليم (Q20)', example: '' },
-      { name: 'جودة البيانات', what: 'كل تناقض/نقص في الورقة بنصه الحرفي وقرار تفسيره وسؤاله للمالك', source: 'التفريغ + شيت درجة الثقة + صور الورقة والعقد', calc: 'الحسم بيتسجّل بنصه في السجل — عمره ما بيتمسح', example: `${Store.state.issues.filter(q => q.status === 'open').length} ملاحظة مفتوحة الآن` },
-      { name: 'الإعدادات', what: 'كل افتراض معلن هنا: أساس الإيجار، السماح، الزيادة، الضريبة + إدارة الكشوف + التصدير', source: '—', calc: 'أي تغيير يعيد حساب كل الأرقام فورًا', example: '' },
+      { name: 'مراجعات مطلوبة', what: 'كل تناقض/نقص في الورقة بنصه الحرفي وقرار تفسيره وسؤاله للمالك', source: 'التفريغ + شيت درجة الثقة + صور الورقة والعقد', calc: 'الحسم بيتسجّل بنصه في السجل — عمره ما بيتمسح', example: `${Store.state.issues.filter(q => q.status === 'open').length} ملاحظة مفتوحة الآن` },
+      { name: 'الإعدادات', what: 'كل افتراض معلن هنا: أساس الإيجار، السماح، الزيادة، الضريبة + إدارة المشاريع + التصدير', source: '—', calc: 'أي تغيير يعيد حساب كل الأرقام فورًا. ومنها التقرير الشامل (Excel) بثماني أوراق، وحذف البيانات التوضيحية عند بدء التشغيل الفعلي', example: '' },
+      { name: 'تسجيل الدخول والأدوار', what: 'ثلاثة مستخدمين بأدوار: مدير (كل الشاشات) · موظف (بلا الإعدادات) · مشاهدة فقط (بلا أي إدخال)', source: 'قائمة المستخدمين في أول ملف صفحة الدخول', calc: 'اسم الداخل ودوره يظهران أعلى الشاشة مع زر خروج، والشاشات والأزرار غير المتاحة لدوره تختفي. تنظيم استخدام داخل المكتب لا حماية أمنية — القفل الفعلي مع نسخة الخادم', example: '' },
     ]);
 
     return h('div.view', [
@@ -7505,6 +7536,73 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     'الاسم والمالك والمنطقة — والكود ثابت لا يتغير': 'Name, owner and area — the code never changes',
     'اضغط الصف ليفتح ملفه ← «تعديل البيانات» بالأسفل — أو زر «عميل جديد»':
       'Click the row to open their profile → “Edit details” at the bottom — or the “New client” button',
+    /* توثيق اللوحة والشاشات في دليل الشرح — النسخة المحدَّثة */
+    'التقييم العام /100 (في سطر مشاريعك)': 'The overall score /100 (in your projects strip)',
+    'رقم واحد يلخّص وضع مشاريعك كلها — أول ما تشوفه فوق': 'A single number summarising all your projects — the first thing you see at the top',
+    'التحصيل والإشغال والمبالغ التي تحتاج تأكيدًا وأعمار المتأخرات وتواريخ انتهاء العقود':
+      'Collection, occupancy, amounts needing confirmation, arrears ageing, and contract end dates',
+    'نسبة التحصيل (40 نقطة) + نسبة الإشغال (25) + اكتمال التأكيد (15) + حداثة المتأخرات (10) + أمان العقود (10) = 100. اضغط الرقم ليفتح درجًا بجدول فيه نقاطك في كل مكوّن ومن كام ومعناه':
+      'Collection rate (40 points) + occupancy (25) + confirmation completeness (15) + arrears freshness (10) + contract safety (10) = 100. Click the number to open a drawer showing your points in each component, out of how many, and what it means',
+    'شهر التقرير (الشريط فوق الكروت)': 'The report month (the strip above the cards)',
+    'يحدد أي شهر تتكلم عنه أرقام التحصيل و«من لم يسدِّد؟» وإيجارات المشاريع':
+      'It decides which month the collection figures, “Who has not paid?” and project rents refer to',
+    'اختيارك بالسهمين، أو زر «آخر شهر مكتمل»': 'Your choice with the arrows, or the “Last complete month” button',
+    'مقفول عند الشهر الجاري — لا تقرير عن شهر لم يبدأ بعد (مستحقاته صفر فيبدو زورًا محصَّلًا بالكامل)، والشهر الجاري معلَّم «— جارٍ». بقية المؤشرات (المتأخرات والشواغر والتجديدات والتقييم) محسوبة دائمًا حتى اليوم مهما غيّرت الشهر':
+      'Capped at the current month — there is no report for a month that has not started (its dues are zero, so it would falsely read as fully collected), and the current month is marked “in progress”. Every other indicator (arrears, vacancies, renewals, the score) is always computed as of today no matter which month you pick',
+    'كارت أحمر أول اللوحة بكل عميل عليه شهران متتاليان أو أكثر بلا سداد: اسمه، وحدته ومشروعه، عدد الشهور، والمبلغ':
+      'A red card at the top of the dashboard listing every client with two or more consecutive unpaid months: their name, unit and project, the number of months, and the amount',
+    'حالة كل شهر × وحدة بالترتيب الزمني': 'Each month × unit state in chronological order',
+    'شهور «يحتاج تأكيدًا» لا تقطع السلسلة ولا تزوّدها — معلومة ناقصة لا اتهام. والضغط على الصف يفتح ملف العميل كاملًا بسجل سداده شهرًا بشهر':
+      'Months needing confirmation neither break the streak nor extend it — missing information is not an accusation. Clicking the row opens the client’s full profile with their month-by-month payment history',
+    'خسائر الوحدات الشاغرة': 'Vacancy losses',
+    'الفلوس التي تضيع كل شهر من وحدات غير مؤجَّرة': 'The money lost every month from unrented units',
+    'الوحدات بلا عقد نشط + آخر إيجار للوحدة نفسها أو متوسط إيجار وحدات نوعها':
+      'Units with no active contract + the unit’s own last rent, or the average rent of its type',
+    'خسارة الوحدة الشهرية × مدة شغورها. والضغط يفتح درجًا وحدة بوحدة مكتوب فيه أساس تقدير كل وحدة صراحةً — تقدير مُعلَن الأساس لا رقم مخفي، وفي آخره زر «افتح الوحدات الشاغرة»':
+      'The unit’s monthly loss × how long it has been vacant. Clicking opens a unit-by-unit drawer stating each estimate’s basis explicitly — a declared estimate, not a hidden number — with an “Open vacant units” button at the end',
+    'بطاقات المشاريع': 'Project cards',
+    'لكل مشروع: مالكه، شريط مؤجَّر/شاغر، إيجارات الشهر ونسبة تحصيله، متأخراته، وخسارة شواغره':
+      'Per project: its owner, a rented/vacant bar, the month’s rents and collection rate, its arrears, and its vacancy loss',
+    'وحدات المشروع وعقودها ودفعاتها': 'The project’s units, contracts and payments',
+    'ضغطة واحدة على البطاقة تركّز كل أرقام المنظومة على هذا المشروع (نفس أثر مرشِّح المشروع فوق)':
+      'One click on the card focuses every figure in the system on that project (the same effect as the project filter above)',
+    'كل وحدة حالتها متأخر/جزئي/يحتاج تأكيدًا/في السماح + المتبقي عليها — يُعرَض أعلى ثمانية والضغط يفتح خلية التسجيل':
+      'Every unit that is late, partial, needs confirmation, or is within grace, plus what it still owes — the top eight are shown and clicking opens the recording cell',
+    'آخر 12 شهرًا حتى شهر التقرير، و«؟» تحت الشهور التي فيها سداد يحتاج تأكيدًا':
+      'The last 12 months up to the report month, with “?” under months holding payments that need confirmation',
+    'بطاقات الوحدات بحالتها وكودها، وخط زمني (جانت) للعقود بخط «اليوم»':
+      'Unit cards with their status and code, and a contract timeline (Gantt) with a “today” line',
+    'حالة الوحدة محسوبة من عقودها — عمرها ما بتتكتب يدويًا. والجانت يعرض أهم ثماني وحدات (ما يحتاج قرارًا أولًا) وتحته زر يعرض الكل':
+      'A unit’s status is computed from its contracts — never typed by hand. The Gantt shows the eight units that need a decision first, with a button below to show them all',
+    'ملف العميل (شاشة العملاء)': 'The client profile (Clients screen)',
+    'كل ما يخص عميلًا في مكان واحد': 'Everything about a client in one place',
+    'عقوده ودفعاته وعلامات الورقة': 'Their contracts, payments and paper marks',
+    'وحداته وعقوده · آخر سداد مسجَّل (ويميّز بين دفعة موثَّقة بمبلغ وتاريخ وبين آخر شهر مؤشَّر ✓ في ورقة المالك) · إجمالي متأخراته · سجل سداد شهرًا بشهر كل سطر فيه يفتح خلية ذلك الشهر. ويُفتح أيضًا من ضغطة على سطر في ألارم اللوحة':
+      'Their units and contracts · the last recorded payment (distinguishing a documented payment with amount and date from the last month merely ticked ✓ on the owner’s paper) · total arrears · a month-by-month payment history where each row opens that month’s cell. It also opens from a click on an alarm row on the dashboard',
+    'عملاء مسجَّلون بلا عقود بعد': 'Clients registered with no contract yet',
+    'قسم أسفل شاشة العملاء لمن أدخلتَ بياناتهم ولم تُسجَّل لهم عقود': 'A section at the bottom of the Clients screen for people whose details you entered but who have no contract recorded',
+    'العملاء غير المرتبطين بأي وحدة': 'Clients not linked to any unit',
+    'يظهر دائمًا مهما كان الترشيح حتى لا يبدو أن تسجيلهم ضاع — وبجانب كل واحد زر «سجِّل له عقدًا» يفتح المعالج والعميل محدَّد':
+      'It always appears regardless of the filter so their registration never looks lost — and each row has a “Record a contract” button that opens the wizard with the client already selected',
+    '✓ رمادي — سداد بلا عقد مسجّل': '✓ grey — payment with no registered contract',
+    'الوحدة تُسدِّد فعلًا لكن لا عقد لها في النظام': 'The unit does pay, but has no contract in the system',
+    'دفعة أو علامة على وحدة بلا عقد': 'A payment or a mark on a unit with no contract',
+    'لا تدخل نسبة التحصيل لأن المستحق نفسه غير معروف — تُحسم بتسجيل عقد الوحدة':
+      'It stays out of the collection rate because the amount due itself is unknown — recording the unit’s contract settles it',
+    'النقل للتاريخ القديم من الورق، والدفعات للتشغيل اليومي. وضع النقل يرفض قلب شهر عليه دفعات مسجَّلة حتى لا تُمحى بالخطأ':
+      'Transcription is for the old paper history, payments are for daily operation. Transcription mode refuses to flip a month that has recorded payments so they cannot be wiped by mistake',
+    'الوحدات / العقود': 'Units / Contracts',
+    'مراجعات مطلوبة': 'Reviews Needed',
+    'كل افتراض معلن هنا: أساس الإيجار، السماح، الزيادة، الضريبة + إدارة المشاريع + التصدير':
+      'Every declared assumption lives here: rent basis, grace, increase, tax + project management + exports',
+    'أي تغيير يعيد حساب كل الأرقام فورًا. ومنها التقرير الشامل (Excel) بثماني أوراق، وحذف البيانات التوضيحية عند بدء التشغيل الفعلي':
+      'Any change recomputes every figure instantly. It also holds the full Excel report with its eight sheets, and the button that removes the demo data when real operation begins',
+    'تسجيل الدخول والأدوار': 'Sign-in and roles',
+    'ثلاثة مستخدمين بأدوار: مدير (كل الشاشات) · موظف (بلا الإعدادات) · مشاهدة فقط (بلا أي إدخال)':
+      'Three users with roles: manager (all screens) · staff (no settings) · view-only (no data entry)',
+    'قائمة المستخدمين في أول ملف صفحة الدخول': 'The user list at the top of the sign-in page file',
+    'اسم الداخل ودوره يظهران أعلى الشاشة مع زر خروج، والشاشات والأزرار غير المتاحة لدوره تختفي. تنظيم استخدام داخل المكتب لا حماية أمنية — القفل الفعلي مع نسخة الخادم':
+      'The signed-in name and role appear at the top with a sign-out button, and screens or buttons their role cannot use disappear. This organises office usage; it is not real security — the actual lock comes with the server version',
     'تقرير شامل للمالك': 'A full report for the owner',
     'الإعدادات ← «التقرير الشامل (Excel)»': 'Settings → “Full report (Excel)”',
     'ملف Excel واحد بأوراق منسَّقة: المشاريع والعقود والعملاء والمتأخرات والتحصيل والدفعات والشواغر والمراجعات':
@@ -7516,6 +7614,17 @@ html[data-shot] *, html[data-shot] *::before, html[data-shot] *::after { animati
     [/^«(.+)» لم تعد متاحة بهذه المدة — اختر وحدة أخرى$/, function (m) { return '“' + I18N.tt(m[1]) + '” is no longer available for this term — choose another unit'; }],
     [/^عملاء مسجَّلون بلا عقود بعد \((\d+)\)$/, function (m) { return 'Clients registered with no contract yet (' + m[1] + ')'; }],
     [/^قيمة السنة (\d+)$/, function (m) { return 'Year ' + m[1] + ' value'; }],
+    /* أمثلة دليل الشرح المحسوبة من البيانات */
+    [/^تقييمك الآن (\d+) من 100$/, function (m) { return 'Your score right now is ' + m[1] + ' out of 100'; }],
+    [/^الشهر المعروض الآن: (.+)$/, function (m) { return 'Currently showing: ' + I18N.tt(m[1]); }],
+    [/^(\d+) حالة الآن — أطولها (\d+) أشهر متتالية$/, function (m) { return m[1] + ' cases now — the longest is ' + m[2] + ' consecutive months'; }],
+    [/^لا حالات حاليًا$/, function () { return 'No cases at the moment'; }],
+    [/^(\d+) وحدة شاغرة · (.+) شهريًا$/, function (m) { return m[1] + ' vacant units · ' + I18N.tt(m[2]) + ' per month'; }],
+    [/^لا وحدات شاغرة$/, function () { return 'No vacant units'; }],
+    [/^(\d+) مشاريع معروضة الآن$/, function (m) { return m[1] + ' projects currently shown'; }],
+    [/^(.+): (\d+) وحدة لم تسدِّد بإجمالي (.+)$/, function (m) { return I18N.tt(m[1]) + ': ' + m[2] + ' units unpaid, totalling ' + I18N.tt(m[3]); }],
+    [/^(.+): (\d+٪|\d+%) من المستحق$/, function (m) { return I18N.tt(m[1]) + ': ' + m[2].replace('٪', '%') + ' of what is due'; }],
+    [/^(.+) في كشف (.+)$/, function (m) { return I18N.tt(m[1]) + ' in the ' + I18N.tt(m[2]) + ' statement'; }],
     [/^لا يمكن حذف عقد عليه (.+) مسجَّلة — احذف الدفعات أولًا من خلايا الأشهر$/,
       function (m) { return 'A contract with ' + I18N.tt(m[1]) + ' recorded cannot be deleted — remove the payments from the month cells first'; }],
     [/^«(.+)» لم تعد متاحة بهذه المدة — اختر وحدة أخرى$/, function (m) { return '“' + I18N.tt(m[1]) + '” is no longer available for this term — choose another unit'; }],
