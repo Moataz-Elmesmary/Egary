@@ -130,10 +130,11 @@
     const sidebar = h('nav.sidebar', [
       h('div.brand', [
         h('span.brand-logo', {
-          html: '<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">' +
-            '<path d="M4.5 20.5v-4.2M9.5 20.5v-7M14.5 20.5v-9.8" stroke="rgba(255,255,255,0.55)" stroke-width="2.6"/>' +
-            '<path d="M4 13.5l5 5L20.5 6.5" stroke="#fff" stroke-width="2.6"/>' +
-            '<path d="M15.8 6.5h4.7v4.7" stroke="#fff" stroke-width="2.2"/></svg>',
+          html: '<svg viewBox="0 0 48 48" fill="none" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M10 21.5 L24 9.5 L38 21.5" stroke="#fff" stroke-width="3.6"/>' +
+            '<path d="M13.5 24.5 V36.5 a2.5 2.5 0 0 0 2.5 2.5 h16 a2.5 2.5 0 0 0 2.5 -2.5 V24.5" stroke="#fff" stroke-width="3.6"/>' +
+            '<path d="M17 32.5 L22 27.5 L25.5 30.5 L31 24.5" stroke="#fab219" stroke-width="3.4"/>' +
+            '<path d="M26.5 24.5 H31 V29" stroke="#fab219" stroke-width="3.4"/></svg>',
         }),
         h('div', [
           h('div.brand-name', BRAND.name),

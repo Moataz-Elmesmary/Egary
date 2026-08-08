@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>إيجاري — تسجيل الدخول</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='12' fill='%237c3aed'/%3E%3Cpath d='M10 21.5L24 9.5 38 21.5' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M13.5 24.5V36.5a2.5 2.5 0 0 0 2.5 2.5h16a2.5 2.5 0 0 0 2.5-2.5V24.5' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M17 32.5 22 27.5 25.5 30.5 31 24.5M26.5 24.5H31V29' stroke='%23fab219' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 /* =========================================================
    صفحة الدخول — هوية إيجاري (بنفسجي) بديناميكيات تفاعلية كاملة
@@ -78,7 +79,7 @@ body{font-family:"Segoe UI","Segoe UI Arabic",Tahoma,system-ui,sans-serif;
   filter:blur(10px);animation:glowPulse 4.5s ease-in-out infinite;z-index:0;}
 @keyframes glowPulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:.95;transform:scale(1.05)}}
 @keyframes logoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-.logo-ring svg{width:44px;height:44px;position:relative;z-index:2;
+.logo-ring svg{width:52px;height:52px;position:relative;z-index:2;
   filter:drop-shadow(0 0 14px rgba(167,139,250,.6));}
 .logo-title{font-size:26px;font-weight:800;margin-bottom:4px;letter-spacing:.01em}
 .logo-sub{font-size:11px;font-weight:500;color:var(--white-icon);letter-spacing:.06em}
@@ -195,10 +196,11 @@ body{font-family:"Segoe UI","Segoe UI Arabic",Tahoma,system-ui,sans-serif;
   <div class="card" id="loginCard">
     <div class="logo-wrap">
       <div class="logo-ring">
-        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4.5 20.5v-4.2M9.5 20.5v-7M14.5 20.5v-9.8" stroke="rgba(255,255,255,0.55)" stroke-width="2.6"/>
-          <path d="M4 13.5l5 5L20.5 6.5" stroke="#fff" stroke-width="2.6"/>
-          <path d="M15.8 6.5h4.7v4.7" stroke="#fff" stroke-width="2.2"/>
+        <svg viewBox="0 0 48 48" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 21.5 L24 9.5 L38 21.5" stroke="#fff" stroke-width="3.2"/>
+          <path d="M13.5 24.5 V36.5 a2.5 2.5 0 0 0 2.5 2.5 h16 a2.5 2.5 0 0 0 2.5 -2.5 V24.5" stroke="#fff" stroke-width="3.2"/>
+          <path d="M17 32.5 L22 27.5 L25.5 30.5 L31 24.5" stroke="#fab219" stroke-width="3"/>
+          <path d="M26.5 24.5 H31 V29" stroke="#fab219" stroke-width="3"/>
         </svg>
       </div>
       <div class="logo-title shiny">إيجاري</div>
@@ -224,7 +226,7 @@ body{font-family:"Segoe UI","Segoe UI Arabic",Tahoma,system-ui,sans-serif;
         <span class="btn-label">دخول</span>
       </button>
     </form>
-    <div class="hint-line">الدخول لتنظيم الاستخدام داخل المكتب — البيانات محفوظة على هذا الجهاز</div>
+    <div class="hint-line">مشاريعك وإيجاراتك ومتأخراتك — في شاشة واحدة</div>
   </div>
 </div>
 
