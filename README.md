@@ -29,7 +29,6 @@ Egary ingests each paper as an independent **statement**, keeps every ambiguity 
 - **Fully bilingual** — Arabic RTL and complete English LTR, switchable live (`EN` button or `?lang=en`).
 - **Dark mode** — full theme including the charts (`🌙` button or `?theme=dark`).
 - **Mobile responsive**, keyboard accessible, Arabic-normalized search (hamza/ta-marbuta/Hindi digits) across tenants, units, owners, phones, and receipt numbers.
-- **Printable contracts** — the system writes the lease itself from the recorded data (parties with national ID, unit with its code, term, per-year rent table, maintenance, deposit, VAT, due day) as twelve clauses on the office's real template, A4-ready to print or save as PDF. No retyping, so no copy errors.
 - **Excel report** — one workbook, eight formatted sheets (project summary, contracts with every year, clients and balances, aged arrears, the year's collection sheet, documented payments, vacancy losses, pending reviews), plus individual CSV exports.
 
 <p align="center">

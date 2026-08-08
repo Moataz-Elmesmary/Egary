@@ -1080,7 +1080,6 @@
         ]))),
       ]),
       c.deposit ? h('p.note-line', [icon('check'), ` تأمين محتجز: ${money(c.deposit.amount)}${c.deposit.note ? ' — ' + c.deposit.note : ''}`]) : null,
-      h('button.btn.btn-ghost.btn-sm', { onclick: () => ContractDoc.printContract(c) }, 'اطبع هذا العقد'),
     ]))));
     const issues = Store.state.issues.filter(q => q.status === 'open' &&
       ((q.refType === 'unit' && q.refId === u.id) ||
@@ -1187,10 +1186,6 @@
         h('td', c.deposit ? money(c.deposit.amount, { bare: true }) : '—'),
         h('td', contractStatusChip(c, asOf)),
         h('td', c.prevId ? 'تجديد' : '—'),
-        h('td', h('button.btn.btn-ghost.btn-sm', {
-          onclick: e => { e.stopPropagation(); ContractDoc.printContract(c); },
-          title: 'يفتح العقد مكتوبًا ببيانات النظام جاهزًا للطباعة',
-        }, 'اطبع العقد')),
       ]));
     });
 
@@ -1225,8 +1220,8 @@
       ])) : null,
       h('div.table-wrap', h('table.table', [
         h('thead', h('tr', [h('th', 'المبنى'), h('th', 'الوحدة'), h('th', 'العميل'), h('th', 'من'), h('th', 'إلى'),
-          h('th', 'قيمة السنة الجارية'), h('th', 'صيانة'), h('th', 'التأمين'), h('th', 'الحالة'), h('th', 'النوع'), h('th', 'العقد')])),
-        h('tbody', rows.length ? rows : h('tr', h('td', { colspan: 11 }, emptyState('لا عقود ضمن الترشيح')))),
+          h('th', 'قيمة السنة الجارية'), h('th', 'صيانة'), h('th', 'التأمين'), h('th', 'الحالة'), h('th', 'النوع')])),
+        h('tbody', rows.length ? rows : h('tr', h('td', { colspan: 10 }, emptyState('لا عقود ضمن الترشيح')))),
       ])),
     ]);
   }
@@ -2600,7 +2595,6 @@
         ['دفعة شهر واحد', 'جدول التحصيل', 'اضغط خلية الشهر ← المبلغ مُعبَّأ بالمتبقي ← احفظ'],
         ['سداد شهر كامل (دفعة واحدة للجميع)', 'جدول التحصيل ← «سداد جماعي»', 'حدِّد من سدَّدوا ← تاريخ وطريقة موحَّدان ← حفظ'],
         ['عقد جديد أو تجديد', 'العقود ← «عقد جديد» أو زر «+ إدخال»', 'العميل (بالاسم أو الرقم القومي) ← البداية والمدة (حتى 10 سنوات) ← المشروع ← وحدة متاحة ← قيمة السنة الأولى — وباقي السنوات تتولَّد بالنسبة أو تكتبها بيدك'],
-        ['طباعة العقد بعد تسجيله', 'العقود ← عمود «العقد» ← «اطبع العقد»', 'يُكتب العقد ببنوده من بيانات النظام ويفتح جاهزًا للطباعة أو الحفظ PDF'],
         ['تقرير شامل للمالك', 'الإعدادات ← «التقرير الشامل (Excel)»', 'ملف Excel واحد بأوراق منسَّقة: المشاريع والعقود والعملاء والمتأخرات والتحصيل والدفعات والشواغر والمراجعات'],
         ['وحدة داخل مشروع قائم', 'الوحدات ← «وحدة جديدة»', 'اختر المشروع ← الاسم والنوع'],
         ['عميل أو تعديل بياناته', 'العملاء', 'اضغط الصف للتعديل أو «عميل جديد»'],
@@ -2817,9 +2811,7 @@
     'لا عملاء لهم عقود ضمن الترشيح': 'No clients with contracts match the filter',
     'لا عقود مسجَّلة لهذا العميل بعد — بياناته محفوظة، وسيظهر في الجدول الرئيسي بمجرد تسجيل أول عقد له.':
       'No contracts recorded for this client yet — their details are saved, and they will appear in the main table as soon as a first contract is recorded.',
-    /* طباعة العقد والتصدير */
-    'اطبع العقد': 'Print contract', 'اطبع هذا العقد': 'Print this contract', 'العقد': 'Contract',
-    'يفتح العقد مكتوبًا ببيانات النظام جاهزًا للطباعة': 'Opens the contract written from the system’s data, ready to print',
+    /* التصدير */
     'تصدير التقارير': 'Report exports',
     'التقرير الشامل ملف Excel واحد بأوراق منفصلة منسَّقة وجاهزة للعرض على المالك. وبجانبه تصديرات مفردة بصيغة CSV لمن يريد بيانات خامًا.':
       'The full report is a single Excel file with separate formatted sheets, ready to show the owner. Alongside it are individual CSV exports for raw data.',
@@ -2831,10 +2823,6 @@
     'أقصى مدة عشر سنوات': 'Ten years is the maximum term',
     'املأ باقي السنوات بزيادة 10٪ (النمط السائد)': 'Fill the remaining years with a 10% increase (the common pattern)',
     'أدخل قيمة السنة 1 أولًا': 'Enter the year-1 value first',
-    'طباعة العقد بعد تسجيله': 'Printing the contract after recording it',
-    'العقود ← عمود «العقد» ← «اطبع العقد»': 'Contracts → the “Contract” column → “Print contract”',
-    'يُكتب العقد ببنوده من بيانات النظام ويفتح جاهزًا للطباعة أو الحفظ PDF':
-      'The lease is written with its clauses from the system’s data and opens ready to print or save as PDF',
     'تقرير شامل للمالك': 'A full report for the owner',
     'الإعدادات ← «التقرير الشامل (Excel)»': 'Settings → “Full report (Excel)”',
     'ملف Excel واحد بأوراق منسَّقة: المشاريع والعقود والعملاء والمتأخرات والتحصيل والدفعات والشواغر والمراجعات':
