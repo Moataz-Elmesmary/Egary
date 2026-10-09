@@ -57,11 +57,21 @@ test('BI: hero with counters, parallax tilt, enter → sections → drill-down d
   // الفلتر داخل BI يغيّر الأرقام
   await page.click('#bi-dock button[data-section="overview"]'); await page.waitForTimeout(250);
   const before = await page.textContent('#bi .board-head .sub');
-  await page.click('#bi .chips button'); await page.waitForTimeout(300);
+  await page.click('#bi .chips > button'); await page.waitForTimeout(300);
   const after = await page.textContent('#bi .board-head .sub');
   assert.notEqual(before, after, 'project chip filters the BI scope: ' + before + ' vs ' + after);
   assert.ok(after.includes('مُرشَّح'));
-  await page.click('#bi .chips button.on'); await page.waitForTimeout(200);
+  await page.click('#bi .chips > button.on'); await page.waitForTimeout(200);
+  // متصفح الشهر داخل BI: السابق يغيّر شهر التقرير وبطاقة التحصيل، والضغط على الشهر يعيد الشهر الحالي
+  const lbl0 = await page.textContent('#bi-period-label');
+  await page.click('#bi-period-prev'); await page.waitForTimeout(250);
+  const lbl1 = await page.textContent('#bi-period-label');
+  assert.notEqual(lbl0, lbl1, 'period label changed');
+  assert.ok((await page.textContent('#bi .board-head .sub')).includes('شهر التقرير'));
+  assert.ok((await page.textContent('#bi .tiles .tile')).includes(lbl1.split(' ')[0]), 'first tile follows the selected month');
+  assert.ok(await page.$('#bi .chart .hl-band'), 'selected month is highlighted in the chart');
+  await page.click('#bi-period-label'); await page.waitForTimeout(250);
+  assert.equal(await page.textContent('#bi-period-label'), lbl0);
   await page.click('#bi-exit'); await page.waitForTimeout(300);
   assert.equal(await page.evaluate(() => location.hash), '#/dashboard');
   assert.equal(await page.getAttribute('html', 'data-theme'), 'light');

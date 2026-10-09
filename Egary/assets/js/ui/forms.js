@@ -365,5 +365,37 @@ window.Egary = window.Egary || {};
     return m;
   }
 
-  E.Forms = { project, unit, client, contract, payment, maintenance, settings, invoice, field, input, select, number, date, textarea, listOpts };
+  /* ---------- كشف حساب عميل (قابل للطباعة): كل شهر مستحق منذ بداية المحاسبة مع المسدَّد والمتبقي، ثم الدفعات ---------- */
+  function statement(c) {
+    if (!c) return null;
+    const st = S().state(), asOf = U().today(), cur = U().periodOf(asOf);
+    const cs = S().contractsOfClient(c.code).slice().sort((a, b) => U().cmp(a.start, b.start));
+    const rows = [];
+    for (const x of cs) {
+      const u = S().unit(x.unitCode) || {}; const sD = U().d(x.start), eD = U().d(x.end); if (!sD || !eD) continue;
+      const from = U().cmp(U().periodOf(sD), st.settings.trackingFrom) > 0 ? U().periodOf(sD) : st.settings.trackingFrom;
+      const to = U().cmp(U().periodOf(eD), cur) < 0 ? U().periodOf(eD) : cur;
+      if (U().cmp(from, to) > 0) continue;
+      for (const pr of U().periods(from, to)) { const ci = En().cell(x, pr, asOf); if (ci.status === 'none' || ci.status === 'history' || ci.status === 'upcoming') continue; rows.push({ period: pr, unit: u.label || x.unitCode, contract: x.code, due: ci.due ? ci.due.amount : 0, paid: ci.paid || 0, remaining: (ci.status === 'late' || ci.status === 'partial' || ci.status === 'due') ? ci.remaining : 0, status: ci.status }); }
+    }
+    rows.sort((a, b) => U().cmp(a.period, b.period) || U().cmp(a.contract, b.contract));
+    const pays = cs.flatMap(x => S().paymentsOf(x.code)).sort((a, b) => U().cmp(a.paidOn || a.period, b.paidOn || b.period));
+    const tDue = U().sum(rows, r => r.due), tPaid = U().sum(rows, r => r.paid), tRem = U().sum(rows, r => r.remaining);
+    const td = (v, cls) => h('td', { class: cls || '' }, v);
+    const box = h('div', { class: 'invoice statement', id: 'statement-print' },
+      h('div', { class: 'inv-head' }, h('div', null, h('h2', null, st.meta.officeName || 'إيجاري'), h('div', { class: 'muted small' }, 'كشف حساب مستأجر')), h('div', { style: { textAlign: 'left' } }, h('div', { class: 'bold' }, c.name), h('div', { class: 'code', style: { fontSize: '14px' } }, c.code), h('div', { class: 'small' }, 'حتى ' + U().fmtDate(U().iso(asOf))))),
+      h('table', null, h('tbody', null, h('tr', null, h('th', null, 'التليفون'), h('td', { class: 'ltr' }, c.phone || '—'), h('th', null, 'الرقم القومي / الضريبي'), h('td', { class: 'ltr' }, [c.nationalId, c.taxId].filter(Boolean).join(' / ') || '—')), h('tr', null, h('th', null, 'العقود'), h('td', { colspan: 3 }, cs.map(x => `${x.code}: ${(S().unit(x.unitCode) || {}).label || x.unitCode} (${U().fmtDate(x.start)} → ${U().fmtDate(x.end)})`).join(' · ') || '—')))),
+      h('h3', { class: 'mt' }, 'الاستحقاقات الشهرية'),
+      h('table', { id: 'statement-months' }, h('thead', null, h('tr', null, h('th', null, 'الشهر'), h('th', null, 'الوحدة'), h('th', null, 'العقد'), h('th', { class: 'num' }, 'المستحق'), h('th', { class: 'num' }, 'المسدَّد'), h('th', { class: 'num' }, 'المتبقي'), h('th', null, 'الحالة'))),
+        h('tbody', null, rows.length ? rows.map(r => h('tr', null, td(U().periodLabel(r.period, true)), td(r.unit), td(h('span', { class: 'code' }, r.contract)), td(U().fmtMoney(r.due), 'num'), td(U().fmtMoney(r.paid), 'num'), td(r.remaining ? U().fmtMoney(r.remaining) : '—', 'num'), td(En().STATUS_AR[r.status] || r.status))) : h('tr', null, h('td', { colspan: 7, class: 'muted' }, 'لا توجد استحقاقات مسجَّلة بعد'))),
+        h('tfoot', null, h('tr', null, h('td', { colspan: 3 }, `الإجمالي (${rows.length} شهر)`), td(U().fmtMoney(tDue), 'num'), td(U().fmtMoney(tPaid), 'num'), td(U().fmtMoney(tRem), 'num'), h('td')))),
+      h('h3', { class: 'mt' }, `الدفعات المسجَّلة (${pays.length})`),
+      h('table', { id: 'statement-payments' }, h('thead', null, h('tr', null, h('th', null, 'الفاتورة'), h('th', null, 'تاريخ السداد'), h('th', null, 'عن شهر'), h('th', { class: 'num' }, 'المبلغ'), h('th', null, 'الطريقة'))), h('tbody', null, pays.map(p => h('tr', null, td(h('span', { class: 'code' }, p.code)), td(p.paidOn ? U().fmtDate(p.paidOn) : '—'), td(U().periodLabel(p.period, true)), td(U().fmtMoney(p.amount), 'num'), td(M().label([{ key: '', ar: 'غير محدد' }].concat(M().PAY_METHODS), p.method || '')))))),
+      h('div', { class: 'total', id: 'statement-total' }, tRem ? 'إجمالي المتأخرات المستحقة: ' + U().fmtMoney(tRem) : 'لا توجد متأخرات مستحقة'),
+      h('p', { class: 'small muted', style: { marginTop: '18px' } }, 'أُصدر من نظام إيجاري — ' + new Date().toLocaleString('ar-EG')));
+    const printBtn = h('button', { class: 'btn primary', onclick: () => { document.body.classList.add('printing'); window.print(); setTimeout(() => document.body.classList.remove('printing'), 500); } }, UI().icon('print'), 'طباعة / حفظ PDF');
+    return UI().modal({ title: 'كشف حساب — ' + c.name, size: 'lg', body: box, footer: [printBtn] });
+  }
+
+  E.Forms = { project, unit, client, contract, payment, maintenance, settings, invoice, statement, field, input, select, number, date, textarea, listOpts };
 })(window.Egary);

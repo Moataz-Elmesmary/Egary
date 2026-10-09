@@ -27,7 +27,7 @@ window.Egary = window.Egary || {};
   ];
 
   const App = {
-    filter: { projectCode: '', unitType: '', status: '', floor: '', q: '' },
+    filter: { projectCode: '', unitType: '', status: '', floor: '', q: '', period: '' }, // period: شهر التقرير المختار (لا يُحفظ بين الجلسات)
     year: String(new Date().getFullYear()),
     route: { view: 'dashboard', id: '', params: {} },
     mode: 'none', // 'linked' | 'preview' | 'file' | 'demo'
@@ -247,7 +247,7 @@ window.Egary = window.Egary || {};
   function ctx() { return { filter: App.filter, year: App.year, params: App.route.params, open, evidence, go, rerender: render, filterBar, setYear: (y) => { App.year = String(y); render(); }, mode: App.mode, flags: App.flags, readOnly: App.mode !== 'linked' && App.mode !== 'file' && App.mode !== 'demo' }; }
 
   /* ---------- الفلاتر ---------- */
-  function saveFilter() { try { localStorage.setItem(FILTER_KEY, JSON.stringify(App.filter)); } catch (e) { } }
+  function saveFilter() { try { const { period, ...rest } = App.filter; localStorage.setItem(FILTER_KEY, JSON.stringify(rest)); } catch (e) { } }
   function setFilter(patch) { Object.assign(App.filter, patch); saveFilter(); render(); }
   function filterBar(opts) {
     opts = opts || {};
@@ -255,13 +255,24 @@ window.Egary = window.Egary || {};
     const chip = (label, on, onClick, cls) => h('button', { class: 'chip ' + (on ? 'on' : '') + ' ' + (cls || ''), onclick: onClick }, label, on ? h('span', { class: 'x' }, '×') : null);
     const bar = h('div', { class: 'flex wrap row-gap', id: 'filter-bar' });
     bar.appendChild(h('span', { class: 'muted small flex' }, UI().icon('filter'), 'الفلاتر:'));
+    if (opts.period) { // متصفح الشهر: ◀ الشهر ▶ — يغيّر شهر التقرير في اللوحة والتحليلات ولوحة BI
+      const cur = U().periodOf(U().today()); const from = st.settings.trackingFrom && U().cmp(st.settings.trackingFrom, cur) <= 0 ? st.settings.trackingFrom : cur.slice(0, 4) + '-01';
+      const sel = f.period || opts.defaultPeriod || cur; const months = [...U().periods(from, cur)].reverse();
+      const setP = (p) => setFilter({ period: p && p !== (opts.defaultPeriod || cur) ? p : '' });
+      bar.appendChild(h('span', { class: 'period-nav', id: 'period-nav' },
+        h('button', { class: 'chip icon', id: 'period-prev', title: 'الشهر السابق', disabled: U().cmp(sel, from) <= 0 ? true : null, onclick: () => setP(U().addMonths(sel, -1)) }, UI().icon('chevR')),
+        h('select', { class: 'chip', id: 'period-pick', title: 'شهر التقرير', onchange: (e) => setP(e.target.value) }, months.map(p => h('option', { value: p, selected: p === sel ? true : null }, U().periodLabel(p, true)))),
+        h('button', { class: 'chip icon', id: 'period-next', title: 'الشهر التالي', disabled: U().cmp(sel, cur) >= 0 ? true : null, onclick: () => setP(U().addMonths(sel, 1)) }, UI().icon('chevL')),
+        f.period ? h('button', { class: 'btn sm ghost', id: 'period-reset', onclick: () => setFilter({ period: '' }) }, 'الشهر الحالي') : null));
+      bar.appendChild(h('span', { class: 'muted' }, '|'));
+    }
     for (const p of st.projects) bar.appendChild(chip(p.name, f.projectCode === p.code, () => setFilter({ projectCode: f.projectCode === p.code ? '' : p.code }), 'f-project'));
     bar.appendChild(h('span', { class: 'muted' }, '|'));
     for (const t of M().UNIT_TYPES) bar.appendChild(chip(t.ar, f.unitType === t.key, () => setFilter({ unitType: f.unitType === t.key ? '' : t.key }), 'f-type'));
     if (opts.status !== false) { bar.appendChild(h('span', { class: 'muted' }, '|')); for (const [k, ar] of [['occupied', 'مؤجَّرة'], ['vacant', 'شاغرة'], ['ending', 'تنتهي قريبًا']]) bar.appendChild(chip(ar, f.status === k, () => setFilter({ status: f.status === k ? '' : k }), 'f-status')); }
     if (opts.year) { const years = st.settings.ledgerYears.length ? st.settings.ledgerYears : [new Date().getFullYear()]; const sel = h('select', { class: 'chip', id: 'year-select', onchange: (e) => { App.year = e.target.value; render(); } }, years.map(y => h('option', { value: y, selected: String(y) === String(App.year) ? true : null }, 'سنة ' + y))); bar.appendChild(sel); }
     if (f.q) bar.appendChild(chip('بحث: ' + f.q, true, () => setFilter({ q: '' }), 'f-q'));
-    if (f.projectCode || f.unitType || f.status || f.q || f.floor) bar.appendChild(h('button', { class: 'btn sm ghost', id: 'clear-filters', onclick: () => setFilter({ projectCode: '', unitType: '', status: '', floor: '', q: '' }) }, 'مسح الكل'));
+    if (f.projectCode || f.unitType || f.status || f.q || f.floor) bar.appendChild(h('button', { class: 'btn sm ghost', id: 'clear-filters', onclick: () => setFilter({ projectCode: '', unitType: '', status: '', floor: '', q: '', period: '' }) }, 'مسح الكل'));
     return bar;
   }
 
@@ -296,7 +307,7 @@ window.Egary = window.Egary || {};
   /* ---------- الإقلاع ---------- */
   async function boot() {
     applyTheme((() => { try { return localStorage.getItem(THEME_KEY) || (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch (e) { return 'light'; } })());
-    try { const f = JSON.parse(localStorage.getItem(FILTER_KEY) || 'null'); if (f) Object.assign(App.filter, f); } catch (e) { }
+    try { const f = JSON.parse(localStorage.getItem(FILTER_KEY) || 'null'); if (f) { delete f.period; Object.assign(App.filter, f); } } catch (e) { }
     App.els.root = document.getElementById('root');
     initSync();
     const yrs = []; App.year = String(new Date().getFullYear());

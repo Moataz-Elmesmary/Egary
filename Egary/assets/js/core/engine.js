@@ -326,24 +326,28 @@ window.Egary = window.Egary || {};
     const sc = scope(filter);
     const cur = U().periodOf(asOf), yr = cur.slice(0, 4);
     const et = enteredThrough(asOf);
-    const reportPeriod = U().cmp(et, cur) < 0 ? et : cur; // آخر شهر مكتمل التسجيل
+    // الشهر المعروض: المختار من المستخدم (فلتر الشهر) أو آخر شهر مكتمل التسجيل
+    const selected = filter && filter.period && /^\d{4}-\d{2}$/.test(filter.period) && U().cmp(filter.period, cur) <= 0 ? filter.period : '';
+    const reportPeriod = selected || (U().cmp(et, cur) < 0 ? et : cur);
     const prev = U().addMonths(reportPeriod, -1);
     const month = monthTotals(sc, reportPeriod, asOf), prevMonth = monthTotals(sc, prev, asOf);
     const pending = pendingEntry(sc, asOf);
-    const ytd = collectedBetween(sc, yr + '-01', cur);
-    const ytdDue = series(sc, cur, +cur.slice(5), asOf).reduce((s, m) => s + m.due, 0);
+    // سنة التقرير: سنة الشهر المعروض (حتى الشهر الحالي لو السنة الحالية، وإلا السنة كاملة)
+    const ryr = reportPeriod.slice(0, 4), yEnd = ryr === yr ? cur : ryr + '-12';
+    const ytd = collectedBetween(sc, ryr + '-01', yEnd);
+    const ytdDue = series(sc, yEnd, +yEnd.slice(5), asOf).reduce((s, m) => s + m.due, 0);
     const ar = arrears(sc, asOf), occ = occupancy(sc, asOf), ren = renewals(sc, asOf), dep = deposits(sc, asOf);
     const next12 = contractedRevenue(sc, U().addMonths(cur, 1), 12);
     const gaps = reletGaps(sc), punct = punctuality(sc), maint = maintenanceStats(sc, asOf);
-    const trend = series(sc, cur, 12, asOf);
-    const byProject = byDimension(sc, yr + '-01', cur, u => u.projectCode).map(o => ({ ...o, name: (S().project(o.key) || {}).name || o.key }));
-    const byType = byDimension(sc, yr + '-01', cur, u => u.type).map(o => ({ ...o, name: M().label(M().UNIT_TYPES, o.key) }));
+    const trend = series(sc, selected || cur, 12, asOf);
+    const byProject = byDimension(sc, ryr + '-01', yEnd, u => u.projectCode).map(o => ({ ...o, name: (S().project(o.key) || {}).name || o.key }));
+    const byType = byDimension(sc, ryr + '-01', yEnd, u => u.type).map(o => ({ ...o, name: M().label(M().UNIT_TYPES, o.key) }));
     const activeContracts = sc.contracts.filter(c => contractStatus(c, asOf) === 'active');
     const monthlyRentRoll = U().sum(activeContracts, c => currentRent(c, asOf));
     const avgRentByType = M().UNIT_TYPES.map(t => { const cs = activeContracts.filter(c => (S().unit(c.unitCode) || {}).type === t.key); return { key: t.key, name: t.ar, count: cs.length, avg: cs.length ? U().sum(cs, c => currentRent(c, asOf)) / cs.length : null }; }).filter(t => t.count);
     const noIncrease = activeContracts.filter(c => !(U().toNum(c.increasePct) > 0));
     const unknownDates = st().payments.filter(p => sc.contractSet.has(p.contractCode) && !p.paidOn).length;
-    return { asOf: U().iso(asOf), period: reportPeriod, currentPeriod: cur, enteredThrough: et, pending, scope: sc, month, prevMonth, ytd: { collected: ytd.total, due: ytdDue, rate: ytdDue ? ytd.total / ytdDue : null, rows: ytd.rows }, arrears: ar, occupancy: occ, renewals: ren, deposits: dep, next12, gaps, punctuality: punct, maintenance: maint, trend, byProject, byType, activeContracts, monthlyRentRoll, avgRentByType, noIncrease, unknownDates, counts: { projects: st().projects.filter(p => !filter || !filter.projectCode || p.code === filter.projectCode).length, units: sc.units.length, clients: sc.clients.length, contracts: sc.contracts.length, payments: st().payments.filter(p => sc.contractSet.has(p.contractCode)).length } };
+    return { asOf: U().iso(asOf), period: reportPeriod, selectedPeriod: selected, reportYear: ryr, currentPeriod: cur, enteredThrough: et, pending, scope: sc, month, prevMonth, ytd: { collected: ytd.total, due: ytdDue, rate: ytdDue ? ytd.total / ytdDue : null, rows: ytd.rows }, arrears: ar, occupancy: occ, renewals: ren, deposits: dep, next12, gaps, punctuality: punct, maintenance: maint, trend, byProject, byType, activeContracts, monthlyRentRoll, avgRentByType, noIncrease, unknownDates, counts: { projects: st().projects.filter(p => !filter || !filter.projectCode || p.code === filter.projectCode).length, units: sc.units.length, clients: sc.clients.length, contracts: sc.contracts.length, payments: st().payments.filter(p => sc.contractSet.has(p.contractCode)).length } };
   }
 
   /* ---------- الإنسايتس (نصوص مولَّدة من الأرقام، كل واحدة بدليلها) ---------- */

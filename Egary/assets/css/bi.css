@@ -51,6 +51,13 @@
 #bi .board-head h2 { margin: 0; font-size: 26px; color: #F4F7FD; }
 #bi .board-head .sub { color: #9DAAC6; font-size: 13px; margin-top: 4px; }
 #bi .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+#bi .pnav { display: inline-flex; align-items: center; gap: 3px; margin-inline-end: 6px; }
+#bi .pnav button svg { width: 15px; height: 15px; vertical-align: -3px; }
+#bi .pnav button:first-child, #bi .pnav button:last-child { width: 32px; padding: 0; }
+#bi .chips button:disabled { opacity: .35; cursor: default; }
+#bi .chart-legend { color: #B9C4DA; }
+#bi .chart .hl-band { fill: rgba(91, 141, 239, .14); }
+#bi .chart text.hl { fill: #9DBBFF; }
 #bi .chips button { height: 32px; padding: 0 12px; border-radius: 99px; border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .04); color: #D2DBEC; cursor: pointer; font-weight: 600; font-size: 13px; transition: background .15s, border-color .15s; }
 #bi .chips button:hover { background: rgba(255, 255, 255, .09); }
 #bi .chips button.on { background: #4F8CFF; border-color: #4F8CFF; color: #06101F; }

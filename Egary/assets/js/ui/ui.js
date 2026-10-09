@@ -58,7 +58,7 @@ window.Egary = window.Egary || {};
     warning: '<path d="M12 3 2 21h20z"/><path d="M12 10v5M12 18h.01"/>', info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>', filter: '<path d="M3 5h18l-7 8v6l-4-2v-4z"/>',
     excel: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 8l8 8M16 8l-8 8"/>', calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>', key: '<circle cx="8" cy="14" r="4"/><path d="M11 11 20 2M16 6l3 3"/>',
     bi: '<circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 4"/>', arrow: '<path d="M19 12H5M12 19l-7-7 7-7"/>', eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
-    shield: '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/>', tag: '<path d="M3 12V3h9l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+    shield: '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/>', chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 11h7M8.5 14h4"/>', copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5h10"/>', chevL: '<path d="M15 6l-6 6 6 6"/>', chevR: '<path d="M9 6l6 6-6 6"/>', statement: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h6M9 16h6"/>', tag: '<path d="M3 12V3h9l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
   };
   function icon(name, size) { const el = document.createElementNS(svgNS, 'svg'); el.setAttribute('viewBox', '0 0 24 24'); el.setAttribute('fill', 'none'); el.setAttribute('stroke', 'currentColor'); el.setAttribute('stroke-width', '1.9'); el.setAttribute('stroke-linecap', 'round'); el.setAttribute('stroke-linejoin', 'round'); if (size) { el.setAttribute('width', size); el.setAttribute('height', size); } el.innerHTML = ICONS[name] || ICONS.info; el.setAttribute('aria-hidden', 'true'); return el; }
 
@@ -184,30 +184,38 @@ window.Egary = window.Egary || {};
     });
     return svg;
   }
-  function columns(opts) { // series: [{name, color, values:[]}], labels:[]
-    const W = opts.width || 720, H = opts.height || 240, padL = 56, padB = 28, padT = 14, padR = 10;
-    const labels = opts.labels, series = opts.series;
-    const max = Math.max(1, ...series.flatMap(sr => sr.values));
+  function columns(opts) { // series: [{name, color, values:[]}], labels:[] ; line اختياري ; highlight فهرس الشهر المميَّز ; fmt للتلميحات ; unit لاحقة المحور
+    const W = opts.width || 720, H = opts.height || 240, padL = 56, padB = 28, padT = opts.valueLabels === false ? 14 : 24, padR = 10;
+    const labels = opts.labels, series = opts.series, fmtV = opts.fmt || (v => U().fmtMoney(v)), unit = opts.unit || '';
+    const max = Math.max(1, ...series.flatMap(sr => sr.values), ...(opts.line ? opts.line.values : []));
     const svg = s('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, style: 'direction:ltr' });
     const iw = (W - padL - padR) / labels.length, ih = H - padT - padB;
-    for (let t = 0; t <= 4; t++) { const y = padT + ih - ih * t / 4; svg.appendChild(s('line', { class: 'grid-line', x1: padL, x2: W - padR, y1: y, y2: y })); svg.appendChild(s('text', { x: padL - 6, y: y + 4, 'text-anchor': 'end' }, short(max * t / 4))); }
+    for (let t = 0; t <= 4; t++) { const y = padT + ih - ih * t / 4; svg.appendChild(s('line', { class: 'grid-line', x1: padL, x2: W - padR, y1: y, y2: y })); svg.appendChild(s('text', { x: padL - 6, y: y + 4, 'text-anchor': 'end' }, short(max * t / 4) + unit)); }
+    const showVals = opts.valueLabels !== false && labels.length <= 13 && series.length === 1;
     labels.forEach((lb, i) => {
-      const x0 = padL + i * iw;
-      svg.appendChild(s('text', { x: x0 + iw / 2, y: H - 8, 'text-anchor': 'middle' }, lb));
-      const n = series.length, bw = Math.min(28, (iw - 10) / n);
+      const x0 = padL + i * iw, hl = opts.highlight === i;
+      if (hl) svg.appendChild(s('rect', { class: 'hl-band', x: x0 + 2, y: padT - 8, width: iw - 4, height: ih + 8 + 4, rx: 7 }));
+      svg.appendChild(s('text', { x: x0 + iw / 2, y: H - 8, 'text-anchor': 'middle', class: hl ? 'hl' : '' }, lb));
+      const n = series.length, bw = Math.min(30, (iw - 10) / n);
       series.forEach((sr, k) => {
-        const v = sr.values[i] || 0, bh = ih * v / max, x = x0 + iw / 2 - (n * bw) / 2 + k * bw;
-        const r = s('rect', { class: 'bar', x, y: padT + ih - bh, width: bw - 3, height: bh, rx: 4, fill: sr.color || PALETTE[k], onclick: opts.onClick ? () => opts.onClick(i, k) : null });
-        tipped(r, () => `${lb} — ${sr.name}: ${U().fmtMoney(v)}`);
-        svg.appendChild(r);
+        const v = sr.values[i] || 0, bh = Math.max(0, ih * v / max), x = x0 + iw / 2 - (n * bw) / 2 + k * bw, w = bw - 3, y = padT + ih - bh, r = Math.min(5, w / 2, bh);
+        // عمود بزوايا علوية مستديرة فقط
+        const d = bh > 0 ? `M${x} ${y + r} a${r} ${r} 0 0 1 ${r} ${-r} h${w - 2 * r} a${r} ${r} 0 0 1 ${r} ${r} v${bh - r} h${-w} z` : `M${x} ${y} h${w} v0 h${-w} z`;
+        const bar = s('path', { class: 'bar' + (hl ? ' hl' : ''), d, fill: sr.color || PALETTE[k], onclick: opts.onClick ? () => opts.onClick(i, k) : null });
+        tipped(bar, () => `${lb} — ${sr.name}: ${fmtV(v)}`);
+        svg.appendChild(bar);
+        if (showVals && v > 0) svg.appendChild(s('text', { class: 'val', x: x + w / 2, y: y - 5, 'text-anchor': 'middle' }, short(v) + unit));
       });
     });
-    if (opts.line) { // خط فوق الأعمدة (مثل المستحق)
+    if (opts.line) { // خط فوق الأعمدة (مثل المستحق) — متقطع وبنقاط واضحة
+      const col = opts.line.color || cssVar('--warn');
       const pts = opts.line.values.map((v, i) => [padL + i * iw + iw / 2, padT + ih - ih * (v || 0) / max]);
-      svg.appendChild(s('path', { class: 'line', d: pts.map((p, i) => (i ? 'L' : 'M') + p[0] + ' ' + p[1]).join(' '), stroke: opts.line.color || cssVar('--text-2') }));
-      pts.forEach((p, i) => { const c = s('circle', { class: 'dot', cx: p[0], cy: p[1], r: 3.5, fill: opts.line.color || cssVar('--text-2') }); tipped(c, () => `${labels[i]} — ${opts.line.name}: ${U().fmtMoney(opts.line.values[i])}`); svg.appendChild(c); });
+      svg.appendChild(s('path', { class: 'line' + (opts.line.dashed === false ? '' : ' dashed'), d: pts.map((p, i) => (i ? 'L' : 'M') + p[0] + ' ' + p[1]).join(' '), stroke: col }));
+      pts.forEach((p, i) => { const c = s('circle', { class: 'dot', cx: p[0], cy: p[1], r: 4, fill: col, stroke: cssVar('--surface'), 'stroke-width': 1.5, onclick: opts.onClick ? () => opts.onClick(i, -1) : null }); tipped(c, () => `${labels[i]} — ${opts.line.name}: ${fmtV(opts.line.values[i])}`); svg.appendChild(c); });
     }
-    return svg;
+    if (opts.legend === false || (series.length < 2 && !opts.line)) return svg;
+    const legend = h('div', { class: 'chart-legend' }, series.map(sr => h('span', null, h('i', { style: { background: sr.color || PALETTE[0] } }), sr.name)), opts.line ? h('span', null, h('i', { class: 'ln', style: { borderColor: opts.line.color || cssVar('--warn') } }), opts.line.name) : null, opts.highlight != null && opts.highlight >= 0 ? h('span', null, h('i', { class: 'band' }), opts.highlightLabel || 'الشهر المعروض') : null);
+    return h('div', { class: 'chart-wrap' }, svg, legend);
   }
   function donut(opts) { // data: [{label, value, color}]
     const R = 54, r = 36, C = 2 * Math.PI * R, total = Math.max(1, U().sum(opts.data, d => d.value));

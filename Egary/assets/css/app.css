@@ -114,6 +114,8 @@ svg[aria-hidden="true"]:not([width]) { width: 18px; height: 18px; flex: none; }
 .chip:hover { border-color: var(--primary); color: var(--primary); }
 .chip.on { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
 .chip .x { opacity: .7; }
+.chip .cnt { font-size: 11px; line-height: 18px; min-width: 18px; text-align: center; background: var(--bg-2); border-radius: 99px; padding: 0 5px; }
+.chip.on .cnt { background: rgba(255, 255, 255, .22); color: inherit; }
 .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 99px; font-size: 12px; font-weight: 700; line-height: 1.5; white-space: nowrap; }
 .badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .9; }
 .badge.ok, .badge.paid, .badge.occupied, .badge.active, .badge.good, .badge.closed { background: var(--ok-soft); color: var(--ok); }
@@ -291,6 +293,30 @@ table.ledger { border-collapse: separate; border-spacing: 0; font-size: 13px; mi
 .chart .line { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .chart .area { opacity: .12; }
 .chart .dot { cursor: pointer; }
+.chart .val { font-size: 10px; fill: var(--muted); font-weight: 700; }
+.chart text.hl { fill: var(--primary); font-weight: 700; }
+.chart .hl-band { fill: var(--primary-soft); }
+.chart .bar.hl { stroke: var(--primary-2); stroke-width: 1.5; }
+.chart .line.dashed { stroke-dasharray: 6 5; }
+.chart-wrap { display: grid; gap: 4px; }
+.chart-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-2); padding-inline-start: 6px; }
+.chart-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-inline-end: 6px; vertical-align: -1px; }
+.chart-legend i.ln { height: 0; width: 18px; border-top: 2.5px dashed; border-radius: 0; vertical-align: 3px; background: none; }
+.chart-legend i.band { background: var(--primary-soft); border: 1px solid var(--primary); }
+.period-nav { display: inline-flex; align-items: center; gap: 4px; }
+.period-nav select.chip { min-width: 128px; text-align: center; }
+.chip.icon { width: 30px; padding: 0; justify-content: center; }
+.chip.icon svg { width: 16px; height: 16px; }
+.chip:disabled { opacity: .35; cursor: default; }
+.chip:disabled:hover { border-color: var(--line); color: var(--text-2); }
+input.chip[type="date"] { padding: 0 8px; direction: ltr; }
+.ledger th.cur { background: var(--primary); color: var(--primary-ink); }
+.ledger td.m.cur { box-shadow: inset 2px 0 0 var(--primary-soft), inset -2px 0 0 var(--primary-soft); }
+.statement table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+.statement th, .statement td { border: 1px solid var(--line); padding: 6px 8px; text-align: start; }
+.statement th { background: var(--surface-2); font-weight: 700; }
+.statement td.num, .statement th.num { text-align: end; font-variant-numeric: tabular-nums; }
+.statement tfoot td { font-weight: 800; background: var(--surface-2); }
 .donut-legend { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 .donut-legend span i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-inline-end: 6px; }
 .tip { position: fixed; z-index: 300; background: var(--text); color: var(--bg); padding: 6px 10px; border-radius: 8px; font-size: 12.5px; pointer-events: none; white-space: nowrap; box-shadow: var(--shadow-lg); }

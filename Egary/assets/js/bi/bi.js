@@ -138,9 +138,14 @@ window.Egary = window.Egary || {};
     root.querySelectorAll('.dock button').forEach(b => b.classList.toggle('on', b.dataset.section === section));
     const c = ctx(), f = E.App.filter, st = S().state();
     const k = En().kpis(f);
-    const chips = h('div', { class: 'chips' }, st.projects.map(p => h('button', { class: f.projectCode === p.code ? 'on' : '', onclick: () => { E.App.filter.projectCode = f.projectCode === p.code ? '' : p.code; renderBoard(); } }, p.name)), M().UNIT_TYPES.map(t => h('button', { class: f.unitType === t.key ? 'on' : '', onclick: () => { E.App.filter.unitType = f.unitType === t.key ? '' : t.key; renderBoard(); } }, t.ar)), (f.projectCode || f.unitType) ? h('button', { onclick: () => { E.App.filter.projectCode = ''; E.App.filter.unitType = ''; renderBoard(); } }, '✕ مسح') : null);
+    const curP = k.currentPeriod, fromP = st.settings.trackingFrom && U().cmp(st.settings.trackingFrom, curP) <= 0 ? st.settings.trackingFrom : curP.slice(0, 4) + '-01';
+    const pnav = h('span', { class: 'pnav', id: 'bi-period-nav' },
+      h('button', { title: 'الشهر السابق', id: 'bi-period-prev', disabled: U().cmp(k.period, fromP) <= 0 ? true : null, onclick: () => { E.App.filter.period = U().addMonths(k.period, -1); renderBoard(); } }, UI().icon('chevR')),
+      h('button', { class: 'on', id: 'bi-period-label', title: k.selectedPeriod ? 'العودة إلى الشهر الحالي' : 'شهر التقرير', onclick: () => { if (k.selectedPeriod) { E.App.filter.period = ''; renderBoard(); } } }, U().periodLabel(k.period, true)),
+      h('button', { title: 'الشهر التالي', id: 'bi-period-next', disabled: U().cmp(k.period, curP) >= 0 ? true : null, onclick: () => { const n = U().addMonths(k.period, 1); E.App.filter.period = U().cmp(n, curP) > 0 ? k.period : n; renderBoard(); } }, UI().icon('chevL')));
+    const chips = h('div', { class: 'chips' }, pnav, st.projects.map(p => h('button', { class: f.projectCode === p.code ? 'on' : '', onclick: () => { E.App.filter.projectCode = f.projectCode === p.code ? '' : p.code; renderBoard(); } }, p.name)), M().UNIT_TYPES.map(t => h('button', { class: f.unitType === t.key ? 'on' : '', onclick: () => { E.App.filter.unitType = f.unitType === t.key ? '' : t.key; renderBoard(); } }, t.ar)), (f.projectCode || f.unitType || f.period) ? h('button', { onclick: () => { E.App.filter.projectCode = ''; E.App.filter.unitType = ''; E.App.filter.period = ''; renderBoard(); } }, '✕ مسح') : null);
     const title = SECTIONS.find(s => s[0] === section)[1];
-    board.appendChild(h('div', { class: 'board-head' }, h('div', null, h('h2', null, title), h('div', { class: 'sub' }, `حتى ${U().fmtDate(k.asOf)} · ${k.counts.units} وحدة · ${k.counts.contracts} عقد${f.projectCode || f.unitType ? ' · (مُرشَّح)' : ''}`)), chips));
+    board.appendChild(h('div', { class: 'board-head' }, h('div', null, h('h2', null, title), h('div', { class: 'sub' }, `حتى ${U().fmtDate(k.asOf)} · ${k.counts.units} وحدة · ${k.counts.contracts} عقد${f.projectCode || f.unitType ? ' · (مُرشَّح)' : ''}${k.selectedPeriod ? ' · شهر التقرير: ' + U().periodLabel(k.period, true) : ''}`)), chips));
     const body = h('div', { class: 'fade-up' });
     ({ overview, collection, arrears, occupancy, contracts, projects, clients, maintenance })[section](body, k, c);
     board.appendChild(body);
@@ -163,7 +168,7 @@ window.Egary = window.Egary || {};
     ));
     const labels = k.trend.map(m => U().periodLabel(m.period).slice(0, 6));
     body.appendChild(h('div', { class: 'grid2' },
-      panel('التحصيل مقابل المستحق — 12 شهرًا', UI().columns({ labels, series: [{ name: 'المحصَّل', values: k.trend.map(m => m.collected), color: '#5B8DEF' }], line: { name: 'المستحق', values: k.trend.map(m => m.due), color: '#EF6B67' }, onClick: (i) => V().monthEvidence(c, k.trend[i].period) }), 'اضغط على الشهر'),
+      panel('التحصيل مقابل المستحق — 12 شهرًا', UI().columns({ labels, series: [{ name: 'المحصَّل', values: k.trend.map(m => m.collected), color: '#5B8DEF' }], line: { name: 'المستحق', values: k.trend.map(m => m.due), color: '#E0A33A' }, highlight: k.trend.findIndex(m => m.period === k.period), onClick: (i) => V().monthEvidence(c, k.trend[i].period) }), 'اضغط على الشهر'),
       panel('أهم الملاحظات', h('div', { style: { display: 'grid', gap: '8px' } }, En().insights(k).slice(0, 6).map(i => V().insightEl(c, i, k)))),
       panel('محصَّل السنة حسب المشروع', UI().donut({ data: k.byProject.map((o, i) => ({ label: o.name, value: o.amount, color: UI().PALETTE[i % 10], code: o.key })), fmt: fm, center: UI().short(k.ytd.collected), onClick: d => c.open('project', d.code) })),
       panel('أعلى المتأخرين', k.arrears.byClient.length ? UI().bars({ data: k.arrears.byClient.slice(0, 7).map(x => ({ label: x.clientName, value: x.amount, color: '#EF6B67', code: x.clientCode })), fmt: fm, onClick: d => c.open('client', d.code) }) : h('p', { class: 'muted' }, 'لا متأخرات')),
@@ -179,8 +184,8 @@ window.Egary = window.Egary || {};
       tile('info', 'دفعات بلا تاريخ', fn(k.unknownDates), 'مستوردة من الإكسيل', () => c.go('payments')),
     ));
     body.appendChild(h('div', { class: 'grid2' },
-      panel('التحصيل الشهري', UI().columns({ labels, series: [{ name: 'المحصَّل', values: k.trend.map(m => m.collected), color: '#5B8DEF' }], line: { name: 'المستحق', values: k.trend.map(m => m.due), color: '#EF6B67' }, onClick: (i) => V().monthEvidence(c, k.trend[i].period) })),
-      panel('معدل التحصيل %', UI().columns({ labels, series: [{ name: 'النسبة %', values: k.trend.map(m => m.rate == null ? 0 : Math.round(m.rate * 100)), color: '#39B8AB' }], onClick: (i) => V().monthEvidence(c, k.trend[i].period) })),
+      panel('التحصيل الشهري', UI().columns({ labels, series: [{ name: 'المحصَّل', values: k.trend.map(m => m.collected), color: '#5B8DEF' }], line: { name: 'المستحق', values: k.trend.map(m => m.due), color: '#E0A33A' }, highlight: k.trend.findIndex(m => m.period === k.period), onClick: (i) => V().monthEvidence(c, k.trend[i].period) })),
+      panel('معدل التحصيل %', UI().columns({ labels, series: [{ name: 'النسبة %', values: k.trend.map(m => m.rate == null ? 0 : Math.round(m.rate * 100)), color: '#39B8AB' }], fmt: v => v + '%', unit: '%', highlight: k.trend.findIndex(m => m.period === k.period), onClick: (i) => V().monthEvidence(c, k.trend[i].period) })),
       panel('حسب نوع الوحدة', UI().donut({ data: k.byType.map((o, i) => ({ label: o.name, value: o.amount, color: UI().PALETTE[(i + 4) % 10] })), fmt: fm, center: UI().short(k.ytd.collected) })),
       panel('حسب المشروع', UI().bars({ data: k.byProject.map((o, i) => ({ label: o.name, value: o.amount, color: UI().PALETTE[i % 10], code: o.key })), fmt: fm, onClick: d => c.open('project', d.code) })),
     ));

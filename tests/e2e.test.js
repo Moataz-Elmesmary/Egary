@@ -832,3 +832,137 @@ e2e('12. mobile viewport: the menu button opens the sidebar and the dashboard ha
   assert.equal(await page.textContent('#page-title'), 'الوحدات');
   assert.ok((await page.evaluate(() => document.scrollingElement.scrollWidth)) <= 392);
 }, { viewport: { width: 390, height: 844 } });
+
+/* =====================================================================
+   13. متصفح الشهر (slicer الزمن) في اللوحة والتحليلات
+   ===================================================================== */
+e2e('13. period navigator: ◀ moves the report month, the collection tile/evidence/chart follow it, the YTD year follows, reset returns, and it is not persisted across reloads', async (page) => {
+  await linkReal(page);
+  const tile0 = await page.textContent('#content .kpis .kpi:first-child .l');
+  const sel0 = await page.inputValue('#period-pick');
+  const expected = await page.evaluate(() => Egary.Engine.kpis(Egary.App.filter).period);
+  assert.equal(sel0, expected, 'navigator shows the report month');
+  await page.click('#period-prev'); await page.waitForSelector('#period-reset');
+  const sel1 = await page.inputValue('#period-pick');
+  assert.equal(sel1, await page.evaluate((p) => Egary.U.addMonths(p, -1), sel0));
+  const tile1 = await page.textContent('#content .kpis .kpi:first-child .l');
+  assert.notEqual(tile0, tile1); assert.ok(tile1.includes('الشهر المختار'));
+  // الرقم في البطاقة = monthTotals للشهر المختار
+  const col = await page.evaluate((p) => Egary.Engine.monthTotals(Egary.Engine.scope(Egary.App.filter), p).collected, sel1);
+  const v = (await page.textContent('#content .kpis .kpi:first-child .v')).replace(/[^\d]/g, '');
+  assert.equal(v, String(Math.round(col)));
+  // الدليل يفتح على نفس الشهر
+  await page.click('#content .kpis .kpi:first-child'); await page.waitForSelector('.drawer');
+  const title = await page.textContent('.drawer .d-head h2');
+  assert.ok(title.includes(await page.evaluate((p) => Egary.U.periodLabel(p, true), sel1)), title);
+  await page.mouse.click(30, 450); await page.waitForTimeout(200);
+  // الرسم يميّز الشهر المختار وآخر عمود هو الشهر المختار
+  assert.ok(await page.$('#content .chart .hl-band'));
+  const lastLabel = await page.evaluate(() => { const t = [...document.querySelectorAll('#content .chart text')].filter(x => x.classList.contains('hl')); return t[0] && t[0].textContent; });
+  assert.equal(lastLabel, await page.evaluate((p) => Egary.U.periodLabel(p).slice(0, 6), sel1));
+  // القائمة المنسدلة تختار شهرًا بعيدًا ⇒ السنة في بطاقة «محصَّل» تتبعه
+  const first = await page.evaluate(() => { const o = document.querySelectorAll('#period-pick option'); return o[o.length - 1].value; });
+  await page.selectOption('#period-pick', first); await page.waitForTimeout(150);
+  assert.ok((await page.textContent('#content .kpis .kpi:nth-child(2) .l')).includes(first.slice(0, 4)));
+  assert.ok(await page.evaluate(() => document.querySelector('#period-prev').disabled), 'prev disabled at the first tracked month');
+  // الصفحة الأخرى (التحليلات) تشارك نفس الاختيار
+  await page.click('#sidebar a[data-view="insights"]'); await page.waitForSelector('#period-pick');
+  assert.equal(await page.inputValue('#period-pick'), first);
+  // إعادة الضبط
+  await page.click('#period-reset'); await page.waitForTimeout(150);
+  assert.equal(await page.inputValue('#period-pick'), expected);
+  assert.equal(await page.$('#period-reset'), null);
+  // لا يُحفظ بين الجلسات
+  await page.click('#period-prev'); await page.waitForSelector('#period-reset');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('egary-filter-v1') || '{}'));
+  assert.equal(saved.period, undefined, 'period is not persisted');
+});
+
+/* =====================================================================
+   14. السلايسرز الجديدة: المدفوعات (مدة/طريقة)، العملاء، الصيانة، وتمييز الشهر الحالي في الكشف
+   ===================================================================== */
+e2e('14. slicers: payments by paid-date range and method, clients by arrears/kind with counts, maintenance by kind, ledger current-month column highlighted', async (page) => {
+  await linkReal(page);
+  await page.evaluate(() => Egary.U.setToday('2026-10-09'));
+  await page.goto(APP + '#/payments'); await page.waitForSelector('#period-bar');
+  const total = await rowsOf(page).count();
+  // مدة: هذه السنة ⇒ فقط الدفعات التي لها تاريخ سداد داخل 2026
+  await page.click('[data-quick="year"]'); await page.waitForSelector('#pay-clear');
+  const yearRows = await page.locator('#content table.tbl tbody tr:not(:has(.empty))').count();
+  const expectYear = await page.evaluate(() => Egary.Store.state().payments.filter(p => p.paidOn && p.paidOn >= '2026-01-01' && p.paidOn <= '2026-10-09').length);
+  assert.equal(yearRows, expectYear, 'rows by paid date range');
+  if (!expectYear) assert.ok(await page.$('#content table.tbl .empty'), 'empty state shown when no payment has a date in range');
+  assert.equal(await page.inputValue('#pay-from'), '2026-01-01');
+  // الطريقة
+  const m = await page.evaluate(() => { const c = {}; for (const p of Egary.Store.state().payments) c[p.method || ''] = (c[p.method || ''] || 0) + 1; return Object.entries(c).filter(([k]) => k).sort((a, b) => b[1] - a[1])[0]; });
+  if (m) {
+    await page.click('#pay-clear'); await page.waitForTimeout(150);
+    await page.click(`[data-method="${m[0]}"]`); await page.waitForTimeout(200);
+    assert.equal(await rowsOf(page).count(), m[1], 'rows by method');
+    assert.ok(location || true);
+    assert.ok((await page.evaluate(() => location.hash)).includes('method=' + m[0]));
+    await page.click(`[data-method="${m[0]}"]`); await page.waitForTimeout(200);
+    assert.equal(await rowsOf(page).count(), total);
+  }
+  // العملاء
+  await page.goto(APP + '#/clients'); await page.waitForSelector('#cf-bar');
+  const nAll = await rowsOf(page).count();
+  const cntArrears = Number(await page.textContent('[data-cf="arrears"] .cnt'));
+  const cntClean = Number(await page.textContent('[data-cf="clean"] .cnt'));
+  assert.equal(cntArrears + cntClean, nAll, 'arrears + clean = all');
+  await page.click('[data-cf="arrears"]'); await page.waitForTimeout(200);
+  assert.equal(await rowsOf(page).count(), cntArrears);
+  const allRed = await page.$$eval('#content table.tbl tbody tr', trs => trs.every(tr => /[1-9]/.test(tr.cells[tr.cells.length - 2].textContent.replace(/[^\d]/g, ''))));
+  assert.ok(allRed, 'every listed client has arrears > 0');
+  await page.click('[data-cf="company"]'); await page.waitForTimeout(200);
+  assert.ok((await page.$$eval('#content table.tbl tbody tr', trs => trs.map(tr => tr.cells[2].textContent))).every(t => t === 'شركة'));
+  // الصيانة
+  await page.goto(APP + '#/maintenance'); await page.waitForSelector('#mstatus-bar');
+  const kinds = await page.evaluate(() => { const c = {}; for (const m of Egary.Store.state().maintenance) c[m.kind] = (c[m.kind] || 0) + 1; return c; });
+  const k0 = Object.keys(kinds)[0];
+  if (k0) { await page.click(`[data-mkind="${k0}"]`); await page.waitForTimeout(200); assert.equal(await rowsOf(page).count(), kinds[k0]); assert.ok((await page.evaluate(() => location.hash)).includes('mkind=' + k0)); }
+  // الكشف: عمود الشهر الحالي مميَّز
+  await page.goto(APP + '#/ledger'); await page.waitForSelector('#ledger');
+  assert.equal(await page.textContent('#ledger thead th.cur'), Egary_periodLabel10());
+  function Egary_periodLabel10() { return 'أكتوبر'; }
+  assert.ok((await page.$$('#ledger tbody td.m.cur')).length > 0);
+});
+
+/* =====================================================================
+   15. تذكير واتساب وكشف الحساب
+   ===================================================================== */
+e2e('15. WhatsApp reminder (text from the numbers, wa.me link with the normalized phone) and the printable client statement (totals = engine arrears)', async (page) => {
+  await linkReal(page);
+  // تطبيع الأرقام المصرية
+  const nums = await page.evaluate(() => ['01005556677', '+20 100 555 6677', '0020-100-5556677', '1005556677', ''].map(Egary.Views.waNumber));
+  assert.deepEqual(nums, ['201005556677', '201005556677', '201005556677', '201005556677', '']);
+  // أكبر مدين
+  const top = await page.evaluate(() => Egary.Engine.kpis(Egary.App.filter).arrears.byClient[0]);
+  await page.goto(APP + '#/client/' + top.clientCode); await page.waitForSelector('.drawer');
+  await page.click('.drawer .d-head button:has-text("تذكير")'); await page.waitForSelector('#reminder-text');
+  const txt = await page.inputValue('#reminder-text');
+  assert.ok(txt.includes(top.clientName), 'name in text');
+  assert.ok(txt.replace(/[^\d]/g, '').includes(String(Math.round(top.amount))), 'total in text: ' + txt);
+  const client = await page.evaluate((c) => Egary.Store.client(c), top.clientCode);
+  if (client.phone) {
+    const href = await page.getAttribute('#btn-wa', 'href');
+    assert.ok(href.startsWith('https://wa.me/' + nums[0].slice(0, 2)), href);
+    assert.ok(decodeURIComponent(href.split('text=')[1]).includes(top.clientName));
+  } else assert.equal(await page.$('#btn-wa'), null);
+  await page.keyboard.press('Escape'); await page.waitForSelector('.modal', { state: 'detached' });
+  // كشف الحساب
+  await page.click('.drawer .d-head button:has-text("كشف حساب")'); await page.waitForSelector('#statement-print');
+  const rem = (await page.textContent('#statement-months tfoot td:nth-child(4)')).replace(/[^\d]/g, '');
+  const ar = await page.evaluate((c) => { const cs = Egary.Store.contractsOfClient(c); return Egary.Engine.arrears({ contracts: cs, contractSet: new Set(cs.map(x => x.code)) }).total; }, top.clientCode);
+  assert.equal(rem, String(Math.round(ar)), 'statement remaining equals engine arrears');
+  const nPays = await page.$$eval('#statement-payments tbody tr', t => t.length);
+  assert.equal(nPays, await page.evaluate((c) => Egary.Store.contractsOfClient(c).reduce((s, x) => s + Egary.Store.paymentsOf(x.code).length, 0), top.clientCode));
+  assert.ok((await page.textContent('#statement-total')).includes('المتأخرات'));
+  // التذكير من درج المتأخرات (تبويب بالعميل)
+  await page.keyboard.press('Escape'); await page.waitForSelector('.modal', { state: 'detached' });
+  await page.goto(APP + '#/dashboard'); await page.waitForSelector('#content .kpis .kpi');
+  await page.click('#content .kpis .kpi[data-kpi="المتأخرات القائمة"]'); await page.waitForSelector('.drawer .tabs');
+  await page.click('.drawer .tabs button[data-t="clients"]'); await page.waitForSelector('.drawer button[title="تذكير واتساب"]');
+  await page.locator('.drawer button[title="تذكير واتساب"]').first().click(); await page.waitForSelector('#reminder-text');
+  assert.ok((await page.inputValue('#reminder-text')).includes('الإجمالي المستحق'));
+});
