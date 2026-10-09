@@ -99,11 +99,13 @@ window.Egary = window.Egary || {};
     S().load(E.Demo ? E.Demo.state() : M().emptyState()); App.mode = 'demo'; S().setRecorder(null); App.flags = [];
     showApp(); renderSync(E.Sync.status);
   }
-  async function tryPreview() { // على استضافة http(s): اعرض Egary.xlsx المجاور للقراءة
-    if (!/^https?:/.test(location.protocol)) return false;
+  async function tryPreview() { // على استضافة http(s): اعرض Egary.xlsx المجاور (أو المضمَّن) للقراءة
+    let buf = null;
+    if (window.__EGARY_XLSX_B64) { try { buf = Uint8Array.from(atob(window.__EGARY_XLSX_B64), c => c.charCodeAt(0)).buffer; } catch (e) { buf = null; } }
+    if (!buf && !/^https?:/.test(location.protocol)) return false;
     try {
-      const res = await fetch('Egary.xlsx', { cache: 'no-store' }); if (!res.ok) return false;
-      const buf = await res.arrayBuffer(); const r = await W().read(buf, { snapshot: null }); lastBytes = buf;
+      if (!buf) { const res = await fetch('Egary.xlsx', { cache: 'no-store' }); if (!res.ok) return false; buf = await res.arrayBuffer(); }
+      const r = await W().read(buf, { snapshot: null }); lastBytes = buf;
       S().load(r.state); App.flags = r.flags; App.mode = 'preview'; S().setRecorder(null);
       showApp(); renderSync(E.Sync.status); return true;
     } catch (e) { return false; }
