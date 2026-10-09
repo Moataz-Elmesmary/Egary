@@ -28,10 +28,12 @@ test('BI: hero with counters, parallax tilt, enter → sections → drill-down d
   await page.mouse.move(1200, 700); await page.waitForTimeout(100);
   const t2 = await page.$eval('#bi .hero-card', e => e.style.transform);
   assert.ok(t1 && t2 && t1 !== t2, 'tilt changes with mouse: ' + t1 + ' vs ' + t2);
-  // canvas is animating (pixels change between frames)
-  const px = async () => page.evaluate(() => { const c = document.querySelector('#bi canvas.city'); const d = c.getContext('2d').getImageData(0, c.height - 60, 200, 50).data; let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2]; return s; });
-  const a = await px(); await page.waitForTimeout(600); const b = await px();
-  assert.notEqual(a, b, 'city canvas animates');
+  // أفق المدينة SVG: ثلاث طبقات، نوافذ تضيء ببطء (CSS)، ومتغيرات parallax تتغير مع الماوس
+  assert.equal(await page.$$eval('#bi svg.skyline .sk-layer', els => els.length), 3);
+  assert.ok((await page.$$eval('#bi svg.skyline .sk-win', els => els.length)) >= 100, 'windows present');
+  assert.equal(await page.$eval('#bi svg.skyline .sk-win', el => getComputedStyle(el).animationName), 'bi-glow');
+  const pxVar = await page.$eval('#bi', el => el.style.getPropertyValue('--px'));
+  assert.ok(pxVar !== '' && pxVar !== '0', 'parallax variable set by mouse: ' + pxVar);
   await page.click('#bi-enter'); await page.waitForSelector('#bi-board.in'); await page.waitForTimeout(500);
   assert.ok(await page.$('#bi.boarded'));
   const tiles = await page.$$('#bi .tile'); assert.ok(tiles.length >= 8, 'overview tiles: ' + tiles.length);
