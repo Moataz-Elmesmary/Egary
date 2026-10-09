@@ -1,85 +1,35 @@
-# Egary (إيجاري) — Rental Management System
+# Egary (إيجاري) v2 — Rental management with Excel as the single source of truth
 
-> Simple, clear, and zero-dependency.
+> One folder. Open it, link the Excel file next to it, and work. Every change on the website is written to `Egary.xlsx` immediately; every change made in Excel shows up on the website within seconds.
 
-Turn paper rent statements into a live digital portfolio: collections, aged arrears, contracts & renewals, complaints, and a built-in data-quality workflow — in a single static web app with **zero dependencies**.
+<p align="center"><b>Folder to ship to the office:</b> <code>Egary/</code> — contains <code>Open-Egary.bat</code>, <code>index.html</code>, <code>Egary.xlsx</code>, <code>assets/</code>, <code>powerbi/</code>, <code>اقرأني-أولا.txt</code></p>
 
-<p align="center">
-  <img src="docs/screens/dashboard.png" alt="Egary dashboard" width="900">
-</p>
+## What it does
+- **Excel ⇄ website two-way sync** (Chrome/Edge, File System Access API, works from `file://` with no server). The familiar yearly sheet (`2026`: rows × months with amounts) is kept exactly as the office uses it, plus structured sheets: المشاريع · الوحدات · أصول الوحدات · العملاء · العقود · المدفوعات · الصيانة · الإعدادات · سجل التعديلات · ملخص المشاريع. If the file is open in Excel (locked), edits are queued and written when it closes.
+- **Codes for everything**: projects `P01`, units `P03-304` / `P01-M1` / `P01-S1`, clients `C001`, contracts `T0001`, invoices `INV-2026-0001`, maintenance `M0001` — searchable everywhere; a project profile lists its unit codes; a unit profile lists every tenant over time (a unit can be let twice).
+- **Dashboard of totals, every number clickable** → the rows behind it: collected / due / arrears with aging, occupancy, vacant units, units vacant > 3 months, contracts ending in 30/60/90 days, ended without renewal, deposits held, contracted revenue next 12 months, maintenance, and more.
+- **Excel-like ledger grid** (كشف التحصيل): click a month cell to record a payment → an **electronic invoice** (printable), or to edit/delete.
+- **Contracts**: start – end – deposit – annual increase, with the per-year rent schedule (prorated split months), renewals chain, status computed (never typed).
+- **Unit profile**: project, type (تجارية / سكنية / إدارية / جراج), assets checklist with free-text details (AC, furniture, …), full rental history, maintenance history with *who was the custodian at the time* (for deposit questions).
+- **Client profile**: national ID / passport, tax registration, phones, contracts, payments, arrears, punctuality.
+- **Delete always asks for confirmation** and shows what else will be deleted.
+- **Filters**: project, unit type (incl. garage), status, floor, year; global search by any code, name, phone, national ID, tax number (Arabic-normalized).
+- **Insights** computed live from the data; **Data quality** flags (text in a number cell, end before start, duplicate labels, mismatched IDs…).
+- **BI mode** (`#/bi`): animated night-city entrance (buildings whose windows light up and drift, mouse-tilt parallax, count-up counters), sectioned dashboard, every tile drills down. Plus a **Power BI Desktop kit** (`Egary/powerbi/`: Power Query M, DAX measures, theme).
+- Light/dark themes, RTL, keyboard/ESC, mobile layout, no internet, no install.
 
-## Why
+## Quick start (office)
+1. Copy the `Egary` folder anywhere (Desktop, OneDrive…).
+2. Double-click `Open-Egary.bat` (opens Edge/Chrome). Or open `index.html` with Edge/Chrome.
+3. Click **ربط ملف الإكسيل** and pick `Egary.xlsx` from the same folder. Allow read/write once.
 
-Property offices receive handwritten rent statements: a grid of tenants × months with ✓/✗ marks, contract dates, and yearly rent values. The paper says *"a payment happened"* — never **how much, when, or what remains**, and it can't tell *"late"* from *"forgot to write it down."*
-
-Egary ingests each paper as an independent **statement**, keeps every ambiguity as an explicit open question, and computes every figure live from contracts and payments — nothing is ever typed into a KPI.
-
-## Features
-
-- **Top-down Dashboard** — portfolio strip (projects / units / rented / vacant / to-collect / collected / a 0-100 **health score**), per-project cards with rented-vs-vacant bars and vacancy loss, a red **two-consecutive-unpaid-months alarm**, move-in/move-out forecast with income impact %, contracts-ending-in-90-days action list, aged arrears, and a direct *"Who has not paid?"* list. Every card clicks through to the exact filtered view.
-- **Collection Sheet** — the paper grid, alive. Two modes: *record payments* (click a cell → full payment with amount, date, method, receipt) and *transcribe paper* (click cycles ✓ → ✗ → blank). Bulk-collect an entire month in one dialog.
-- **Statement Intake** — a 3-step wizard that turns any incoming paper into a working statement: owner → rows (unit + tenant + contract with auto-generated year schedule) → month marks.
-- **Insights** — auto-written findings (arrears concentration, revenue cliff, vacancy loss estimate, best/worst statement), 12-month collection trend, top debtors, tenant punctuality scores, rent averages by unit type.
-- **Contracts timeline** — a priority-sorted Gantt: ended-without-renewal first, "X days left" badges, renewal chains, monthly rent inside each bar.
-- **Data Quality** — every contradiction in the source paper becomes a tracked question with the literal source text, the interpretation taken, and a recorded owner resolution.
-- **Complaints log** with category, cost, and who bears it.
-- **Tenant profiles** — click any tenant (or an alarm row) for their full file: units and contracts, **last recorded payment**, total arrears, and a month-by-month payment ledger where every row opens the matching collection-sheet cell.
-- **Search with live suggestions** — typing in the global search shows matching tenants / units / projects / types / floors as clickable keywords that filter instantly.
-- **Login with roles** — an animated sign-in page (interactive particle web, rotating globe, 3D-tilt card) with three editable client-side users: manager, staff (no settings), and view-only (no data entry). Organizational gating, not real security — that arrives with the backend.
-- **Fully bilingual** — Arabic RTL and complete English LTR, switchable live (`EN` button or `?lang=en`).
-- **Dark mode** — full theme including the charts (`🌙` button or `?theme=dark`).
-- **Mobile responsive**, keyboard accessible, Arabic-normalized search (hamza/ta-marbuta/Hindi digits) across tenants, units, owners, phones, and receipt numbers.
-- **Excel report** — one workbook, eight formatted sheets (project summary, contracts with every year, clients and balances, aged arrears, the year's collection sheet, documented payments, vacancy losses, pending reviews), plus individual CSV exports.
-
-<p align="center">
-  <img src="docs/screens/english.png" alt="English version" width="440">
-  <img src="docs/screens/dark.png" alt="Dark mode" width="440">
-</p>
-
-## Quick start
-
-No build, no server, no dependencies:
-
+## Development
+No build step. Tests (Node 22 + Playwright + Python openpyxl as an independent oracle):
 ```
-open app/index.html        # or just double-click it
+node --test tests/sync.test.js tests/workbook.test.js          # sync engine + Excel round trips (both directions)
+NODE_PATH=/opt/node22/lib/node_modules node --test tests/e2e.test.js   # browser end-to-end
+node tests/build_workbook.js                                   # regenerate Egary/Egary.xlsx from a source workbook
 ```
+Architecture (`Egary/assets/js`): `core/` (util, model, codes, store, engine) · `xlsx/workbook.js` (ExcelJS read/write + migration of the original sheet format + conflict rules) · `sync/` (file link + sync engine with a pending-ops journal) · `ui/` (toolkit, forms, views) · `bi/` · `app.js`.
 
-Works from `file://` or any static host. To share with a non-technical person, send them the single self-contained `Egary.html` (login-free by design).
-
-Default users (edit them at the top of the first `<script>` in `app/login.html`): `admin` / `admin@2026` (manager), `office` / `office@2026` (staff), `zaer` / `1234` (view-only).
-
-### Deploy
-
-The repo ships with `vercel.json` — import it on [Vercel](https://vercel.com/new) (or any static host; GitHub Pages works too). The root URL serves the app; `/docs` serves the user guide.
-
-## Documentation
-
-**[docs/index.html](docs/index.html)** — a full screenshot-based user guide (Arabic): every screen and every card explained — what it is, where its number comes from, how it's computed, and how to use it. Written as a handover document.
-
-## Architecture
-
-```
-app/
-├── index.html
-├── css/app.css        design system: light/dark themes, RTL/LTR
-└── js/
-    ├── seed.js        real statement data + 2 sample statements + quality log
-    ├── store.js       dues engine & BI aggregations, localStorage persistence
-    ├── i18n-content.js + i18n.js   complete English layer (zero-Arabic verified)
-    ├── ui.js          DOM helpers, drawers, normalized Arabic search
-    ├── charts.js      hand-rolled theme-aware SVG charts
-    ├── views.js       all screens
-    └── app.js         shell & routing
-docs/                  screenshot-based user guide
-Egary.html             single-file build for easy sharing
-```
-
-Plain ES5+ JavaScript, no frameworks, no external requests. State persists in `localStorage` (demo build); a production deployment swaps the storage layer for a server with auth and an audit trail — the UI stays the same.
-
-## Design principles
-
-1. **State is computed, never typed** — "late" is the result of comparing dues to payments after the due day + grace, not a field someone fills.
-2. **Confirmed-late ≠ undocumented** — paper can't tell them apart; the system refuses to guess.
-3. **Rent follows the contract year**, not the calendar year — split months are prorated by day.
-4. **A renewal is a new contract** linked to its predecessor — history is never edited away.
-5. **Every assumption is declared** and every source ambiguity is a tracked question with a recorded resolution.
+The previous version lives in `legacy/` for reference. The full conversation and decisions are in `CHAT-LOG.md`.

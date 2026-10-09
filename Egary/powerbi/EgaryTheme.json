@@ -1,0 +1,22 @@
+{
+  "name": "Egary",
+  "dataColors": ["#2457C5", "#0E8F84", "#B7791F", "#C9403C", "#6D5BD0", "#3E6FB1", "#1E8E5A", "#D97706", "#8B5CF6", "#0891B2"],
+  "background": "#F3F5F9",
+  "foreground": "#1B2634",
+  "tableAccent": "#2457C5",
+  "good": "#1E8E5A",
+  "neutral": "#B7791F",
+  "bad": "#C9403C",
+  "maximum": "#2457C5",
+  "center": "#B7791F",
+  "minimum": "#C9403C",
+  "textClasses": {
+    "title": { "fontSize": 14, "fontFace": "Segoe UI", "color": "#1B2634" },
+    "label": { "fontSize": 10, "fontFace": "Segoe UI", "color": "#4E5E71" },
+    "callout": { "fontSize": 28, "fontFace": "Segoe UI Semibold", "color": "#1B2634" }
+  },
+  "visualStyles": {
+    "*": { "*": { "background": [{ "show": true, "color": { "solid": { "color": "#FFFFFF" } }, "transparency": 0 }], "border": [{ "show": true, "color": { "solid": { "color": "#DCE3EC" } }, "radius": 12 }], "visualHeader": [{ "show": true }] } },
+    "card": { "*": { "labels": [{ "color": { "solid": { "color": "#1B2634" } }, "fontSize": 26 }], "categoryLabels": [{ "color": { "solid": { "color": "#7C8A9B" } } }] } }
+  }
+}

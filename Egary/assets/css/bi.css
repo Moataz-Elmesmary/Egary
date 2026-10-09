@@ -1,0 +1,88 @@
+/* =====================================================================
+   bi.css — لوحة BI التفاعلية: مدخل متحرك، خلفية مدينة ليلية، parallax، لوحات زجاجية
+   ===================================================================== */
+#bi { position: fixed; inset: 0; z-index: 80; background: #070B14; color: #E9EEF6; overflow: hidden; font-family: var(--font); direction: rtl; }
+#bi * { box-sizing: border-box; }
+#bi .sky { position: absolute; inset: 0; background: radial-gradient(1200px 700px at 70% -10%, #1C2E5A 0%, #0B1630 45%, #070B14 100%); }
+#bi .sky::after { content: ""; position: absolute; inset: 0; background: radial-gradient(800px 400px at 20% 20%, rgba(14, 143, 132, .18), transparent 60%), radial-gradient(600px 300px at 85% 60%, rgba(36, 87, 197, .22), transparent 60%); animation: bi-aurora 14s ease-in-out infinite alternate; }
+@keyframes bi-aurora { from { transform: translateX(-2%) scale(1); opacity: .8; } to { transform: translateX(2%) scale(1.06); opacity: 1; } }
+#bi canvas.city { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transition: opacity .8s ease, filter .8s ease; }
+#bi.boarded canvas.city { opacity: .5; filter: blur(1px); }
+#bi.boarded .stars { opacity: .35; }
+#bi .layer { position: absolute; inset: 0; pointer-events: none; will-change: transform; transition: transform 120ms linear; }
+#bi .stars { position: absolute; inset: 0; background-image: radial-gradient(1.5px 1.5px at 20% 30%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 70% 20%, #fff 50%, transparent 51%), radial-gradient(1.2px 1.2px at 40% 70%, #cfe0ff 50%, transparent 51%), radial-gradient(1px 1px at 85% 45%, #fff 50%, transparent 51%), radial-gradient(1.4px 1.4px at 10% 80%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 55% 10%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 30% 50%, #fff 50%, transparent 51%), radial-gradient(1.2px 1.2px at 92% 80%, #cfe0ff 50%, transparent 51%); opacity: .7; animation: bi-twinkle 5s ease-in-out infinite alternate; }
+@keyframes bi-twinkle { from { opacity: .45; } to { opacity: .85; } }
+#bi .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, .55)); pointer-events: none; }
+
+/* ----- الهيرو ----- */
+#bi .hero { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; perspective: 1200px; transition: opacity .6s ease, transform .6s ease; }
+#bi .hero.out { opacity: 0; transform: scale(1.05); pointer-events: none; }
+#bi .hero-card { width: min(760px, 100%); background: rgba(14, 22, 40, .55); border: 1px solid rgba(255, 255, 255, .12); border-radius: 28px; padding: 40px 42px 34px; backdrop-filter: blur(14px); box-shadow: 0 30px 80px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .08); transform-style: preserve-3d; transition: transform 160ms ease-out; text-align: center; animation: bi-rise 900ms cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes bi-rise { from { opacity: 0; transform: translateY(40px) scale(.96); } to { opacity: 1; transform: none; } }
+#bi .hero-card .glow { position: absolute; inset: -1px; border-radius: 28px; background: conic-gradient(from 0deg, transparent, rgba(91, 141, 239, .35), transparent 30%); animation: bi-spin 7s linear infinite; z-index: -1; filter: blur(14px); }
+@keyframes bi-spin { to { transform: rotate(360deg); } }
+#bi .hero h1 { font-size: 44px; margin: 0; letter-spacing: -.5px; background: linear-gradient(90deg, #fff, #BFD3FF); -webkit-background-clip: text; background-clip: text; color: transparent; }
+#bi .hero .tag { color: #A9B8D4; margin-top: 8px; font-size: 16px; }
+#bi .counters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 26px 0 22px; }
+#bi .counter { background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .09); border-radius: 16px; padding: 14px 10px; transform: translateZ(30px); }
+#bi .counter b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; }
+#bi .counter span { font-size: 12.5px; color: #A9B8D4; }
+#bi .enter { height: 54px; padding: 0 34px; border-radius: 16px; border: 0; background: linear-gradient(135deg, #5B8DEF, #39B8AB); color: #061020; font-weight: 800; font-size: 17px; cursor: pointer; box-shadow: 0 10px 30px rgba(91, 141, 239, .45); transition: transform .15s, box-shadow .15s; display: inline-flex; align-items: center; gap: 10px; }
+#bi .enter:hover { transform: translateY(-2px); box-shadow: 0 16px 40px rgba(91, 141, 239, .6); }
+#bi .hero .hint { color: #7E8EAB; font-size: 12.5px; margin-top: 14px; }
+#bi .exit { position: absolute; top: 18px; inset-inline-end: 18px; z-index: 5; height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .15); background: rgba(10, 16, 30, .6); color: #E9EEF6; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; backdrop-filter: blur(8px); }
+#bi .exit:hover { background: rgba(255, 255, 255, .1); }
+@media (max-width: 720px) { #bi .counters { grid-template-columns: repeat(2, 1fr); } #bi .hero h1 { font-size: 32px; } #bi .hero-card { padding: 28px 20px; } }
+
+/* ----- اللوحة ----- */
+#bi .board { position: absolute; inset: 0; overflow: auto; padding: 76px 28px 110px; opacity: 0; transform: translateY(30px); transition: opacity .6s ease .15s, transform .6s ease .15s; pointer-events: none; }
+#bi .board.in { opacity: 1; transform: none; pointer-events: auto; }
+#bi .board-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+#bi .board-head h2 { margin: 0; font-size: 24px; }
+#bi .board-head .sub { color: #A9B8D4; font-size: 13px; }
+#bi .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+#bi .chips button { height: 32px; padding: 0 12px; border-radius: 99px; border: 1px solid rgba(255, 255, 255, .15); background: rgba(255, 255, 255, .05); color: #D7E0F0; cursor: pointer; font-weight: 600; font-size: 13px; }
+#bi .chips button.on { background: #5B8DEF; border-color: #5B8DEF; color: #061020; }
+#bi .panel { background: rgba(14, 21, 38, .88); border: 1px solid rgba(255, 255, 255, .09); border-radius: 20px; padding: 18px; backdrop-filter: blur(10px); box-shadow: 0 10px 40px rgba(0, 0, 0, .35); animation: bi-rise .7s both; }
+#bi .panel h3 { margin: 0 0 10px; font-size: 15px; color: #D7E0F0; display: flex; justify-content: space-between; align-items: center; }
+#bi .panel h3 small { color: #7E8EAB; font-weight: 500; }
+#bi .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+#bi .tile { position: relative; overflow: hidden; background: linear-gradient(160deg, rgba(30, 42, 70, .92), rgba(16, 24, 44, .9)); border: 1px solid rgba(255, 255, 255, .1); border-radius: 18px; padding: 14px 16px; cursor: pointer; text-align: start; color: inherit; transition: transform .2s, border-color .2s, box-shadow .2s; animation: bi-rise .6s both; }
+#bi .tile:hover { transform: translateY(-3px); border-color: rgba(91, 141, 239, .6); box-shadow: 0 12px 30px rgba(91, 141, 239, .18); }
+#bi .tile .l { font-size: 12.5px; color: #A9B8D4; font-weight: 600; }
+#bi .tile .v { font-size: 26px; font-weight: 800; margin-top: 4px; font-variant-numeric: tabular-nums; }
+#bi .tile .d { font-size: 12.5px; color: #B9C6DC; margin-top: 4px; }
+#bi .tile .ring { position: absolute; inset-inline-end: -20px; top: -20px; width: 90px; height: 90px; border-radius: 50%; background: radial-gradient(circle, var(--c, #5B8DEF) 0%, transparent 70%); opacity: .25; }
+#bi .tile.ok { --c: #3FBF7F; } #bi .tile.warn { --c: #E0A33A; } #bi .tile.danger { --c: #EF6B67; } #bi .tile.info { --c: #6D9BE0; } #bi .tile.accent { --c: #39B8AB; }
+#bi .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+#bi .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 1100px) { #bi .grid3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 760px) { #bi .grid2, #bi .grid3 { grid-template-columns: 1fr; } #bi .board { padding: 70px 14px 120px; } }
+#bi .chart text { fill: #B9C6DC; }
+#bi .chart .grid-line { stroke: rgba(255, 255, 255, .08); }
+#bi .insight { background: rgba(255, 255, 255, .04); border-color: rgba(255, 255, 255, .08); color: inherit; }
+#bi .insight p { color: #B9C6DC; }
+#bi .insight b { color: #fff; }
+#bi .tbl th { background: rgba(255, 255, 255, .06); color: #B9C6DC; border-color: rgba(255, 255, 255, .08); }
+#bi .tbl td { border-color: rgba(255, 255, 255, .06); }
+#bi .tbl tbody tr:hover { background: rgba(255, 255, 255, .05); }
+#bi .donut-legend { color: #D7E0F0; }
+#bi .proj { display: grid; gap: 10px; }
+#bi .proj .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; background: rgba(255, 255, 255, .04); border-radius: 14px; padding: 10px 14px; cursor: pointer; transition: background .2s; }
+#bi .proj .row:hover { background: rgba(255, 255, 255, .08); }
+#bi .proj .bar { height: 8px; border-radius: 99px; background: rgba(255, 255, 255, .08); overflow: hidden; margin-top: 6px; }
+#bi .proj .bar i { display: block; height: 100%; background: linear-gradient(90deg, #39B8AB, #5B8DEF); }
+#bi .building-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 6px; }
+#bi .u { height: 44px; border-radius: 9px; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; cursor: pointer; border: 1px solid rgba(255, 255, 255, .1); transition: transform .15s; }
+#bi .u:hover { transform: scale(1.08); }
+#bi .u.occupied { background: rgba(63, 191, 127, .25); color: #9FE7C1; } #bi .u.ending { background: rgba(224, 163, 58, .28); color: #FFD88A; } #bi .u.vacant { background: rgba(239, 107, 103, .25); color: #FFB3B0; }
+
+/* ----- شريط التنقل السفلي ----- */
+#bi .dock { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; gap: 4px; padding: 6px; background: rgba(10, 16, 30, .72); border: 1px solid rgba(255, 255, 255, .12); border-radius: 18px; backdrop-filter: blur(12px); box-shadow: 0 10px 40px rgba(0, 0, 0, .5); max-width: calc(100vw - 20px); overflow-x: auto; }
+#bi .dock button { height: 42px; padding: 0 14px; border-radius: 13px; border: 0; background: transparent; color: #C9D4E6; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13px; white-space: nowrap; transition: background .15s, color .15s; }
+#bi .dock button:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+#bi .dock button.on { background: #5B8DEF; color: #061020; }
+#bi .dock button svg { width: 17px; height: 17px; }
+#bi .section { display: none; } #bi .section.on { display: block; }
+#bi .fade-up { animation: bi-rise .5s both; }
+@media (prefers-reduced-motion: reduce) { #bi .hero-card, #bi .tile, #bi .panel, #bi .sky::after, #bi .stars, #bi .hero-card .glow { animation: none !important; } }

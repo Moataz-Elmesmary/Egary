@@ -1,0 +1,70 @@
+// ======================================================================
+//  Egary — مقاييس DAX (Modeling → New measure، الصق كل مقياس على حدة)
+//  الجداول: Projects, Units, Clients, Contracts, Payments, Maintenance, DueMonths, Calendar
+// ======================================================================
+
+Collected = SUM ( Payments[Amount] )
+
+Due (to date) =
+CALCULATE ( SUM ( DueMonths[Due] ), DueMonths[MonthStart] <= TODAY () )
+
+Collection Rate = DIVIDE ( [Collected], [Due (to date)] )
+
+Arrears =
+CALCULATE ( SUM ( DueMonths[Remaining] ), DueMonths[IsLate] = TRUE () )
+
+Late Months = CALCULATE ( COUNTROWS ( DueMonths ), DueMonths[IsLate] = TRUE () )
+
+Arrears > 90 days =
+CALCULATE ( SUM ( DueMonths[Remaining] ), DueMonths[IsLate] = TRUE (), DueMonths[OverdueDays] > 90 )
+
+Arrears 31-90 days =
+CALCULATE ( SUM ( DueMonths[Remaining] ), DueMonths[IsLate] = TRUE (), DueMonths[OverdueDays] > 30, DueMonths[OverdueDays] <= 90 )
+
+Debtors = CALCULATE ( DISTINCTCOUNT ( DueMonths[ClientCode] ), DueMonths[IsLate] = TRUE () )
+
+Units Count = COUNTROWS ( Units )
+
+Occupied Units = CALCULATE ( COUNTROWS ( Units ), Units[Status] IN { "مؤجَّرة", "تنتهي قريبًا" } )
+
+Vacant Units = CALCULATE ( COUNTROWS ( Units ), Units[Status] = "شاغرة" )
+
+Occupancy Rate = DIVIDE ( [Occupied Units], [Units Count] )
+
+Vacant > 3 months = CALCULATE ( COUNTROWS ( Units ), Units[Status] = "شاغرة", Units[VacantDays] >= 90 )
+
+Active Contracts = CALCULATE ( COUNTROWS ( Contracts ), Contracts[Status] = "ساري" )
+
+Monthly Rent Roll = CALCULATE ( SUM ( Contracts[CurrentRent] ), Contracts[Status] = "ساري" )
+
+Ending in 90 days =
+CALCULATE ( COUNTROWS ( Contracts ), Contracts[Status] = "ساري", Contracts[DaysLeft] >= 0, Contracts[DaysLeft] <= 90 )
+
+Ending in 30 days =
+CALCULATE ( COUNTROWS ( Contracts ), Contracts[Status] = "ساري", Contracts[DaysLeft] >= 0, Contracts[DaysLeft] <= 30 )
+
+Ended without renewal = CALCULATE ( COUNTROWS ( Contracts ), Contracts[Status] = "منتهٍ" )
+
+Deposits Held = CALCULATE ( SUM ( Contracts[Deposit] ), Contracts[DepositStatus] = "محتفظ به" )
+
+Contracted Revenue Next 12M =
+CALCULATE (
+    SUM ( DueMonths[Due] ),
+    DueMonths[MonthStart] > EOMONTH ( TODAY (), 0 ),
+    DueMonths[MonthStart] <= EOMONTH ( TODAY (), 12 )
+)
+
+Collected YTD =
+CALCULATE ( [Collected], FILTER ( ALL ( Calendar ), Calendar[Year] = YEAR ( TODAY () ) && Calendar[Date] <= TODAY () ) )
+
+Maintenance Cost = SUM ( Maintenance[Cost] )
+
+Open Maintenance = CALCULATE ( COUNTROWS ( Maintenance ), Maintenance[Status] = "مفتوحة" )
+
+Maintenance on Owner = CALCULATE ( [Maintenance Cost], Maintenance[BorneBy] = "المالك" )
+
+Maintenance on Tenant = CALCULATE ( [Maintenance Cost], Maintenance[BorneBy] = "المستأجر" )
+
+Avg Rent per Active Contract = DIVIDE ( [Monthly Rent Roll], [Active Contracts] )
+
+Payments without date = CALCULATE ( COUNTROWS ( Payments ), ISBLANK ( Payments[PaidOn] ) )

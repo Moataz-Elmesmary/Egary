@@ -1,0 +1,19 @@
+// بيئة Node لتحميل وحدات التطبيق (نافذة وهمية + ExcelJS من الحزمة المضمَّنة)
+const path = require('path');
+const fs = require('fs');
+const ROOT = path.join(__dirname, '..', '..', 'Egary');
+function load(opts) {
+  const store = {};
+  global.window = { Egary: {} };
+  global.localStorage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } };
+  global.ExcelJS = require(path.join(ROOT, 'assets/vendor/exceljs.min.js'));
+  for (const f of ['core/util', 'core/model', 'core/codes', 'core/store', 'core/engine', 'xlsx/workbook', 'sync/file-link', 'sync/sync']) {
+    const p = path.join(ROOT, 'assets/js', f + '.js'); delete require.cache[p]; require(p);
+  }
+  const E = window.Egary;
+  if (opts && opts.today) E.U.setToday(opts.today);
+  return E;
+}
+function toArrayBuffer(buf) { return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength); }
+function readFile(p) { return toArrayBuffer(fs.readFileSync(p)); }
+module.exports = { load, ROOT, toArrayBuffer, readFile, SOURCE: '/tmp/claude-0/-home-user-Egary/e8cec96e-9e54-59ec-a68b-cc761d4144c6/scratchpad/xl/source.xlsx' };
