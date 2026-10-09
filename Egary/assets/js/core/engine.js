@@ -37,13 +37,20 @@ window.Egary = window.Egary || {};
   function currentRent(c, asOf) { asOf = asOf || U().today(); const r = rentOn(c, asOf); if (r != null) return r; const sch = schedule(c); return sch.length ? (asOf < U().d(sch[0].from) ? sch[0].rent : sch[sch.length - 1].rent) : 0; }
 
   /* الاستحقاق لشهر: الأيام المغطّاة داخل العقد × إيجار سنتها ÷ أيام الشهر */
+  /* الشهر المقطوع: المكتب يحسب الشهر 30 يومًا (النصف = 15/30) — settings.prorationBasis = '30' (افتراضي) أو 'actual' */
   function dueForMonth(c, period) {
     const f = U().monthFirst(period), l = U().monthLast(period), dim = U().daysInMonth(period);
+    const basis30 = (settings().prorationBasis || '30') === '30';
     let amount = 0, days = 0;
     for (const y of schedule(c)) {
       const a = U().d(y.from) > f ? U().d(y.from) : f, b = U().d(y.to) < l ? U().d(y.to) : l;
       if (a > b) continue;
-      const n = U().daysBetween(a, b) + 1; days += n; amount += y.rent * n / dim;
+      const n = U().daysBetween(a, b) + 1; days += n;
+      let frac;
+      if (n === dim) frac = 1;
+      else if (basis30) { const sDay = a.getUTCDate(), eDay = b.getUTCDate(); frac = (eDay === dim ? Math.max(0, 31 - sDay) : (eDay - sDay + 1)) / 30; frac = Math.min(1, frac); }
+      else frac = n / dim;
+      amount += y.rent * frac;
     }
     if (!days) return null;
     return { amount: Math.round(amount), days, full: days === dim };
@@ -54,6 +61,30 @@ window.Egary = window.Egary || {};
     const dt = U().d(period + '-' + U().pad(dd, 2));
     return start && start > dt && U().periodOf(start) === period ? start : dt;
   }
+
+  /* ---------- آخر شهر مكتمل التسجيل في الورقة ----------
+     الورقة تتأخر عن الواقع: الشهور بعد آخر شهر مسجَّل لا تُعدّ «متأخرة» بل «بانتظار التسجيل».
+     يُكتشف تلقائيًا: آخر شهر (حتى الشهر الحالي) سُجِّل فيه سداد لربع العقود السارية على الأقل. */
+  let ET_CACHE = { key: '', value: '' };
+  function enteredThrough(asOf) {
+    asOf = asOf || U().today();
+    const manual = settings().enteredThrough;
+    if (manual && /^\d{4}-\d{2}$/.test(manual)) return manual;
+    const key = U().periodOf(asOf) + '|' + st().payments.length + '|' + st().contracts.length;
+    if (ET_CACHE.key === key) return ET_CACHE.value;
+    const cur = U().periodOf(asOf);
+    let found = cur;
+    for (let i = 0; i < 24; i++) {
+      const p = U().addMonths(cur, -i);
+      let active = 0, paid = 0;
+      for (const c of st().contracts) { if (!dueForMonth(c, p)) continue; active++; if (S().paymentsOfCell(c.code, p).length) paid++; }
+      if (active && paid / active >= 0.25) { found = p; break; }
+      if (!active && i > 0) { found = p; break; }
+    }
+    ET_CACHE = { key, value: found };
+    return found;
+  }
+  function tolerance(dueAmount) { const sg = settings(); return Math.max(U().toNum(sg.toleranceMin) == null ? 50 : U().toNum(sg.toleranceMin), (U().toNum(sg.tolerancePct) == null ? 0.5 : U().toNum(sg.tolerancePct)) / 100 * (dueAmount || 0)); }
 
   /* ---------- حالة خلية (عقد × شهر) ---------- */
   function cell(c, period, asOf) {
@@ -67,14 +98,16 @@ window.Egary = window.Egary || {};
     const dueDate = dueDateOf(c, period); base.dueDate = U().iso(dueDate);
     base.overdueDays = U().daysBetween(dueDate, asOf);
     const remaining = Math.max(0, due.amount - paid); base.remaining = remaining;
-    if (paid >= due.amount - 0.5) return { ...base, status: 'paid', over: paid - due.amount > 0.5 };
+    const tol = tolerance(due.amount);
+    if (paid >= due.amount - tol) return { ...base, status: 'paid', over: paid - due.amount > tol, remaining: 0 };
     const cur = U().periodOf(asOf);
     if (U().cmp(period, cur) > 0) return { ...base, status: paid > 0 ? 'advance' : 'upcoming' };
+    if (U().cmp(period, enteredThrough(asOf)) > 0 && paid === 0) return { ...base, status: 'pending' };
     const late = base.overdueDays > (settings().graceDays || 0);
     if (paid > 0) return { ...base, status: 'partial', late };
     return { ...base, status: late ? 'late' : 'due', late };
   }
-  const STATUS_AR = { paid: 'مسدَّد', partial: 'جزئي', late: 'متأخر', due: 'مستحق', upcoming: 'قادم', advance: 'مقدَّم', none: '—', history: 'قبل التتبع', orphan: 'خارج العقد' };
+  const STATUS_AR = { paid: 'مسدَّد', partial: 'جزئي', late: 'متأخر', due: 'مستحق', upcoming: 'قادم', advance: 'مقدَّم', pending: 'بانتظار التسجيل', none: '—', history: 'قبل التتبع', orphan: 'خارج العقد' };
 
   /* ---------- حالة عقد / وحدة ---------- */
   function contractStatus(c, asOf) {
@@ -159,17 +192,30 @@ window.Egary = window.Egary || {};
   }
   function monthTotals(sc, period, asOf) {
     asOf = asOf || U().today();
-    let due = 0, collected = 0, lateCount = 0, paidCount = 0, dueCount = 0; const rows = [];
+    let due = 0, collected = 0, lateCount = 0, paidCount = 0, dueCount = 0, pendingCount = 0, pendingDue = 0, orphanPaid = 0; const rows = [];
     for (const c of sc.contracts) {
       const ci = cell(c, period, asOf);
       if (ci.status === 'none' || ci.status === 'history') continue;
+      if (ci.status === 'orphan') { orphanPaid += ci.paid; rows.push(row(ci)); continue; }
       if (ci.due && ci.status !== 'upcoming' && ci.status !== 'advance') { due += ci.due.amount; dueCount++; }
       if (ci.paid) { collected += ci.paid; }
       if (ci.status === 'paid') paidCount++;
       if (ci.status === 'late' || (ci.status === 'partial' && ci.late)) lateCount++;
+      if (ci.status === 'pending') { pendingCount++; pendingDue += ci.due.amount; }
       rows.push(row(ci));
     }
-    return { period, due, collected, rate: due > 0 ? collected / due : null, lateCount, paidCount, dueCount, rows };
+    return { period, due, collected, rate: due > 0 ? collected / due : null, lateCount, paidCount, dueCount, pendingCount, pendingDue, orphanPaid, rows };
+  }
+  /* الشهور التي لم يسجّلها المكتب بعد (بعد آخر شهر مكتمل) */
+  function pendingEntry(sc, asOf) {
+    asOf = asOf || U().today();
+    const cur = U().periodOf(asOf), et = enteredThrough(asOf);
+    const periods = [], rows = []; let due = 0;
+    for (let p = U().addMonths(et, 1); U().cmp(p, cur) <= 0; p = U().addMonths(p, 1)) {
+      periods.push(p);
+      for (const c of sc.contracts) { const ci = cell(c, p, asOf); if (ci.status === 'pending') { rows.push(row({ ...ci, amount: ci.due.amount })); due += ci.due.amount; } }
+    }
+    return { enteredThrough: et, periods, rows, due, contracts: new Set(rows.map(r => r.contractCode)).size };
   }
   function collectedBetween(sc, fromPeriod, toPeriod) {
     let total = 0; const rows = [];
@@ -254,8 +300,8 @@ window.Egary = window.Egary || {};
     asOf = asOf || U().today();
     const yr = String(asOf.getUTCFullYear());
     const items = st().maintenance.filter(m => sc.unitSet.has(m.unitCode)).map(m => {
-      const u = S().unit(m.unitCode); const cAt = u ? activeContractOf(u.code, U().d(m.date) || asOf) : null; const cl = cAt ? S().client(cAt.clientCode) : null;
-      return { ...m, unitLabel: u ? u.label : '', projectName: u ? (S().project(u.projectCode) || {}).name : '', custodianContract: cAt ? cAt.code : '', custodianName: cl ? cl.name : '' };
+      const u = S().unit(m.unitCode); const cAt = m.custodianContract ? S().contract(m.custodianContract) : (u ? activeContractOf(u.code, U().d(m.date) || asOf) : null); const cl = cAt ? S().client(cAt.clientCode) : null;
+      return { ...m, unitLabel: u ? u.label : '', projectName: u ? (S().project(u.projectCode) || {}).name : '', custodianContract: cAt ? cAt.code : '', custodianName: m.custodianName || (cl ? cl.name : '') };
     });
     const open = items.filter(m => m.status === 'open');
     const ytd = items.filter(m => (m.date || '').startsWith(yr));
@@ -278,8 +324,12 @@ window.Egary = window.Egary || {};
   function kpis(filter, asOf) {
     asOf = asOf || U().today();
     const sc = scope(filter);
-    const cur = U().periodOf(asOf), prev = U().addMonths(cur, -1), yr = cur.slice(0, 4);
-    const month = monthTotals(sc, cur, asOf), prevMonth = monthTotals(sc, prev, asOf);
+    const cur = U().periodOf(asOf), yr = cur.slice(0, 4);
+    const et = enteredThrough(asOf);
+    const reportPeriod = U().cmp(et, cur) < 0 ? et : cur; // آخر شهر مكتمل التسجيل
+    const prev = U().addMonths(reportPeriod, -1);
+    const month = monthTotals(sc, reportPeriod, asOf), prevMonth = monthTotals(sc, prev, asOf);
+    const pending = pendingEntry(sc, asOf);
     const ytd = collectedBetween(sc, yr + '-01', cur);
     const ytdDue = series(sc, cur, +cur.slice(5), asOf).reduce((s, m) => s + m.due, 0);
     const ar = arrears(sc, asOf), occ = occupancy(sc, asOf), ren = renewals(sc, asOf), dep = deposits(sc, asOf);
@@ -293,16 +343,17 @@ window.Egary = window.Egary || {};
     const avgRentByType = M().UNIT_TYPES.map(t => { const cs = activeContracts.filter(c => (S().unit(c.unitCode) || {}).type === t.key); return { key: t.key, name: t.ar, count: cs.length, avg: cs.length ? U().sum(cs, c => currentRent(c, asOf)) / cs.length : null }; }).filter(t => t.count);
     const noIncrease = activeContracts.filter(c => !(U().toNum(c.increasePct) > 0));
     const unknownDates = st().payments.filter(p => sc.contractSet.has(p.contractCode) && !p.paidOn).length;
-    return { asOf: U().iso(asOf), period: cur, scope: sc, month, prevMonth, ytd: { collected: ytd.total, due: ytdDue, rate: ytdDue ? ytd.total / ytdDue : null, rows: ytd.rows }, arrears: ar, occupancy: occ, renewals: ren, deposits: dep, next12, gaps, punctuality: punct, maintenance: maint, trend, byProject, byType, activeContracts, monthlyRentRoll, avgRentByType, noIncrease, unknownDates, counts: { projects: st().projects.filter(p => !filter || !filter.projectCode || p.code === filter.projectCode).length, units: sc.units.length, clients: sc.clients.length, contracts: sc.contracts.length, payments: st().payments.filter(p => sc.contractSet.has(p.contractCode)).length } };
+    return { asOf: U().iso(asOf), period: reportPeriod, currentPeriod: cur, enteredThrough: et, pending, scope: sc, month, prevMonth, ytd: { collected: ytd.total, due: ytdDue, rate: ytdDue ? ytd.total / ytdDue : null, rows: ytd.rows }, arrears: ar, occupancy: occ, renewals: ren, deposits: dep, next12, gaps, punctuality: punct, maintenance: maint, trend, byProject, byType, activeContracts, monthlyRentRoll, avgRentByType, noIncrease, unknownDates, counts: { projects: st().projects.filter(p => !filter || !filter.projectCode || p.code === filter.projectCode).length, units: sc.units.length, clients: sc.clients.length, contracts: sc.contracts.length, payments: st().payments.filter(p => sc.contractSet.has(p.contractCode)).length } };
   }
 
   /* ---------- الإنسايتس (نصوص مولَّدة من الأرقام، كل واحدة بدليلها) ---------- */
   function insights(k) {
     const out = [], f = U().fmtMoney, pct = U().fmtPct;
     const push = (sev, title, text, evidence) => out.push({ sev, title, text, evidence });
+    if (k.pending && k.pending.periods.length) push('warn', `لم يُسجَّل تحصيل ${k.pending.periods.map(p => U().periodLabel(p)).join(' و')} بعد`, `${k.pending.contracts} عقد بمستحق ${f(k.pending.due)} بانتظار التسجيل في الورقة — آخر شهر مكتمل: ${U().periodLabel(k.enteredThrough, true)}. هذه الشهور لا تُحتسب متأخرات حتى تُسجَّل.`, { view: 'pending' });
     if (k.month.due > 0) {
       const r = k.month.rate || 0;
-      push(r >= 0.9 ? 'good' : r >= 0.6 ? 'warn' : 'danger', `تحصيل ${U().periodLabel(k.period, true)}: ${pct(r)}`, `محصَّل ${f(k.month.collected)} من مستحق ${f(k.month.due)} — ${k.month.lateCount} عقد لم يُسجَّل له سداد الشهر بعد.`, { view: 'ledger', period: k.period, status: 'late' });
+      push(r >= 0.9 ? 'good' : r >= 0.6 ? 'warn' : 'danger', `تحصيل ${U().periodLabel(k.period, true)}: ${pct(r)}`, `محصَّل ${f(k.month.collected)} من مستحق ${f(k.month.due)} — ${k.month.lateCount} عقد لم يُسجَّل له سداد الشهر.`, { view: 'ledger', period: k.period, status: 'late' });
     }
     if (k.prevMonth.due > 0 && k.month.due > 0 && k.prevMonth.collected > 0) {
       const ch = (k.month.collected - k.prevMonth.collected) / k.prevMonth.collected;
@@ -318,8 +369,8 @@ window.Egary = window.Egary || {};
     } else if (k.scope.contracts.length) push('good', 'لا توجد متأخرات قائمة', 'كل الشهور المستحقة حتى اليوم مسدَّدة.', { view: 'ledger' });
     if (k.occupancy.total) {
       push(k.occupancy.rate >= 0.9 ? 'good' : k.occupancy.rate >= 0.75 ? 'info' : 'warn', `الإشغال ${pct(k.occupancy.rate)} (${k.occupancy.occupiedCount} من ${k.occupancy.total} وحدة)`, `${k.occupancy.vacant.length} وحدة شاغرة الآن${k.occupancy.longVacant.length ? `، منها ${k.occupancy.longVacant.length} شاغرة أكثر من ${settings().vacancyMonths} شهور` : ''}.`, { view: 'units', status: 'vacant' });
-      const lost = U().sum(k.occupancy.vacant, v => { const last = v.last; return last ? Math.round(((v.vacantDays || 0) / 30) * currentRent(last)) : 0; });
-      if (lost > 0) push('warn', `فاقد الشواغر التقديري ${f(lost)}`, `محسوب من مدة الشغور × آخر إيجار لكل وحدة شاغرة سبق تأجيرها.`, { view: 'units', status: 'vacant' });
+      const lost = U().sum(k.occupancy.vacant, v => { const last = v.last; return last ? Math.round((Math.min(365, v.vacantDays || 0) / 30) * currentRent(last)) : 0; });
+      if (lost > 0) push('warn', `فاقد الشواغر التقديري ≈ ${f(lost)}`, `تقدير: مدة الشغور × آخر إيجار لكل وحدة شاغرة سبق تأجيرها (الشغور الأطول من سنة يُحسب بسنة).`, { view: 'units', status: 'vacant' });
     }
     if (k.renewals.soon.length) push('warn', `${k.renewals.soon.length} عقد ينتهي خلال 90 يومًا`, `منها ${k.renewals.soon30.length} خلال 30 يومًا. الإيجار الشهري المعرَّض: ${f(U().sum(k.renewals.soon, r => r.rent))}.`, { view: 'contracts', status: 'ending' });
     if (k.renewals.ended.length) push('danger', `${k.renewals.ended.length} عقد انتهى والوحدة ما زالت شاغرة بلا تجديد`, k.renewals.ended.slice(0, 3).map(r => `${r.unitLabel} (${r.projectName}) منذ ${r.daysAgo} يوم`).join(' · '), { view: 'contracts', status: 'ended' });
@@ -365,6 +416,11 @@ window.Egary = window.Egary || {};
       for (const p of S().paymentsOf(c.code)) { const d = dueForMonth(c, p.period); if (!d) add('info', 'payments', p.code, `دفعة ${U().periodLabel(p.period, true)} خارج مدة العقد ${c.code} (فترة سابقة؟)`); }
     }
     for (const u of st().units) if (!S().project(u.projectCode)) add('danger', 'units', u.code, 'الوحدة تشير إلى مشروع غير موجود');
+    for (const p of st().payments) if (!S().contract(p.contractCode)) add('danger', 'payments', p.code, `الدفعة ${p.code} تشير إلى عقد غير موجود (${p.contractCode}) — ربما حُذف صفه من ورقة العقود`);
+    for (const c of st().contracts) { const s0 = U().d(c.start), e0 = U().d(c.end); if (!s0 || !e0) continue; for (const p of S().paymentsOf(c.code)) { const ci = cell(c, p.period); if (ci.status === 'paid' && ci.over) add('warn', 'contracts', c.code, `${(S().client(c.clientCode) || {}).name || ''} / ${(S().unit(c.unitCode) || {}).label || ''}: المسدَّد في ${U().periodLabel(p.period, true)} (${U().fmtMoney(ci.paid)}) أعلى من المستحق (${U().fmtMoney(ci.due.amount)})`); } }
+    const byNid = U().groupBy(st().clients.filter(c => c.nationalId), c => U().foldCode(c.nationalId));
+    for (const [nid, cs] of byNid) if (cs.length > 1) add('info', 'clients', cs[0].code, `نفس الرقم القومي/الباسبور (${nid}) مسجَّل لأكثر من عميل: ${cs.map(c => c.name + ' (' + c.code + ')').join('، ')}`);
+    for (const c of st().contracts) if (c.inferred) add('info', 'contracts', c.code, `${(S().client(c.clientCode) || {}).name || ''} / ${(S().unit(c.unitCode) || {}).label || ''}: فترة سابقة مستنتجة من مبالغ الورقة قبل بداية العقد الحالي — راجع تواريخها وإيجارها`);
     for (const cl of st().clients) { if (!cl.phone) add('info', 'clients', cl.code, 'لا يوجد رقم تليفون'); if (!cl.nationalId) add('info', 'clients', cl.code, 'لا يوجد رقم قومي/باسبور'); }
     const byLabel = U().groupBy(st().units, u => u.projectCode + '|' + U().normalize(u.label));
     for (const [, us] of byLabel) if (us.length > 1) add('warn', 'units', us[0].code, `${us.length} وحدات بنفس الاسم «${us[0].label}» في نفس المشروع (${us.map(u => u.code).join('، ')})`);
@@ -372,5 +428,5 @@ window.Egary = window.Egary || {};
     return flags.sort((a, b) => sev[a.sev] - sev[b.sev]);
   }
 
-  E.Engine = { schedule, rentOn, currentRent, dueForMonth, dueDateOf, cell, STATUS_AR, contractStatus, CSTATUS_AR, activeContractOf, unitStatus, USTATUS_AR, scope, row, arrears, monthTotals, collectedBetween, series, occupancy, renewals, deposits, contractedRevenue, reletGaps, punctuality, maintenanceStats, byDimension, kpis, insights, ledger, dataQuality };
+  E.Engine = { schedule, rentOn, currentRent, dueForMonth, dueDateOf, cell, enteredThrough, tolerance, pendingEntry, STATUS_AR, contractStatus, CSTATUS_AR, activeContractOf, unitStatus, USTATUS_AR, scope, row, arrears, monthTotals, collectedBetween, series, occupancy, renewals, deposits, contractedRevenue, reletGaps, punctuality, maintenanceStats, byDimension, kpis, insights, ledger, dataQuality };
 })(window.Egary);

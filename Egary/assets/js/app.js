@@ -40,15 +40,16 @@ window.Egary = window.Egary || {};
   function toggleTheme() { applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); render(); }
 
   /* ---------- اللقطة (لحل التعارض) ---------- */
-  function saveSnapshot() { try { localStorage.setItem(SNAP_KEY, JSON.stringify(W().snapshotOf(S().state()))); } catch (e) { } }
-  function loadSnapshot() { try { return JSON.parse(localStorage.getItem(SNAP_KEY) || 'null'); } catch (e) { return null; } }
+  function snapName() { return (E.Sync.adapter && E.Sync.adapter.name) || ''; }
+  function saveSnapshot() { try { const snap = W().snapshotOf(S().state()); snap.file = snapName(); localStorage.setItem(SNAP_KEY, JSON.stringify(snap)); } catch (e) { } }
+  function loadSnapshot() { try { const snap = JSON.parse(localStorage.getItem(SNAP_KEY) || 'null'); return snap && (!snap.file || snap.file === snapName()) ? snap : null; } catch (e) { return null; } }
 
   /* ---------- المزامنة ---------- */
   let lastBytes = null; // آخر ملف مقروء/مكتوب — لحفظ الأوراق التي أضافها المكتب كما هي
   function initSync() {
     E.Sync.init({
       serialize: async () => { const buf = await W().write(S().state(), { base: lastBytes }); lastBytes = buf; saveSnapshot(); E.FileLink.saveBackup(buf); return buf; },
-      deserialize: async (buf) => { const r = await W().read(buf, { snapshot: loadSnapshot() }); lastBytes = buf; S().load(r.state); App.flags = r.flags; saveSnapshot(); E.FileLink.saveBackup(buf); },
+      deserialize: async (buf) => { if (App.mode === 'linked' && E.Sync.adapter) await E.FileLink.saveOriginal(buf, E.Sync.adapter.name); const r = await W().read(buf, { snapshot: loadSnapshot() }); lastBytes = buf; S().load(r.state); App.flags = r.flags; saveSnapshot(); E.FileLink.saveBackup(buf); },
       applyOps: ops => S().applyOps(ops),
       onStatus: renderSync,
       onExternalChange: () => { UI().toast('تم تحديث البيانات من ملف الإكسيل', 'ok'); render(); },
@@ -62,10 +63,11 @@ window.Egary = window.Egary || {};
     el.className = 'sync ' + st.state; UI().clear(el); el.append(h('span', { class: 'dot' }), h('span', null, t)); el.title = sub;
     const banner = App.els.banner; if (!banner) return; UI().clear(banner);
     if (st.state === 'locked') banner.appendChild(h('div', { class: 'banner warn' }, UI().icon('warning'), h('span', null, `ملف الإكسيل مفتوح في برنامج Excel، لذلك لا يمكن الحفظ الآن. تعديلاتك (${st.pending}) محفوظة مؤقتًا وستُكتب تلقائيًا بمجرد إغلاق الملف.`), h('button', { class: 'btn sm', onclick: () => E.Sync.flush() }, 'حاول الآن')));
-    else if (st.state === 'error') banner.appendChild(h('div', { class: 'banner danger' }, UI().icon('warning'), h('span', null, 'خطأ في المزامنة: ' + (st.error || '')), h('button', { class: 'btn sm', onclick: () => E.Sync.flush() }, 'إعادة المحاولة')));
+    else if (st.state === 'error') banner.appendChild(h('div', { class: 'banner danger' }, UI().icon('warning'), h('span', null, 'خطأ في المزامنة: ' + (st.error || '')), h('button', { class: 'btn sm', onclick: () => E.Sync.flush() }, 'إعادة المحاولة'), E.FileLink.supported ? h('button', { class: 'btn sm primary', onclick: linkFile }, UI().icon('link'), 'ربط الملف من جديد') : null));
     else if (App.mode === 'preview' || App.mode === 'demo' || App.mode === 'file') banner.appendChild(h('div', { class: 'banner info' }, UI().icon('info'), h('span', null, App.mode === 'demo' ? 'وضع تجريبي ببيانات نموذجية — التعديلات لا تُحفظ. اربط ملف الإكسيل لبدء العمل الحقيقي.' : 'الملف مفتوح للعرض بلا ربط — التعديلات تبقى في الذاكرة فقط. يمكنك تنزيل نسخة إكسيل محدثة أو ربط الملف للحفظ التلقائي.'), E.FileLink.supported ? h('button', { class: 'btn sm primary', onclick: linkFile }, UI().icon('link'), 'ربط ملف الإكسيل') : null, h('button', { class: 'btn sm', onclick: downloadCopy }, UI().icon('download'), 'تنزيل نسخة إكسيل')));
   }
   async function downloadCopy() { const buf = await W().write(S().state(), { base: lastBytes }); E.FileLink.downloadBytes(buf, 'Egary.xlsx'); UI().toast('تم تنزيل نسخة الإكسيل', 'ok'); }
+  async function downloadOriginal() { const b = await E.FileLink.loadOriginal(); if (!b || !b.bytes) { UI().toast('لا يوجد ملف أصلي محفوظ (يُحفظ عند أول ربط)', 'warn'); return; } E.FileLink.downloadBytes(b.bytes, 'Egary-original-' + new Date(b.at).toISOString().slice(0, 10) + '.xlsx'); UI().toast('تم تنزيل الملف الأصلي كما كان قبل أول تحويل (' + new Date(b.at).toLocaleDateString('ar-EG') + ')', 'ok'); }
   async function downloadBackup() { const b = await E.FileLink.loadBackup(); if (!b || !b.bytes) { UI().toast('لا توجد نسخة احتياطية بعد', 'warn'); return; } E.FileLink.downloadBytes(b.bytes, 'Egary-backup-' + new Date(b.at).toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.xlsx'); UI().toast('تم تنزيل النسخة الاحتياطية (' + new Date(b.at).toLocaleString('ar-EG') + ')', 'ok'); }
 
   async function linkFile() {
@@ -124,10 +126,9 @@ window.Egary = window.Egary || {};
       ) : null,
       h('div', { class: 'flex wrap mt', style: { justifyContent: 'center' } },
         E.FileLink.supported ? h('button', { class: 'btn primary', id: 'btn-link', onclick: linkFile }, UI().icon('link'), restored ? 'ربط ملف آخر' : 'ربط ملف الإكسيل') : h('div', { class: 'banner warn' }, UI().icon('warning'), h('span', null, 'هذا المتصفح لا يدعم المزامنة التلقائية — افتح البرنامج بـ Microsoft Edge أو Google Chrome (ملف Open-Egary.bat).')),
-        h('button', { class: 'btn', id: 'btn-open', onclick: () => fileInput.click() }, UI().icon('upload'), 'فتح ملف للعرض فقط'),
-        h('button', { class: 'btn ghost', id: 'btn-demo', onclick: loadDemo }, UI().icon('eye'), 'تجربة ببيانات نموذجية'),
         fileInput,
       ),
+      h('div', { class: 'flex wrap mt-s small', style: { justifyContent: 'center' } }, h('span', { class: 'muted' }, 'خيارات أخرى:'), h('button', { class: 'btn ghost sm', id: 'btn-open', onclick: () => fileInput.click() }, UI().icon('upload'), 'فتح ملف للعرض فقط'), h('button', { class: 'btn ghost sm', id: 'btn-demo', onclick: loadDemo }, UI().icon('eye'), 'تجربة ببيانات نموذجية')),
       h('p', { class: 'small muted mt' }, 'يعمل بالكامل على جهازك بلا إنترنت ولا خادم. المتصفح الموصى به: Edge أو Chrome.'),
     );
     root.appendChild(h('div', { class: 'welcome' }, box));
@@ -200,6 +201,7 @@ window.Egary = window.Egary || {};
   function render() {
     if (!App.els.content) return;
     if (App.route.view === 'bi') { if (E.BI) E.BI.open(); return; }
+    if (E.BI && E.BI.isOpen) E.BI.close(true);
     const v = VIEWS.find(x => x.key === App.route.view) || VIEWS[0];
     App.els.title.textContent = v.title; document.title = v.title + ' — إيجاري';
     renderNav();
@@ -234,9 +236,10 @@ window.Egary = window.Egary || {};
     const n = U().normalize(q); UI().clear(box);
     if (!n) { box.classList.add('hidden'); return; }
     const st = S().state(), out = [];
-    const m = (hay) => U().matches(hay, n);
+    const tokens = n.split(' ').filter(Boolean);
+    const m = (hay) => { const H = U().normalize(hay); const Hs = H.replace(/\s+/g, ''); return tokens.every(t => H.includes(t) || Hs.includes(t.replace(/\s+/g, ''))) || Hs.includes(n.replace(/\s+/g, '')); };
     for (const p of st.projects) if (m(p.code + ' ' + p.name + ' ' + p.address)) out.push({ k: 'مشروع', code: p.code, label: p.name, sub: p.address, open: () => open('project', p.code) });
-    for (const u of st.units) if (m(u.code + ' ' + u.label)) out.push({ k: 'وحدة', code: u.code, label: u.label, sub: (S().project(u.projectCode) || {}).name, open: () => open('unit', u.code) });
+    for (const u of st.units) if (m(u.code + ' ' + u.label + ' ' + ((S().project(u.projectCode) || {}).name || ''))) out.push({ k: 'وحدة', code: u.code, label: u.label, sub: (S().project(u.projectCode) || {}).name, open: () => open('unit', u.code) });
     for (const c of st.clients) if (m([c.code, c.name, c.rep, c.phone, c.phone2, c.nationalId, c.taxId].join(' '))) out.push({ k: 'عميل', code: c.code, label: c.name, sub: c.phone || c.nationalId, open: () => open('client', c.code) });
     for (const c of st.contracts) if (m(c.code)) { const cl = S().client(c.clientCode) || {}, u = S().unit(c.unitCode) || {}; out.push({ k: 'عقد', code: c.code, label: `${cl.name || ''} — ${u.label || ''}`, sub: U().fmtDate(c.start) + ' → ' + U().fmtDate(c.end), open: () => open('contract', c.code) }); }
     for (const p of st.payments) if (m(p.code + ' ' + p.ref)) { const c = S().contract(p.contractCode) || {}; const cl = S().client(c.clientCode) || {}; out.push({ k: 'فاتورة', code: p.code, label: `${cl.name || ''} — ${U().periodLabel(p.period, true)}`, sub: U().fmtMoney(p.amount), open: () => F().invoice(p) }); }
@@ -257,7 +260,7 @@ window.Egary = window.Egary || {};
 
   /* ---------- الإقلاع ---------- */
   async function boot() {
-    applyTheme((() => { try { return localStorage.getItem(THEME_KEY) || 'light'; } catch (e) { return 'light'; } })());
+    applyTheme((() => { try { return localStorage.getItem(THEME_KEY) || (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch (e) { return 'light'; } })());
     try { const f = JSON.parse(localStorage.getItem(FILTER_KEY) || 'null'); if (f) Object.assign(App.filter, f); } catch (e) { }
     App.els.root = document.getElementById('root');
     initSync();
@@ -276,7 +279,7 @@ window.Egary = window.Egary || {};
   /* واجهة للاختبارات: ربط محوِّل ذاكرة مباشرة */
   async function linkAdapter(adapter) { App.mode = 'linked'; S().setRecorder(op => E.Sync.record(op)); await E.Sync.link(adapter, { writeOnLink: false }); showApp(); return true; }
 
-  Object.assign(App, { boot, go, open, evidence, render, setFilter, filterBar, linkFile, linkAdapter, downloadCopy, downloadBackup, loadDemo, openWithoutLink, ctx, VIEWS, saveSnapshot, loadSnapshot, toggleTheme });
+  Object.assign(App, { boot, go, open, evidence, render, setFilter, filterBar, linkFile, linkAdapter, downloadCopy, downloadBackup, downloadOriginal, loadDemo, openWithoutLink, ctx, VIEWS, saveSnapshot, loadSnapshot, toggleTheme });
   E.App = App;
   document.addEventListener('DOMContentLoaded', () => { if (!window.__EGARY_NO_BOOT) boot(); });
 })(window.Egary);

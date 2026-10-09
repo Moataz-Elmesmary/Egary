@@ -99,7 +99,7 @@ window.Egary = window.Egary || {};
       title: isNew ? 'وحدة جديدة' : 'تعديل وحدة ' + rec.code,
       size: 'lg',
       body: (form) => {
-        const proj = select('projectCode', [{ value: '', label: '— اختر المشروع —' }].concat(projOpts), rec.projectCode);
+        const proj = select('projectCode', [{ value: '', label: '— اختر المشروع —' }].concat(projOpts), rec.projectCode, isNew ? null : { disabled: true, title: 'كود الوحدة مبني على المشروع ولا يتغيّر' });
         const label = input('label', rec.label, { placeholder: '304 / محل 2 / ميزان 1 / جراج 5' });
         codePreview = h('span', { class: 'code' }, isNew ? '—' : rec.code);
         const type = select('type', listOpts(M().UNIT_TYPES), rec.type);
@@ -130,6 +130,7 @@ window.Egary = window.Egary || {};
       onSave: (v, form) => {
         const assetRows = [...form._assets.querySelectorAll('.asset-row')].map(r => r._get()).filter(a => a.name);
         const r = Object.assign({}, rec, v, { assets: assetRows.filter(a => a.present || a.details), createdAt: rec.createdAt || now() });
+        if (!isNew) r.projectCode = rec.projectCode;
         r.code = isNew ? C().unitCode(S().state(), r.projectCode, r.label) : rec.code;
         const errors = M().validate('units', r, S().state()); if (errors.length) return { errors };
         S().upsert('units', r, `${r.label} (${(S().project(r.projectCode) || {}).name || ''})`); UI().toast((isNew ? 'أُضيفت الوحدة ' : 'عُدِّلت الوحدة ') + r.code, 'ok');
@@ -156,8 +157,12 @@ window.Egary = window.Egary || {};
         field('تفاصيل / ملاحظات', textarea('notes', rec.notes), { full: true }),
       ],
       onSave: (v) => {
+        for (const k of ['nationalId', 'taxId', 'phone', 'phone2']) if (v[k]) v[k] = U().foldCode(v[k]).replace(/[^0-9A-Z+\-]/g, '');
         const r = Object.assign({}, rec, v, { code: isNew ? C().nextClient(S().state()) : rec.code, createdAt: rec.createdAt || now() });
         const errors = M().validate('clients', r, S().state()); if (errors.length) return { errors };
+        const dup = r.nationalId ? S().state().clients.find(c => c.code !== r.code && U().foldCode(c.nationalId) === U().foldCode(r.nationalId)) : null;
+        if (dup && !rec._dupConfirmed) { rec._dupConfirmed = true; return { errors: [`هذا الرقم القومي/الباسبور مسجَّل للعميل «${dup.name}» (${dup.code}) — اضغط حفظ مرة أخرى للتأكيد لو كان عميلًا مختلفًا فعلًا`] }; }
+        delete r._dupConfirmed;
         S().upsert('clients', r, r.name); UI().toast((isNew ? 'أُضيف العميل ' : 'عُدِّل العميل ') + r.code, 'ok');
         return { record: r };
       },
@@ -293,6 +298,7 @@ window.Egary = window.Egary || {};
       onSave: (v) => {
         const r = Object.assign({}, rec, v, { code: isNew ? C().nextMaintenance(S().state()) : rec.code, createdAt: rec.createdAt || now() });
         if (r.cost === '') r.cost = 0;
+        if (!r.custodianContract) { const uu = S().unit(r.unitCode); const cAt = uu ? En().activeContractOf(uu.code, U().d(r.date) || U().today()) : null; r.custodianContract = cAt ? cAt.code : ''; r.custodianName = cAt ? ((S().client(cAt.clientCode) || {}).name || '') : ''; }
         if (r.status === 'closed' && !r.closedOn) r.closedOn = now();
         const errors = M().validate('maintenance', r, S().state()); if (errors.length) return { errors };
         const u = S().unit(r.unitCode) || {};
@@ -316,13 +322,17 @@ window.Egary = window.Egary || {};
         field('الزيادة السنوية الافتراضية %', number('defaultIncreasePct', sg.defaultIncreasePct, { min: 0, max: 100 })),
         field('بادئة رقم الفاتورة', input('invoicePrefix', sg.invoicePrefix, { dir: 'ltr' })),
         field('رمز العملة', input('currency', sg.currency)),
+        field('آخر شهر مسجَّل في الورقة', input('enteredThrough', sg.enteredThrough, { dir: 'ltr', placeholder: 'تلقائي (مثال 2026-08)' }), { help: 'الشهور بعده تُعرض «بانتظار التسجيل» لا «متأخرة». اتركه فارغًا ليُكتشف تلقائيًا.' }),
+        field('فرق مقبول في السداد %', number('tolerancePct', sg.tolerancePct, { min: 0, max: 10, step: '0.1' }), { help: 'يُقبل المبلغ كسداد كامل لو الفرق أقل من هذه النسبة من المستحق' }),
+        field('الحد الأدنى للفرق المقبول (ج)', number('toleranceMin', sg.toleranceMin, { min: 0, step: 1 })),
       ],
       onSave: (v) => {
         const errors = [];
         if (!/^\d{4}-\d{2}$/.test(v.trackingFrom)) errors.push('بداية المحاسبة بصيغة سنة-شهر مثل 2026-01');
+        if (v.enteredThrough && !/^\d{4}-\d{2}$/.test(v.enteredThrough)) errors.push('آخر شهر مسجَّل بصيغة سنة-شهر مثل 2026-08 أو اتركه فارغًا');
         if (errors.length) return { errors };
         st.meta.officeName = v.officeName || st.meta.officeName; delete v.officeName;
-        for (const k of ['graceDays', 'dueDay', 'vacancyMonths', 'defaultIncreasePct']) if (v[k] === '') delete v[k];
+        for (const k of ['graceDays', 'dueDay', 'vacancyMonths', 'defaultIncreasePct', 'tolerancePct', 'toleranceMin']) if (v[k] === '') delete v[k];
         Object.assign(sg, v);
         S().notify('change');
         if (E.Sync) E.Sync.record({ type: 'settings', at: new Date().toISOString(), record: Object.assign({}, sg, { officeName: st.meta.officeName }) });

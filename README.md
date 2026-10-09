@@ -15,6 +15,8 @@
 - **Delete always asks for confirmation** and shows what else will be deleted.
 - **Filters**: project, unit type (incl. garage), status, floor, year; global search by any code, name, phone, national ID, tax number (Arabic-normalized).
 - **Insights** computed live from the data; **Data quality** flags (text in a number cell, end before start, duplicate labels, mismatched IDs…).
+- **Honest arrears**: the sheet usually lags reality, so months after the last fully-entered month (auto-detected, or set in Settings) are shown as **بانتظار التسجيل** (pending entry) instead of "late"; money entered before a contract's start date becomes a linked **prior term** of the same tenant; split months follow the office's 30-day convention; small rounding differences are tolerated (0.5 %, min 50 EGP).
+- **Safety**: every save keeps a browser-side backup of the last good file and of the original file before its first conversion (Settings → downloads); sheets the office adds by hand are preserved; a save never overwrites an Excel edit that landed in between (the file is re-read first).
 - **BI mode** (`#/bi`): animated night-city entrance (buildings whose windows light up and drift, mouse-tilt parallax, count-up counters), sectioned dashboard, every tile drills down. Plus a **Power BI Desktop kit** (`Egary/powerbi/`: Power Query M, DAX measures, theme).
 - Light/dark themes, RTL, keyboard/ESC, mobile layout, no internet, no install.
 
@@ -31,5 +33,8 @@ NODE_PATH=/opt/node22/lib/node_modules node --test tests/e2e.test.js   # browser
 node tests/build_workbook.js                                   # regenerate Egary/Egary.xlsx from a source workbook
 ```
 Architecture (`Egary/assets/js`): `core/` (util, model, codes, store, engine) · `xlsx/workbook.js` (ExcelJS read/write + migration of the original sheet format + conflict rules) · `sync/` (file link + sync engine with a pending-ops journal) · `ui/` (toolkit, forms, views) · `bi/` · `app.js`.
+
+## Data in this repository
+`Egary/Egary.xlsx` in the repo (and in the hosted preview) is an **anonymized** workbook: same projects, units, dates and amounts as the office sheet, but every tenant name, national ID and tax number is synthetic. The real workbook is produced privately with `node tests/build_workbook.js <today> <path-to-original.xlsx>` and dropped into the folder you send to the office — it must not be committed to this public repository. Tests run against the anonymized fixture `tests/fixtures/source-anon.xlsx`.
 
 The previous version lives in `legacy/` for reference. The full conversation and decisions are in `CHAT-LOG.md`.

@@ -89,7 +89,7 @@ window.Egary = window.Egary || {};
     const first = body.querySelector('input, select, textarea, button'); if (first) setTimeout(() => first.focus(), 30);
     return api;
   }
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && stack.length) stack[stack.length - 1].close(); });
+  document.addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; if (stack.length) { stack[stack.length - 1].close(); return; } if (drawerApi) drawerApi.close(); });
   function confirm(opts) {
     return new Promise(resolve => {
       let done = false;

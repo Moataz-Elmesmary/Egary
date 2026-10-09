@@ -1,8 +1,9 @@
 // ======================================================================
 //  Egary — Power Query (M)
 //  الصق هذا كله في Advanced Editor لاستعلام فارغ، ثم عدّل FilePath.
-//  ينتج الاستعلامات: Projects, Units, Clients, Contracts, Payments, Maintenance,
-//  UnitAssets, Calendar, DueMonths (كل عقد × كل شهر مع الإيجار المحسوب)
+//  ينتج سجلًا واحدًا فيه الجداول: Projects, Units, Clients, Contracts, Payments, Maintenance,
+//  UnitAssets, Calendar, Months, DueMonths (كل عقد × كل شهر مع الإيجار المحسوب)
+//  بعد اللصق: في نافذة الاستعلام اضغط بزر الماوس الأيمن على كل حقل من السجل → Add as New Query
 // ======================================================================
 let
     FilePath = "C:\Egary\Egary.xlsx",
@@ -16,7 +17,9 @@ let
     // ---------- الوحدات ----------
     Units0 = Sheet("الوحدات"),
     Units1 = Table.RenameColumns(Table.SelectColumns(Units0, {"كود الوحدة", "كود المشروع", "رقم / اسم الوحدة", "النوع", "الدور", "المساحة م²", "الحالة (محسوب)", "المستأجر الحالي (محسوب)", "الإيجار الحالي (محسوب)", "أيام الشغور (محسوب)"}), {{"كود الوحدة", "UnitCode"}, {"كود المشروع", "ProjectCode"}, {"رقم / اسم الوحدة", "UnitLabel"}, {"النوع", "UnitType"}, {"الدور", "Floor"}, {"المساحة م²", "AreaM2"}, {"الحالة (محسوب)", "Status"}, {"المستأجر الحالي (محسوب)", "CurrentTenant"}, {"الإيجار الحالي (محسوب)", "CurrentRent"}, {"أيام الشغور (محسوب)", "VacantDays"}}),
-    Units = Table.TransformColumnTypes(Units1, {{"UnitCode", type text}, {"ProjectCode", type text}, {"UnitType", type text}, {"CurrentRent", type number}, {"VacantDays", Int64.Type}}),
+    Units2 = Table.ReplaceValue(Units1, "", null, Replacer.ReplaceValue, {"VacantDays", "CurrentRent"}),
+    Units3 = Table.TransformColumnTypes(Units2, {{"UnitCode", type text}, {"ProjectCode", type text}, {"UnitType", type text}, {"CurrentRent", type number}, {"VacantDays", Int64.Type}}),
+    Units = Table.AddColumn(Units3, "StatusKey", each if [Status] = "شاغرة" then "vacant" else if [Status] = "تنتهي قريبًا" then "ending" else "occupied", type text),
 
     // ---------- العملاء ----------
     Clients0 = Sheet("العملاء"),
@@ -26,12 +29,14 @@ let
     Contracts0 = Sheet("العقود"),
     Contracts1 = Table.RenameColumns(Table.SelectColumns(Contracts0, {"كود العقد", "كود الوحدة", "كود العميل", "بداية العقد", "نهاية العقد", "الإيجار الشهري (السنة الأولى)", "الزيادة السنوية %", "إيجار كل سنة (يدوي)", "التأمين", "حالة التأمين", "يوم الاستحقاق", "العقد السابق", "الحالة (محسوب)", "الإيجار الحالي (محسوب)"}), {{"كود العقد", "ContractCode"}, {"كود الوحدة", "UnitCode"}, {"كود العميل", "ClientCode"}, {"بداية العقد", "StartDate"}, {"نهاية العقد", "EndDate"}, {"الإيجار الشهري (السنة الأولى)", "Rent"}, {"الزيادة السنوية %", "IncreasePct"}, {"إيجار كل سنة (يدوي)", "RentOverrides"}, {"التأمين", "Deposit"}, {"حالة التأمين", "DepositStatus"}, {"يوم الاستحقاق", "DueDay"}, {"العقد السابق", "PrevContract"}, {"الحالة (محسوب)", "Status"}, {"الإيجار الحالي (محسوب)", "CurrentRent"}}),
     Contracts2 = Table.TransformColumnTypes(Contracts1, {{"ContractCode", type text}, {"StartDate", type date}, {"EndDate", type date}, {"Rent", type number}, {"IncreasePct", type number}, {"Deposit", type number}, {"DueDay", Int64.Type}}),
-    Contracts = Table.AddColumn(Contracts2, "DaysLeft", each Duration.Days([EndDate] - Date.From(DateTime.LocalNow())), Int64.Type),
+    Contracts3 = Table.AddColumn(Contracts2, "DaysLeft", each Duration.Days([EndDate] - Date.From(DateTime.LocalNow())), Int64.Type),
+    Contracts = Table.AddColumn(Contracts3, "StatusKey", each if [Status] = "ساري" then "active" else if [Status] = "لم يبدأ" then "future" else if Text.Contains([Status], "أُجِّرت") then "renewed" else "ended", type text),
 
     // ---------- المدفوعات ----------
     Payments0 = Sheet("المدفوعات"),
     Payments1 = Table.RenameColumns(Table.SelectColumns(Payments0, {"رقم الفاتورة", "كود العقد", "الشهر", "المبلغ", "تاريخ السداد", "طريقة السداد", "المصدر"}), {{"رقم الفاتورة", "InvoiceNo"}, {"كود العقد", "ContractCode"}, {"الشهر", "MonthKey"}, {"المبلغ", "Amount"}, {"تاريخ السداد", "PaidOn"}, {"طريقة السداد", "Method"}, {"المصدر", "Source"}}),
-    Payments = Table.TransformColumnTypes(Payments1, {{"InvoiceNo", type text}, {"ContractCode", type text}, {"MonthKey", type text}, {"Amount", type number}, {"PaidOn", type date}}),
+    Payments2 = Table.TransformColumnTypes(Payments1, {{"InvoiceNo", type text}, {"ContractCode", type text}, {"MonthKey", type text}, {"Amount", type number}, {"PaidOn", type date}}),
+    Payments = Table.AddColumn(Payments2, "MonthStart", each try #date(Number.From(Text.Start([MonthKey], 4)), Number.From(Text.Middle([MonthKey], 5, 2)), 1) otherwise null, type date),
 
     // ---------- الصيانة ----------
     Maintenance0 = Sheet("الصيانة"),
@@ -49,6 +54,11 @@ let
     Calendar3 = Table.AddColumn(Calendar2, "Month", each Date.Month([Date]), Int64.Type),
     Calendar4 = Table.AddColumn(Calendar3, "MonthKey", each Text.From(Date.Year([Date])) & "-" & Text.PadStart(Text.From(Date.Month([Date])), 2, "0"), type text),
     Calendar = Table.AddColumn(Calendar4, "MonthName", each Date.ToText([Date], "MMMM yyyy", "ar-EG"), type text),
+    // جدول الشهور (مفتاح فريد لكل شهر) لربطه بالمدفوعات والاستحقاق
+    Months = Table.Distinct(Table.SelectColumns(Table.AddColumn(Calendar, "MonthStart", each Date.StartOfMonth([Date]), type date), {"MonthKey", "MonthStart", "Year", "Month", "MonthName"})),
+    Settings0 = Sheet("الإعدادات"),
+    GraceRows = Table.SelectRows(Settings0, each Text.Contains(Text.From([الإعداد]), "السماح")),
+    GraceDaysSetting = if Table.RowCount(GraceRows) > 0 then Number.From(GraceRows{0}[القيمة]) else 5,
 
     // ---------- الاستحقاق الشهري: كل عقد × كل شهر ----------
     // إيجار الشهر = إيجار سنة العقد (الزيادة السنوية في ذكرى البداية)، والشهر المقطوع بالأيام
@@ -58,14 +68,22 @@ let
             n = if e < s then 0 else (Date.Year(e) - Date.Year(s)) * 12 + Date.Month(e) - Date.Month(s) + 1,
             months = List.Generate(() => 0, each _ < n, each _ + 1, each Date.AddMonths(Date.StartOfMonth(s), _)),
             inc = (if c[IncreasePct] = null then 0 else c[IncreasePct]) / 100,
-            rentForDate = (d as date) as number =>
-                let k = Number.IntegerDivide(Duration.Days(d - s), 365.25) + 0,
-                    kk = Date.Year(d) - Date.Year(s) - (if Date.Month(d) < Date.Month(s) or (Date.Month(d) = Date.Month(s) and Date.Day(d) < Date.Day(s)) then 1 else 0)
-                in Number.Round(c[Rent] * Number.Power(1 + inc, kk), 0),
+            // «إيجار كل سنة (يدوي)» بصيغة "2:83600; 3:91960" يتقدم على الزيادة المحسوبة
+            ovText = if c[RentOverrides] = null then "" else Text.From(c[RentOverrides]),
+            ovList = List.Transform(List.Select(Text.Split(ovText, ";"), each Text.Contains(_, ":")), each let parts = Text.Split(Text.Trim(_), ":") in [k = Number.From(Text.Trim(parts{0})), rent = Number.From(Text.Replace(Text.Trim(parts{1}), ",", ""))]),
+            yearIndex = (d as date) as number => Date.Year(d) - Date.Year(s) - (if Date.Month(d) < Date.Month(s) or (Date.Month(d) = Date.Month(s) and Date.Day(d) < Date.Day(s)) then 1 else 0) + 1,
+            rentForYear = (k as number) as number =>
+                let ov = List.Select(ovList, each _[k] = k),
+                    prev = if k <= 1 then c[Rent] else @rentForYear(k - 1)
+                in if List.Count(ov) > 0 then ov{0}[rent] else (if k <= 1 then c[Rent] else Number.Round(prev * (1 + inc), 0)),
+            rentForDate = (d as date) as number => rentForYear(yearIndex(d)),
             rows = List.Transform(months, (m) =>
                 let mf = m, ml = Date.EndOfMonth(m), a = if s > mf then s else mf, b = if e < ml then e else ml,
                     days = Duration.Days(b - a) + 1, dim = Date.Day(ml),
-                    due = Number.Round(rentForDate(a) * days / dim, 0),
+                    // الشهر الذي تقع فيه ذكرى العقد يُقسَّم بالأيام بين السنتين (كما في البرنامج)
+                    anniv = #date(Date.Year(m), Date.Month(s), Number.Min(Date.Day(s), Date.Day(Date.EndOfMonth(#date(Date.Year(m), Date.Month(s), 1))))),
+                    split = anniv > a and anniv <= b,
+                    due = if split then Number.Round((rentForDate(a) * Duration.Days(anniv - a) + rentForDate(anniv) * (Duration.Days(b - anniv) + 1)) / dim, 0) else Number.Round(rentForDate(a) * days / dim, 0),
                     dueDate = if a > #date(Date.Year(m), Date.Month(m), Number.Min(c[DueDay], dim)) then a else #date(Date.Year(m), Date.Month(m), Number.Min(c[DueDay], dim))
                 in [ContractCode = c[ContractCode], UnitCode = c[UnitCode], ClientCode = c[ClientCode], MonthKey = Text.From(Date.Year(m)) & "-" & Text.PadStart(Text.From(Date.Month(m)), 2, "0"), MonthStart = m, DueDate = dueDate, Due = due, CoveredDays = days])
         in Table.FromRecords(rows, type table [ContractCode = text, UnitCode = text, ClientCode = text, MonthKey = text, MonthStart = date, DueDate = date, Due = number, CoveredDays = Int64.Type]),
@@ -75,10 +93,10 @@ let
     DueMonths2 = Table.ExpandTableColumn(DueMonths1, "P", {"Paid"}),
     DueMonths3 = Table.ReplaceValue(DueMonths2, null, 0, Replacer.ReplaceValue, {"Paid"}),
     Today = Date.From(DateTime.LocalNow()),
-    GraceDays = 5,
+    GraceDays = GraceDaysSetting,
     DueMonths4 = Table.AddColumn(DueMonths3, "Remaining", each Number.Max(0, [Due] - [Paid]), type number),
     DueMonths5 = Table.AddColumn(DueMonths4, "OverdueDays", each Duration.Days(Today - [DueDate]), Int64.Type),
     DueMonths6 = Table.AddColumn(DueMonths5, "IsLate", each [Remaining] > 0 and [OverdueDays] > GraceDays, type logical),
     DueMonths = Table.AddColumn(DueMonths6, "Status", each if [Paid] >= [Due] - 0.5 then "مسدَّد" else if [MonthStart] > Today then "قادم" else if [Paid] > 0 then (if [IsLate] then "جزئي متأخر" else "جزئي") else if [IsLate] then "متأخر" else "مستحق", type text)
 in
-    [Projects = Projects, Units = Units, Clients = Clients, Contracts = Contracts, Payments = Payments, Maintenance = Maintenance, UnitAssets = UnitAssets, Calendar = Calendar, DueMonths = DueMonths]
+    [Projects = Projects, Units = Units, Clients = Clients, Contracts = Contracts, Payments = Payments, Maintenance = Maintenance, UnitAssets = UnitAssets, Calendar = Calendar, Months = Months, DueMonths = DueMonths]

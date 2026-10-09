@@ -35,6 +35,9 @@ window.Egary = window.Egary || {};
   /* نسخة احتياطية من آخر ملف سليم قُرئ أو كُتب (داخل المتصفح) — شبكة أمان لو تلف الملف */
   const saveBackup = (buf) => tx('readwrite', st => st.put({ at: Date.now(), bytes: buf.slice(0) }, 'backup')).catch(() => null);
   const loadBackup = () => tx('readonly', st => st.get('backup')).catch(() => null);
+  /* الملف الأصلي قبل أول تحويل: يُحفظ مرة واحدة ولا يُستبدل أبدًا */
+  const saveOriginal = async (buf, name) => { const cur = await tx('readonly', st => st.get('original')).catch(() => null); if (cur && cur.bytes) return false; await tx('readwrite', st => st.put({ at: Date.now(), name: name || 'Egary.xlsx', bytes: buf.slice(0) }, 'original')).catch(() => null); return true; };
+  const loadOriginal = () => tx('readonly', st => st.get('original')).catch(() => null);
 
   /* ---------- محوِّل ملف حقيقي (Chrome / Edge) ---------- */
   function fileHandleAdapter(handle) {
@@ -100,5 +103,5 @@ window.Egary = window.Egary || {};
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
-  E.FileLink = { supported, pick, restore, saveHandle, loadHandle, clearHandle, saveBackup, loadBackup, fileHandleAdapter, memoryAdapter, downloadBytes };
+  E.FileLink = { supported, pick, restore, saveHandle, loadHandle, clearHandle, saveBackup, loadBackup, saveOriginal, loadOriginal, fileHandleAdapter, memoryAdapter, downloadBytes };
 })(window.Egary);

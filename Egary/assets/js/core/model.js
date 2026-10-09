@@ -42,6 +42,10 @@ window.Egary = window.Egary || {};
         ledgerYears: [2026],     // أوراق السنوات الموجودة في الإكسيل
         invoicePrefix: 'INV',
         currency: 'ج',
+        enteredThrough: '',      // آخر شهر مكتمل التسجيل في الورقة ('' = يُكتشف تلقائيًا)
+        tolerancePct: 0.5,       // فرق مقبول بين المسدَّد والمستحق (٪ من المستحق) قبل اعتبار الشهر جزئيًا
+        toleranceMin: 50,        // وبحد أدنى بالجنيه (تقريب المكتب للكسور)
+        prorationBasis: '30',    // الشهر المقطوع يُحسب على 30 يومًا كما يفعل المكتب ('actual' = بالأيام الفعلية)
       },
       projects: [], units: [], clients: [], contracts: [], payments: [], maintenance: [],
       audit: [],
@@ -54,9 +58,9 @@ window.Egary = window.Egary || {};
     projects: () => ({ code: '', name: '', address: '', area: '', notes: '', createdAt: '' }),
     units: () => ({ code: '', projectCode: '', label: '', type: 'admin', floor: '', area: '', notes: '', assets: [], createdAt: '' }),
     clients: () => ({ code: '', name: '', kind: 'person', rep: '', nationalId: '', taxId: '', phone: '', phone2: '', email: '', address: '', notes: '', createdAt: '' }),
-    contracts: () => ({ code: '', unitCode: '', clientCode: '', start: '', end: '', rent: 0, increasePct: 0, rentOverrides: {}, deposit: 0, depositStatus: 'none', dueDay: 1, prevCode: '', notes: '', createdAt: '' }),
+    contracts: () => ({ code: '', unitCode: '', clientCode: '', start: '', end: '', rent: 0, increasePct: 0, rentOverrides: {}, deposit: 0, depositStatus: 'none', dueDay: 1, prevCode: '', notes: '', inferred: false, createdAt: '' }),
     payments: () => ({ code: '', contractCode: '', period: '', amount: 0, paidOn: '', method: 'cash', ref: '', notes: '', source: 'web', createdAt: '' }),
-    maintenance: () => ({ code: '', unitCode: '', date: '', kind: 'other', description: '', cost: 0, borneBy: 'owner', status: 'open', closedOn: '', notes: '', createdAt: '' }),
+    maintenance: () => ({ code: '', unitCode: '', date: '', kind: 'other', description: '', cost: 0, borneBy: 'owner', status: 'open', closedOn: '', notes: '', custodianContract: '', custodianName: '', createdAt: '' }),
   };
   const ENTITIES = Object.keys(blank);
   const ENTITY_AR = { projects: 'مشروع', units: 'وحدة', clients: 'عميل', contracts: 'عقد', payments: 'دفعة', maintenance: 'صيانة' };
@@ -87,13 +91,13 @@ window.Egary = window.Egary || {};
         need(U.d(r.start), 'تاريخ بداية العقد مطلوب');
         need(U.d(r.end), 'تاريخ نهاية العقد مطلوب');
         need(!(U.d(r.start) && U.d(r.end)) || U.d(r.end) >= U.d(r.start), 'تاريخ النهاية قبل تاريخ البداية');
-        need(U.toNum(r.rent) != null && U.toNum(r.rent) >= 0, 'الإيجار الشهري مطلوب');
+        need(U.toNum(r.rent) != null && U.toNum(r.rent) > 0, 'الإيجار الشهري مطلوب (أكبر من صفر)');
         need(U.toNum(r.increasePct) == null || (U.toNum(r.increasePct) >= 0 && U.toNum(r.increasePct) <= 100), 'نسبة الزيادة بين 0 و100');
         need(U.toNum(r.deposit) == null || U.toNum(r.deposit) >= 0, 'التأمين لا يكون سالبًا');
         need(!r.dueDay || (r.dueDay >= 1 && r.dueDay <= 28), 'يوم الاستحقاق بين 1 و28');
         if (state && U.d(r.start) && U.d(r.end)) {
           const overlap = state.contracts.find(c => c.code !== r.code && c.unitCode === r.unitCode && U.d(c.start) <= U.d(r.end) && U.d(c.end) >= U.d(r.start));
-          need(!overlap, overlap ? `يتداخل مع العقد ${overlap.code} على نفس الوحدة` : '');
+          need(!overlap, overlap ? `يتداخل مع العقد ${overlap.code} على نفس الوحدة (${U.fmtDate(overlap.start)} → ${U.fmtDate(overlap.end)}) — ابدأ من ${U.fmtDate(U.iso(U.addDays(U.d(overlap.end), 1)))} أو عدّل العقد السابق` : '');
         }
         break;
       case 'payments':

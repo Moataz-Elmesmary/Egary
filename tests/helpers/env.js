@@ -16,4 +16,4 @@ function load(opts) {
 }
 function toArrayBuffer(buf) { return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength); }
 function readFile(p) { return toArrayBuffer(fs.readFileSync(p)); }
-module.exports = { load, ROOT, toArrayBuffer, readFile, SOURCE: '/tmp/claude-0/-home-user-Egary/e8cec96e-9e54-59ec-a68b-cc761d4144c6/scratchpad/xl/source.xlsx' };
+module.exports = { load, ROOT, toArrayBuffer, readFile, SOURCE: process.env.EGARY_SOURCE || path.join(__dirname, '..', 'fixtures', 'source-anon.xlsx') };

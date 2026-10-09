@@ -51,7 +51,8 @@ test('migration of the owner\'s original workbook: counts, totals, codes, re-let
   assert.equal(res.migrated, true);
   assert.deepEqual(st.projects.map(p => p.name), ['بابل', 'محيي الدين', 'ابو بكر']);
   assert.deepEqual(st.projects.map(p => p.code), ['P01', 'P02', 'P03']);
-  assert.equal(st.contracts.length, 73);
+  assert.equal(st.contracts.length, 86);                // 73 صف + 13 فترة سابقة مستنتجة (مبالغ قبل بداية العقد الحالي)
+  assert.equal(st.contracts.filter(c => c.inferred).length, 13);
   assert.equal(st.clients.length, 64);
   assert.equal(st.units.length, 71);                    // 73 صف − وحدتان أُجِّرتا مرتين (204، 304) ... + محل الثاني مستقل
   assert.equal(st.payments.length, 509);
@@ -70,8 +71,8 @@ test('migration of the owner\'s original workbook: counts, totals, codes, re-let
   assert.deepEqual(E.Engine.schedule(t5).map(y => y.rent), [76000, 83600, 91960]);
   // الأعلام: الخلية النصية، النهاية قبل البداية، الرقم المختلف
   assert.ok(res.flags.some(f => f.text.includes('63+.0+3+26309')));
-  assert.ok(res.flags.some(f => f.sev === 'danger' && f.text.includes('قبل بدايته')));
-  assert.ok(res.flags.some(f => f.code === 'C020' && f.text.includes('P12766398')));
+  assert.ok(res.flags.some(f => f.sev === 'danger' && (f.text.includes('قبل بدايته') || f.text.includes('بعد نهايته'))));
+  assert.ok(res.flags.some(f => f.code === 'C020' && f.text.includes('P16126721')));
   // كود العميل يبدأ بـ C والعقد بـ T والفاتورة INV-2026-
   assert.ok(st.clients.every(c => /^C\d{3,}$/.test(c.code)));
   assert.ok(st.contracts.every(c => /^T\d{4,}$/.test(c.code)));
@@ -88,18 +89,29 @@ test('round trip: state → Egary.xlsx → state is identical, and the sheet kee
   const r2 = await E.Workbook.read(buf);
   assert.equal(r2.migrated, false);
   assert.equal(sortedState(state), sortedState(r2.state));
-  const info = py(PY_READ, file, '2026', 'K1,A2,B2,C3,E3,G3,K3,W3,X65,R65,Y3,Z3,AA3,AB3,C76,K76');
+  const rows = py(`
+import sys, json, openpyxl
+wb = openpyxl.load_workbook(sys.argv[1]); ws = wb['2026']
+out = {}
+for r in range(3, ws.max_row+1):
+    v = ws.cell(r, 25).value
+    if v == 'T0001': out['t1'] = r
+    if ws.cell(r, 26).value == 'P03-605' and ws.cell(r, 25).value and not str(ws.cell(r, 25).value).startswith('x'): out['u605'] = r
+    if ws.cell(r, 3).value == 'الاجمالي العام': out['tot'] = r
+print(json.dumps(out))`, file);
+  const info = py(PY_READ, file, '2026', `K1,A2,B2,C${rows.t1},E${rows.t1},G${rows.t1},K${rows.t1},W${rows.t1},R${rows.u605},Y${rows.t1},Z${rows.t1},AA${rows.t1},AB${rows.t1},C${rows.tot},K${rows.tot}`);
+  const c = (col) => info.cells[col + rows.t1];
   assert.deepEqual(info.sheets.slice(0, 2), ['2026', 'ملخص المشاريع']);
   assert.ok(info.sheets.includes('العقود') && info.sheets.includes('المدفوعات') && info.sheets.includes('الوحدات') && info.sheets.includes('العملاء') && info.sheets.includes('الصيانة') && info.sheets.includes('أصول الوحدات'));
   assert.equal(info.cells.K1, '2026');
   assert.equal(info.cells.B2, 'المشروع');
-  assert.equal(info.cells.C3, 'حسام حسن سنوسي');
-  assert.equal(info.cells.G3, '2023-06-01T00:00:00');
-  assert.equal(info.cells.K3, 12705);
-  assert.equal(info.cells.W3, '=SUM(K3:V3)');
-  assert.equal(info.cells.R65, '63+.0+3+26309');        // النص الأصلي محفوظ في خليته
-  assert.equal(info.cells.Y3, 'T0001'); assert.equal(info.cells.Z3, 'P01-S1'); assert.equal(info.cells.AA3, 'C001'); assert.equal(info.cells.AB3, 'P01');
-  assert.equal(info.cells.C76, 'الاجمالي العام'); assert.equal(info.cells.K76, '=SUM(K3:K75)');
+  assert.equal(c('C'), 'عمرو أيمن زكي');
+  assert.equal(c('G'), '2023-06-01T00:00:00');
+  assert.equal(c('K'), 12705);
+  assert.equal(c('W'), `=SUM(K${rows.t1}:V${rows.t1})`);
+  assert.equal(info.cells['R' + rows.u605], '63+.0+3+26309');        // النص الأصلي محفوظ في خليته
+  assert.equal(c('Y'), 'T0001'); assert.equal(c('Z'), 'P01-S1'); assert.equal(c('AA'), 'C001'); assert.equal(c('AB'), 'P01');
+  assert.equal(info.cells['C' + rows.tot], 'الاجمالي العام'); assert.equal(info.cells['K' + rows.tot], `=SUM(K3:K${rows.tot - 1})`);
   assert.equal(info.rtl, true);
   assert.equal(info.freeze, 'F3');
   assert.equal(info.fill_B2, 'FF1F4E78');
@@ -115,7 +127,10 @@ test('Excel → website: a month cell edited in Excel (openpyxl) updates the pay
   const base = path.join(OUT, 'base.xlsx'), edited = path.join(OUT, 'edited.xlsx');
   fs.writeFileSync(base, Buffer.from(buf));
   // الصف 3 = T0001: سبتمبر (S3) يُكتب 12705، يناير (K3) يُفرَّغ؛ صف جديد 76؟ لا — الصف 76 إجمالي؛ نضيف الصف بعده بـ openpyxl: نكتب في الصف 77 (أسفل الإجمالي يقرؤه الموقع أيضًا)
-  py(PY_EDIT, base, '2026', 'S3=12705;K3=;B77=ابو بكر;C77=عميل جديد تجريبي;D77=عميل جديد تجريبي;E77=709;F77=شارع ابو بكر الصديق 3;G77=2026-09-01;H77=2027-08-31;J77=29001011234567;S77=9000;T77=9000', edited);
+  const nr = py(`
+import sys, json, openpyxl
+wb = openpyxl.load_workbook(sys.argv[1]); ws = wb['2026']; print(json.dumps({'n': ws.max_row + 1}))`, base).n;
+  py(PY_EDIT, base, '2026', `S3=12705;K3=;B${nr}=ابو بكر;C${nr}=عميل جديد تجريبي;D${nr}=عميل جديد تجريبي;E${nr}=709;F${nr}=شارع ابو بكر الصديق 3;G${nr}=2026-09-01;H${nr}=2027-08-31;J${nr}=29001011234567;S${nr}=9000;T${nr}=9000`, edited);
   const snapshot = E.Workbook.snapshotOf(state);
   const r2 = await E.Workbook.read(readFile(edited), { snapshot });
   const s2 = r2.state;
@@ -135,9 +150,15 @@ test('Excel → website: a month cell edited in Excel (openpyxl) updates the pay
   E.Store.load(s2);
   const buf3 = await E.Workbook.write(s2);
   const file3 = path.join(OUT, 'rewritten.xlsx'); fs.writeFileSync(file3, Buffer.from(buf3));
-  const info = py(PY_READ, file3, '2026', 'C76,Y76,Z76,S3,K3');
-  assert.equal(info.cells.C76, 'عميل جديد تجريبي'); assert.equal(info.cells.Z76, 'P03-709'); assert.equal(info.cells.Y76, nk.code);
-  assert.equal(info.cells.S3, 12705); assert.equal(info.cells.K3, null);
+  const found = py(`
+import sys, json, openpyxl
+wb = openpyxl.load_workbook(sys.argv[1]); ws = wb['2026']
+out = {'S3': ws['S3'].value, 'K3': ws['K3'].value}
+for r in range(3, ws.max_row+1):
+    if ws.cell(r, 26).value == 'P03-709': out['name'] = ws.cell(r, 3).value; out['code'] = ws.cell(r, 25).value
+print(json.dumps(out, ensure_ascii=False))`, file3);
+  assert.equal(found.name, 'عميل جديد تجريبي'); assert.equal(found.code, nk.code);
+  assert.equal(found.S3, 12705); assert.equal(found.K3, null);
 });
 
 test('website → Excel: payments, a new unit with assets, a client edit and a delete all land in the workbook (openpyxl)', async () => {

@@ -1,6 +1,7 @@
 // ======================================================================
 //  Egary — مقاييس DAX (Modeling → New measure، الصق كل مقياس على حدة)
-//  الجداول: Projects, Units, Clients, Contracts, Payments, Maintenance, DueMonths, Calendar
+//  الجداول: Projects, Units, Clients, Contracts, Payments, Maintenance, DueMonths, Months, Calendar
+//  العلاقات المطلوبة: Months[MonthKey] 1:* DueMonths[MonthKey] و Months[MonthKey] 1:* Payments[MonthKey]
 // ======================================================================
 
 Collected = SUM ( Payments[Amount] )
@@ -25,25 +26,25 @@ Debtors = CALCULATE ( DISTINCTCOUNT ( DueMonths[ClientCode] ), DueMonths[IsLate]
 
 Units Count = COUNTROWS ( Units )
 
-Occupied Units = CALCULATE ( COUNTROWS ( Units ), Units[Status] IN { "مؤجَّرة", "تنتهي قريبًا" } )
+Occupied Units = CALCULATE ( COUNTROWS ( Units ), Units[StatusKey] IN { "occupied", "ending" } )
 
-Vacant Units = CALCULATE ( COUNTROWS ( Units ), Units[Status] = "شاغرة" )
+Vacant Units = CALCULATE ( COUNTROWS ( Units ), Units[StatusKey] = "vacant" )
 
 Occupancy Rate = DIVIDE ( [Occupied Units], [Units Count] )
 
-Vacant > 3 months = CALCULATE ( COUNTROWS ( Units ), Units[Status] = "شاغرة", Units[VacantDays] >= 90 )
+Vacant > 3 months = CALCULATE ( COUNTROWS ( Units ), Units[StatusKey] = "vacant", Units[VacantDays] >= 90 )   // 3 × 30 يومًا كما في البرنامج (عدّل الرقم لو غيّرت الإعداد)
 
-Active Contracts = CALCULATE ( COUNTROWS ( Contracts ), Contracts[Status] = "ساري" )
+Active Contracts = CALCULATE ( COUNTROWS ( Contracts ), Contracts[StatusKey] = "active" )
 
-Monthly Rent Roll = CALCULATE ( SUM ( Contracts[CurrentRent] ), Contracts[Status] = "ساري" )
+Monthly Rent Roll = CALCULATE ( SUM ( Contracts[CurrentRent] ), Contracts[StatusKey] = "active" )
 
 Ending in 90 days =
-CALCULATE ( COUNTROWS ( Contracts ), Contracts[Status] = "ساري", Contracts[DaysLeft] >= 0, Contracts[DaysLeft] <= 90 )
+CALCULATE ( COUNTROWS ( Contracts ), Contracts[StatusKey] = "active", Contracts[DaysLeft] >= 0, Contracts[DaysLeft] <= 90 )
 
 Ending in 30 days =
-CALCULATE ( COUNTROWS ( Contracts ), Contracts[Status] = "ساري", Contracts[DaysLeft] >= 0, Contracts[DaysLeft] <= 30 )
+CALCULATE ( COUNTROWS ( Contracts ), Contracts[StatusKey] = "active", Contracts[DaysLeft] >= 0, Contracts[DaysLeft] <= 30 )
 
-Ended without renewal = CALCULATE ( COUNTROWS ( Contracts ), Contracts[Status] = "منتهٍ" )
+Ended without renewal = CALCULATE ( COUNTROWS ( Contracts ), Contracts[StatusKey] = "ended" )
 
 Deposits Held = CALCULATE ( SUM ( Contracts[Deposit] ), Contracts[DepositStatus] = "محتفظ به" )
 
@@ -55,7 +56,7 @@ CALCULATE (
 )
 
 Collected YTD =
-CALCULATE ( [Collected], FILTER ( ALL ( Calendar ), Calendar[Year] = YEAR ( TODAY () ) && Calendar[Date] <= TODAY () ) )
+CALCULATE ( [Collected], FILTER ( ALL ( Months ), Months[Year] = YEAR ( TODAY () ) && Months[MonthStart] <= TODAY () ) )
 
 Maintenance Cost = SUM ( Maintenance[Cost] )
 

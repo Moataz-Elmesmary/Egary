@@ -181,6 +181,8 @@ table.ledger { border-collapse: separate; border-spacing: 0; font-size: 13px; mi
 .ledger td.m.late { background: var(--late-soft); color: var(--late); }
 .ledger td.m.due { background: var(--due-soft); color: var(--due); }
 .ledger td.m.upcoming, .ledger td.m.none, .ledger td.m.history { color: var(--muted); background: transparent; }
+.ledger td.m.pending { color: var(--text-2); background: repeating-linear-gradient(135deg, var(--upcoming-soft) 0 6px, transparent 6px 12px); }
+.badge.pending { background: var(--upcoming-soft); color: var(--text-2); }
 .ledger td.m.orphan { background: var(--info-soft); color: var(--info); }
 .ledger td.m .hint { display: block; font-size: 10.5px; opacity: .8; line-height: 1.1; }
 .ledger td.tot { text-align: end; direction: ltr; font-weight: 700; font-variant-numeric: tabular-nums; }

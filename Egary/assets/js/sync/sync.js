@@ -83,6 +83,11 @@ window.Egary = window.Egary || {};
     writing = true;
     emit({ state: 'saving', error: null });
     try {
+      // لو تغيّر الملف منذ آخر قراءة (حفظ من Excel أو جهاز آخر) نقرأه أولًا ثم نكتب فوقه بالعمليات المعلّقة
+      try {
+        if (pollPromise) { writing = false; await pollPromise; writing = true; }
+        if (adapter && (await adapter.lastModified()) !== lastSeen) { writing = false; await poll(); writing = true; }
+      } catch (e) { /* يُعالَج في الكتابة */ }
       const buf = await cfg.serialize();
       await adapter.write(buf);
       lastSeen = await adapter.lastModified();
@@ -115,34 +120,44 @@ window.Egary = window.Egary || {};
   }
 
   /* ---------- مراقبة التعديلات الخارجية ---------- */
-  async function poll() {
-    if (!adapter || writing) return;
+  let pollPromise = null;
+  function poll() {
+    if (!adapter || writing) return Promise.resolve(false);
+    if (pollPromise) return pollPromise;
+    pollPromise = doPoll().catch(() => false).then(r => { pollPromise = null; return r; });
+    return pollPromise;
+  }
+  async function doPoll() {
     let m;
-    try { m = await adapter.lastModified(); } catch (e) { emit({ state: 'error', error: errorText(e) }); return; }
-    if (m === lastSeen) return;
-    lastSeen = m;
+    try { m = await adapter.lastModified(); } catch (e) { emit({ state: 'error', error: errorText(e) }); return false; }
+    if (m === lastSeen) return false;
+    try {
+      // ننتظر حتى يستقر الملف (Excel/OneDrive يكتبان على دفعات)
+      await new Promise(r => setTimeout(r, cfg.settleMs == null ? 400 : cfg.settleMs));
+      const m2 = await adapter.lastModified();
+      if (m2 !== m) return false;
+    } catch (e) { return false; }
     emit({ state: 'reading' });
     try {
       const buf = await adapter.read();
       await cfg.deserialize(buf);
+      lastSeen = m; // لا نعتبر التعديل مقروءًا إلا بعد نجاح القراءة
       status.lastExternal = Date.now();
-      if (pending.length) {
-        cfg.applyOps(pending.slice());
-        emit({ state: 'linked', lastSync: Date.now() });
-        await flush();
-      } else {
-        emit({ state: 'linked', lastSync: Date.now(), error: null });
-      }
+      let replayed = false;
+      if (pending.length) { cfg.applyOps(pending.slice()); replayed = true; } // الكتابة تتم من المستدعي (لا من داخل الاستطلاع)
+      emit({ state: 'linked', lastSync: Date.now(), error: null });
       if (cfg.onExternalChange) cfg.onExternalChange();
+      return { changed: true, replayed };
     } catch (e) {
-      emit({ state: 'error', error: 'تعذّر قراءة الملف بعد تعديله: ' + errorText(e) });
+      emit({ state: 'error', error: 'تعذّر قراءة الملف بعد تعديله (ربما لم يكتمل حفظه بعد) — ستُعاد المحاولة تلقائيًا: ' + errorText(e) });
+      return false;
     }
   }
   function startPolling() {
     stopPolling();
-    timer = setInterval(() => { poll().catch(() => {}); }, cfg.pollMs || 1500);
+    timer = setInterval(() => { poll().then(r => { if (r && r.replayed) flush().catch(() => {}); }).catch(() => {}); }, cfg.pollMs || 1500);
   }
-  function stopPolling() { if (timer) clearInterval(timer); timer = null; }
+  function stopPolling() { if (timer) clearInterval(timer); timer = null; clearTimeout(flushTimer); flushTimer = null; }
 
   E.Sync = {
     init, link, unlink, record, flush, poll, startPolling, stopPolling,

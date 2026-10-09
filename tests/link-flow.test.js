@@ -25,7 +25,7 @@ test('link flow: pick file → permission → app shows real data → an edit wr
     throw e;
   }
   assert.equal(await page.evaluate(() => window.__picked), true);
-  assert.ok((await page.$$eval('.nav .cnt', els => els.map(e => e.textContent))).join(',').startsWith('3,71,64,73,509'));
+  assert.ok((await page.$$eval('.nav .cnt', els => els.map(e => e.textContent))).join(',').startsWith('3,71,64,86,509'));
   await page.waitForFunction(() => document.querySelector('#sync-status').classList.contains('linked'));
   const w0 = await page.evaluate(() => window.__writes || 0);
   assert.ok(w0 >= 1, 'linking writes the upgraded workbook back once: ' + w0);

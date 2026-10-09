@@ -42,7 +42,7 @@ wb = openpyxl.load_workbook(sys.argv[1]); ws = wb['الصيانة']
 hdr = [c.value for c in ws[1]]; r = dict(zip(hdr, [c.value for c in ws[2]]))
 s = wb['الإعدادات']; sett = {s.cell(i,1).value: s.cell(i,2).value for i in range(2, s.max_row+1)}
 print(json.dumps({'cust': r['المستأجر وقتها (محسوب)'], 'k': r['العقد وقتها (محسوب)'], 'grace': sett.get('أيام السماح بعد الاستحقاق'), 'office': sett.get('اسم المكتب')}, ensure_ascii=False))`, f);
-  assert.equal(info.k, 'T0008'); assert.equal(info.cust, 'شركة مستر تايلور'); assert.equal(info.grace, 7); assert.equal(info.office, 'مكتب الاختبار');
+  assert.equal(info.k, 'T0008'); assert.equal(info.cust, 'شركة المستقبل للتدريب'); assert.equal(info.grace, 7); assert.equal(info.office, 'مكتب الاختبار');
 });
 
 test('the text cell from the original sheet survives repeated round trips and a later real payment replaces it', async () => {
@@ -79,7 +79,7 @@ wb.save(sys.argv[2]); print(json.dumps({'ok': True}))`, base, edited);
   const r2 = await E.Workbook.read(readFile(edited), { snapshot: E.Workbook.snapshotOf(state) });
   assert.equal(r2.state.contracts.find(c => c.code === 'T0007'), undefined);
   assert.equal(r2.state.payments.filter(p => p.contractCode === 'T0007').length, 0);
-  assert.equal(r2.state.contracts.length, 72);
+  assert.equal(r2.state.contracts.length, 85);
 });
 
 test('sheets the office adds by hand (e.g. ملاحظات) survive a website save, keep their content, and stay after our sheets', async () => {

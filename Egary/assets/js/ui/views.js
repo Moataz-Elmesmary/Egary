@@ -46,8 +46,9 @@ window.Egary = window.Egary || {};
     const tile = (cls, label, value, detail, onClick, extra) => { const t = h('button', { class: 'kpi ' + cls, onclick: onClick, dataset: { kpi: label } }, h('span', { class: 'bar' }), h('span', { class: 'go' }, UI().icon('arrow')), h('div', { class: 'l' }, label), h('div', { class: 'v' }, value), detail ? h('div', { class: 'd' }, detail) : null, extra || null); tiles.appendChild(t); return t; };
     const mo = k.month, pm = k.prevMonth;
     const delta = pm.collected ? (mo.collected - pm.collected) / pm.collected : null;
-    tile(mo.rate == null ? 'info' : mo.rate >= .9 ? 'ok' : mo.rate >= .6 ? 'warn' : 'danger', `تحصيل ${U().periodLabel(k.period, true)}`, h('span', null, fm(mo.collected)), h('span', null, `${fp(mo.rate)} من مستحق ${fm(mo.due)}`, delta != null ? h('span', { class: delta >= 0 ? 'up' : 'down' }, ` ${delta >= 0 ? '▲' : '▼'} ${fp(Math.abs(delta))} عن الشهر السابق`) : null), () => monthEvidence(ctx, k.period));
-    tile('accent', `محصَّل ${k.period.slice(0, 4)} حتى اليوم`, h('span', null, fm(k.ytd.collected)), `${k.counts.payments} دفعة · معدل التحصيل ${fp(k.ytd.rate)}`, () => paymentsEvidence(ctx, k.ytd.rows, `المدفوعات المسجَّلة في ${k.period.slice(0, 4)}`), UI().spark(k.trend.map(m => m.collected)));
+    tile(mo.rate == null ? 'info' : mo.rate >= .9 ? 'ok' : mo.rate >= .6 ? 'warn' : 'danger', `تحصيل ${U().periodLabel(k.period, true)}${k.period !== k.currentPeriod ? ' (آخر شهر مسجَّل)' : ''}`, h('span', null, fm(mo.collected)), h('span', null, `${fp(mo.rate)} من مستحق ${fm(mo.due)}`, delta != null ? h('span', { class: delta >= 0 ? 'up' : 'down' }, ` ${delta >= 0 ? '▲' : '▼'} ${fp(Math.abs(delta))} عن الشهر السابق`) : null), () => monthEvidence(ctx, k.period));
+    tile('accent', `محصَّل ${k.period.slice(0, 4)} حتى اليوم`, h('span', null, fm(k.ytd.collected)), `${k.ytd.rows.length} دفعة · معدل التحصيل ${fp(k.ytd.rate)}`, () => paymentsEvidence(ctx, k.ytd.rows, `المدفوعات المسجَّلة في ${k.period.slice(0, 4)}`), UI().spark(k.trend.map(m => m.collected)));
+    if (k.pending.periods.length) tile('warn', 'بانتظار التسجيل في الورقة', h('span', null, fn(k.pending.contracts), h('small', null, 'عقد')), `${k.pending.periods.map(p => U().periodLabel(p)).join(' و')} — مستحق ${fm(k.pending.due)} لم يُسجَّل بعد (لا يُحتسب متأخرات)`, () => pendingEvidence(ctx, k.pending));
     tile(k.arrears.total > 0 ? 'danger' : 'ok', 'المتأخرات القائمة', h('span', null, fm(k.arrears.total)), `${k.arrears.rows.length} شهر على ${k.arrears.byClient.length} عميل · >90 يوم: ${fm(k.arrears.buckets.b90p)}`, () => arrearsEvidence(ctx, k.arrears));
     tile(k.occupancy.rate >= .9 ? 'ok' : k.occupancy.rate >= .75 ? 'info' : 'warn', 'نسبة الإشغال', h('span', null, fp(k.occupancy.rate), h('small', null, `${k.occupancy.occupiedCount} / ${k.occupancy.total}`)), `${k.occupancy.ending.length} تنتهي خلال 90 يومًا`, () => unitsEvidence(ctx, [...k.occupancy.occupied, ...k.occupancy.ending], 'الوحدات المؤجَّرة الآن'));
     tile(k.occupancy.vacant.length ? 'warn' : 'ok', 'وحدات شاغرة', h('span', null, fn(k.occupancy.vacant.length), h('small', null, 'وحدة')), `منها ${k.occupancy.longVacant.length} شاغرة أكثر من ${st.settings.vacancyMonths} شهور`, () => unitsEvidence(ctx, k.occupancy.vacant, 'الوحدات الشاغرة (الأطول شغورًا أولًا)'));
@@ -57,7 +58,7 @@ window.Egary = window.Egary || {};
     tile('info', 'تأمينات محتفظ بها', h('span', null, fm(k.deposits.total)), `${k.deposits.held.length} عقد · ${k.deposits.endedStillHeld.length} لعقود منتهية`, () => depositsEvidence(ctx, k.deposits));
     tile('accent', 'إيراد متعاقد عليه (12 شهرًا)', h('span', null, fm(k.next12.total)), `الإيجار الشهري الحالي ${fm(k.monthlyRentRoll)} من ${k.activeContracts.length} عقد ساري`, () => forecastEvidence(ctx, k));
     tile(k.maintenance.open.length ? 'warn' : 'ok', 'صيانة مفتوحة', h('span', null, fn(k.maintenance.open.length), h('small', null, 'طلب')), `تكلفة ${k.period.slice(0, 4)}: ${fm(k.maintenance.costYtd)}`, () => maintenanceEvidence(ctx, k.maintenance.open, 'طلبات الصيانة المفتوحة'));
-    tile('info', 'الإيجار الحالي', h('span', null, fm(k.monthlyRentRoll), h('small', null, '/ شهر')), `متوسط ${fm(k.activeContracts.length ? k.monthlyRentRoll / k.activeContracts.length : 0)} للعقد`, () => contractsEvidence(ctx, k.activeContracts, 'العقود السارية'));
+    tile('info', 'الإيجار الحالي', h('span', null, fm(k.monthlyRentRoll), h('small', null, '/ شهر')), `متوسط ${fm(k.activeContracts.length ? k.monthlyRentRoll / k.activeContracts.length : 0)} للعقد`, () => contractsEvidence(ctx, k.activeContracts, `العقود السارية — إيجار شهري ${fm(k.monthlyRentRoll)}`));
     el.appendChild(tiles);
 
     // الرسوم
@@ -92,6 +93,7 @@ window.Egary = window.Egary || {};
     k = k || En().kpis(ctx.filter);
     switch (ev.view) {
       case 'arrears': return arrearsEvidence(ctx, k.arrears, ev.bucket, ev.tab);
+      case 'pending': return pendingEvidence(ctx, k.pending);
       case 'ledger': return ev.period ? monthEvidence(ctx, ev.period) : ctx.go('ledger');
       case 'units': return ev.status === 'vacant' ? unitsEvidence(ctx, k.occupancy.vacant, 'الوحدات الشاغرة') : ctx.go('units');
       case 'contracts': if (ev.status === 'ending') return renewalsEvidence(ctx, k.renewals.soon, 'عقود تنتهي خلال 90 يومًا'); if (ev.status === 'ended') return renewalsEvidence(ctx, k.renewals.ended, 'عقود منتهية بلا تجديد', true); if (ev.deposit) return depositsEvidence(ctx, k.deposits); if (ev.increase) return contractsEvidence(ctx, k.noIncrease, 'عقود سارية بلا زيادة سنوية مسجَّلة'); return ctx.go('contracts');
@@ -108,9 +110,14 @@ window.Egary = window.Egary || {};
     const cols = [col.contract(ctx), col.client(ctx), col.unit(ctx), col.project(), { key: 'due', label: 'المستحق', num: true, render: r => r.due ? fm(r.due.amount) : '—' }, col.money('paid', 'المسدَّد'), { key: 'remaining', label: 'المتبقي', num: true, render: r => fm(r.remaining) }, col.status(), { key: '_a', label: '', sortable: false, cls: 'actions', render: r => r.status !== 'paid' && r.due ? iconBtn('receipt', 'تسجيل دفعة', async () => { if (await F().payment(null, { contractCode: r.contractCode, period })) { UI().closeDrawer(); ctx.rerender(); } }, 'primary') : null }];
     ctx.evidence(`${U().periodLabel(period, true)} — مستحق ${fm(k.due)} · محصَّل ${fm(k.collected)} (${fp(k.rate)})`, rows, cols, { onRow: r => ctx.open('contract', r.contractCode), sort: 'status', foot: (d) => h('tr', null, h('td', { colspan: 4 }, 'الإجمالي'), h('td', { class: 'num' }, fm(U().sum(d, r => r.due ? r.due.amount : 0))), h('td', { class: 'num' }, fm(U().sum(d, r => r.paid))), h('td', { class: 'num' }, fm(U().sum(d, r => r.remaining))), h('td', { colspan: 2 })) });
   }
+  function pendingEvidence(ctx, pending) {
+    ctx.evidence(`شهور بانتظار التسجيل — ${pending.periods.map(p => U().periodLabel(p, true)).join('، ')}`, pending.rows, [col.contract(ctx), col.client(ctx), col.unit(ctx), col.project(), col.period(), col.money('amount', 'المستحق'), { key: '_a', label: '', sortable: false, cls: 'actions', render: r => iconBtn('receipt', 'تسجيل الدفعة', async () => { if (await F().payment(null, { contractCode: r.contractCode, period: r.period })) { UI().closeDrawer(); ctx.rerender(); } }, 'primary') }], { intro: `آخر شهر مكتمل التسجيل في الورقة: ${U().periodLabel(pending.enteredThrough, true)}. هذه الشهور لم يُسجَّل لها تحصيل بعد فلا تُحتسب متأخرات — سجّل الدفعات أو غيّر «آخر شهر مسجَّل» من الإعدادات.`, onRow: r => ctx.open('contract', r.contractCode), foot: d => h('tr', null, h('td', { colspan: 5 }, `${d.length} شهر × عقد`), h('td', { class: 'num' }, fm(U().sum(d, r => r.amount))), h('td')) });
+  }
   function arrearsEvidence(ctx, ar, bucket, tab) {
     let rows = ar.rows;
     if (bucket === 'b90p') rows = rows.filter(r => r.overdueDays > 90);
+    else if (bucket === 'b31_90') rows = rows.filter(r => r.overdueDays > 30 && r.overdueDays <= 90);
+    else if (bucket === 'b30') rows = rows.filter(r => r.overdueDays <= 30);
     const body = h('div');
     const tabs = h('div', { class: 'tabs' });
     const views = {
@@ -124,7 +131,7 @@ window.Egary = window.Egary || {};
     for (const [key, label] of [['months', 'بالشهر'], ['clients', 'بالعميل'], ['projects', 'بالمشروع'], ['aging', 'أعمار المتأخرات']]) tabs.appendChild(h('button', { dataset: { t: key }, onclick: () => show(key) }, label));
     body.append(h('p', { class: 'muted' }, `إجمالي المتأخرات ${fm(U().sum(rows, r => r.amount))} — كل شهر مستحق لم يُسدَّد بعد يوم الاستحقاق + أيام السماح (${S().state().settings.graceDays} أيام).`), tabs, content);
     show(tab === 'clients' ? 'clients' : 'months');
-    UI().drawer({ title: bucket === 'b90p' ? 'متأخرات أكثر من 90 يومًا' : 'المتأخرات القائمة', body });
+    UI().drawer({ title: bucket === 'b90p' ? 'متأخرات أكثر من 90 يومًا' : bucket === 'b31_90' ? 'متأخرات 31–90 يومًا' : bucket === 'b30' ? 'متأخرات حتى 30 يومًا' : 'المتأخرات القائمة', body });
   }
   function unitsEvidence(ctx, list, title) {
     const rows = list.map(r => ({ ...r, unitCode: r.unit.code, unitLabel: r.unit.label, type: r.unit.type, floor: r.unit.floor }));
@@ -144,7 +151,7 @@ window.Egary = window.Egary || {};
   }
   function contractsEvidence(ctx, contracts, title) {
     const rows = contracts.map(c => ({ ...En().row({ contract: c }), rent: En().currentRent(c), start: c.start, end: c.end, cstatus: En().contractStatus(c) }));
-    ctx.evidence(title, rows, [col.contract(ctx), col.client(ctx), col.unit(ctx), col.project(), { key: 'start', label: 'من', render: r => fd(r.start) }, { key: 'end', label: 'إلى', render: r => fd(r.end) }, col.money('rent', 'الإيجار الحالي'), { key: 'increasePct', label: 'الزيادة', num: true, render: r => fp((r.contract.increasePct || 0) / 100) }, { key: 'cstatus', label: 'الحالة', render: r => UI().badge(r.cstatus, En().CSTATUS_AR[r.cstatus]) }], { onRow: r => ctx.open('contract', r.contractCode) });
+    ctx.evidence(title, rows, [col.contract(ctx), col.client(ctx), col.unit(ctx), col.project(), { key: 'start', label: 'من', render: r => fd(r.start) }, { key: 'end', label: 'إلى', render: r => fd(r.end) }, col.money('rent', 'الإيجار الحالي'), { key: 'increasePct', label: 'الزيادة', num: true, render: r => fp((r.contract.increasePct || 0) / 100) }, { key: 'cstatus', label: 'الحالة', render: r => UI().badge(r.cstatus, En().CSTATUS_AR[r.cstatus]) }], { onRow: r => ctx.open('contract', r.contractCode), foot: d => h('tr', null, h('td', { colspan: 6 }, `${d.length} عقد`), h('td', { class: 'num' }, fm(U().sum(d, r => r.rent))), h('td', { colspan: 2 })) });
   }
   function paymentsEvidence(ctx, pays, title) {
     const rows = pays.map(p => { const c = S().contract(p.contractCode) || {}; const cl = S().client(c.clientCode) || {}, u = S().unit(c.unitCode) || {}; return { ...p, clientName: cl.name, clientCode: cl.code, unitLabel: u.label, unitCode: u.code, projectName: (S().project(u.projectCode) || {}).name }; });
@@ -167,7 +174,7 @@ window.Egary = window.Egary || {};
     const L = En().ledger(year, ctx.filter);
     el.appendChild(h('div', { class: 'page-head' }, h('div', null, h('h1', null, `كشف التحصيل ${year}`), h('div', { class: 'sub' }, 'نفس شكل ورقة الإكسيل: كل صف عقد، وكل خانة شهر = المبلغ المحصَّل. اضغط على الخانة لتسجيل دفعة أو تعديلها.')), h('div', { class: 'flex wrap' }, btn('عقد جديد', 'plus', async () => { if (await F().contract()) ctx.rerender(); }, 'primary'))));
     el.appendChild(ctx.filterBar({ year: true }));
-    el.appendChild(h('div', { class: 'legend' }, [['paid', 'مسدَّد'], ['partial', 'جزئي'], ['late', 'متأخر'], ['due', 'مستحق (في فترة السماح)'], ['upcoming', 'قادم'], ['orphan', 'خارج مدة العقد']].map(([k, l]) => h('span', null, h('i', { style: { background: `var(--${k === 'orphan' ? 'info' : k}-soft)`, border: `1px solid var(--${k === 'orphan' ? 'info' : k})` } }), l))));
+    el.appendChild(h('div', { class: 'legend' }, [['paid', 'مسدَّد'], ['partial', 'جزئي'], ['late', 'متأخر'], ['due', 'مستحق (في فترة السماح)'], ['pending', 'بانتظار التسجيل'], ['upcoming', 'قادم'], ['orphan', 'خارج مدة العقد']].map(([k, l]) => h('span', null, h('i', { style: { background: `var(--${k === 'orphan' ? 'info' : k === 'pending' ? 'upcoming' : k}-soft)`, border: `1px solid var(--${k === 'orphan' ? 'info' : k === 'pending' ? 'upcoming' : k})` } }), l))));
     const months = []; for (let m = 1; m <= 12; m++) months.push(year + '-' + U().pad(m, 2));
     const thead = h('thead', null, h('tr', null, h('th', { class: 'fix c1' }, 'م'), h('th', { class: 'fix c2' }, 'المشروع'), h('th', { class: 'fix c3' }, 'الاسم'), h('th', null, 'الوحدة'), h('th', null, 'العقد من'), h('th', null, 'إلى'), ...months.map(p => h('th', { style: { textAlign: 'center' } }, U().periodLabel(p))), h('th', null, 'الإجمالي'), h('th', null, '')));
     const tbody = h('tbody');
@@ -180,6 +187,7 @@ window.Egary = window.Egary || {};
         td.appendChild(h('span', null, c.paid ? fm(c.paid, { plain: true }) : (c.status === 'late' || c.status === 'due' ? '—' : '')));
         if (c.status === 'partial' && c.due) td.appendChild(h('span', { class: 'hint' }, 'متبقٍ ' + fm(c.remaining, { plain: true })));
         if (c.status === 'late' && c.due) td.appendChild(h('span', { class: 'hint' }, fm(c.due.amount, { plain: true }) + ' متأخر'));
+        if (c.status === 'pending' && c.due) td.appendChild(h('span', { class: 'hint' }, 'لم يُسجَّل'));
         if (r.contract.cellNotes && r.contract.cellNotes[p] && !c.paid) td.appendChild(h('span', { class: 'hint', title: r.contract.cellNotes[p] }, 'نص: ' + r.contract.cellNotes[p].slice(0, 10)));
         tr.appendChild(td);
       }
@@ -314,8 +322,8 @@ window.Egary = window.Egary || {};
     const stateAr = { unlinked: 'غير مرتبط', linked: 'مرتبط ومتزامن', saving: 'جارٍ الحفظ', reading: 'جارٍ القراءة', locked: 'الملف مفتوح في Excel (بانتظار الإغلاق)', error: 'خطأ' };
     const modeAr = { linked: 'مرتبط بملف الإكسيل — كل تعديل يُحفظ تلقائيًا', preview: 'عرض فقط (نسخة من الاستضافة)', file: 'ملف مفتوح للعرض بلا ربط', demo: 'بيانات تجريبية', none: '—' };
     el.appendChild(h('div', { class: 'grid g2' },
-      section('ملف الإكسيل', h('div', null, UI().kv([['الوضع', modeAr[ctx.mode] || ctx.mode], ['الملف', sy.name || '—'], ['حالة المزامنة', stateAr[sy.state] || sy.state], ['تعديلات بانتظار الحفظ', sy.pending], ['آخر مزامنة', sy.lastSync ? new Date(sy.lastSync).toLocaleString('ar-EG') : '—'], ['سنوات الورقة', (st.settings.ledgerYears || []).join('، ')]]), h('div', { class: 'flex wrap mt' }, E.FileLink.supported ? btn(ctx.mode === 'linked' ? 'ربط ملف آخر' : 'ربط ملف الإكسيل', 'link', () => E.App.linkFile(), 'primary') : null, btn('تنزيل نسخة إكسيل الآن', 'download', () => E.App.downloadCopy()), btn('آخر نسخة احتياطية', 'shield', () => E.App.downloadBackup()), ctx.mode === 'linked' ? btn('حفظ الآن', 'check', () => E.Sync.flush().then(ok => UI().toast(ok ? 'تم الحفظ في الإكسيل' : 'تعذّر الحفظ الآن', ok ? 'ok' : 'warn'))) : null, ctx.mode === 'linked' ? btn('إلغاء الربط', 'x', async () => { if (await UI().confirm({ title: 'إلغاء ربط الملف', text: 'سيتوقف الحفظ التلقائي حتى تربط الملف مرة أخرى. البيانات في الإكسيل لن تُمس.', okText: 'إلغاء الربط' })) { E.Sync.unlink(); await E.FileLink.clearHandle(); location.reload(); } }, 'ghost') : null), h('p', { class: 'small muted mt-s' }, 'القاعدة: الإكسيل هو مصدر الحقيقة. البرنامج يراقب الملف كل ثانيتين ويقرأ أي تعديل، ويكتب كل تعديل منه فورًا. لو الملف مفتوح في Excel تُحفظ التعديلات مؤقتًا وتُكتب بعد إغلاقه.'))),
-      section('قواعد الاستحقاق والمكتب', h('div', null, UI().kv([['اسم المكتب', st.meta.officeName], ['أيام السماح', st.settings.graceDays], ['يوم الاستحقاق الافتراضي', st.settings.dueDay], ['عتبة الشغور الطويل', st.settings.vacancyMonths + ' شهور'], ['بداية المحاسبة', st.settings.trackingFrom], ['الزيادة الافتراضية', st.settings.defaultIncreasePct + '%'], ['بادئة الفاتورة', st.settings.invoicePrefix], ['العملة', st.settings.currency]]), h('div', { class: 'flex wrap mt' }, btn('تعديل الإعدادات', 'edit', async () => { if (await F().settings()) ctx.rerender(); }, 'primary'), btn(document.documentElement.dataset.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن', document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon', () => E.App.toggleTheme())))),
+      section('ملف الإكسيل', h('div', null, UI().kv([['الوضع', modeAr[ctx.mode] || ctx.mode], ['الملف', sy.name || '—'], ['حالة المزامنة', stateAr[sy.state] || sy.state], ['تعديلات بانتظار الحفظ', sy.pending], ['آخر مزامنة', sy.lastSync ? new Date(sy.lastSync).toLocaleString('ar-EG') : '—'], ['سنوات الورقة', (st.settings.ledgerYears || []).join('، ')]]), h('div', { class: 'flex wrap mt' }, E.FileLink.supported ? btn(ctx.mode === 'linked' ? 'ربط ملف آخر' : 'ربط ملف الإكسيل', 'link', () => E.App.linkFile(), 'primary') : null, btn('تنزيل نسخة إكسيل الآن', 'download', () => E.App.downloadCopy()), btn('آخر نسخة احتياطية', 'shield', () => E.App.downloadBackup()), btn('الملف الأصلي قبل أول تحويل', 'file', () => E.App.downloadOriginal()), ctx.mode === 'linked' ? btn('حفظ الآن', 'check', () => E.Sync.flush().then(ok => UI().toast(ok ? 'تم الحفظ في الإكسيل' : 'تعذّر الحفظ الآن', ok ? 'ok' : 'warn'))) : null, ctx.mode === 'linked' ? btn('إلغاء الربط', 'x', async () => { if (await UI().confirm({ title: 'إلغاء ربط الملف', text: 'سيتوقف الحفظ التلقائي حتى تربط الملف مرة أخرى. البيانات في الإكسيل لن تُمس.', okText: 'إلغاء الربط' })) { E.Sync.unlink(); await E.FileLink.clearHandle(); location.reload(); } }, 'ghost') : null), h('p', { class: 'small muted mt-s' }, 'القاعدة: الإكسيل هو مصدر الحقيقة. البرنامج يراقب الملف كل ثانيتين ويقرأ أي تعديل، ويكتب كل تعديل منه فورًا. لو الملف مفتوح في Excel تُحفظ التعديلات مؤقتًا وتُكتب بعد إغلاقه.'))),
+      section('قواعد الاستحقاق والمكتب', h('div', null, UI().kv([['اسم المكتب', st.meta.officeName], ['أيام السماح', st.settings.graceDays], ['يوم الاستحقاق الافتراضي', st.settings.dueDay], ['عتبة الشغور الطويل', st.settings.vacancyMonths + ' شهور'], ['بداية المحاسبة', st.settings.trackingFrom], ['آخر شهر مسجَّل في الورقة', st.settings.enteredThrough ? st.settings.enteredThrough + ' (يدوي)' : U().periodLabel(En().enteredThrough(), true) + ' (تلقائي)'], ['فرق مقبول في السداد', `${st.settings.tolerancePct}% وبحد أدنى ${st.settings.toleranceMin} ج`], ['الزيادة الافتراضية', st.settings.defaultIncreasePct + '%'], ['بادئة الفاتورة', st.settings.invoicePrefix], ['العملة', st.settings.currency]]), h('div', { class: 'flex wrap mt' }, btn('تعديل الإعدادات', 'edit', async () => { if (await F().settings()) ctx.rerender(); }, 'primary'), btn(document.documentElement.dataset.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن', document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon', () => E.App.toggleTheme())))),
     ));
     el.appendChild(section('ملخص البيانات', UI().kv([['المشاريع', st.projects.length], ['الوحدات', st.units.length], ['العملاء', st.clients.length], ['العقود', st.contracts.length], ['الدفعات / الفواتير', st.payments.length], ['سجلات الصيانة', st.maintenance.length], ['ملاحظات جودة البيانات', En().dataQuality().length]])));
   }
@@ -349,7 +357,7 @@ window.Egary = window.Egary || {};
   function unitProfile(u, ctx) {
     const p = S().project(u.projectCode) || {}, s = En().unitStatus(u), cl = s.contract ? S().client(s.contract.clientCode) : null;
     const cs = S().contractsOfUnit(u.code).slice().reverse();
-    const maint = S().maintenanceOf(u.code).map(m => { const c = En().activeContractOf(u.code, U().d(m.date) || U().today()); const cc = c ? S().client(c.clientCode) : null; return { ...m, custodianName: cc ? cc.name : '', custodianContract: c ? c.code : '' }; });
+    const maint = S().maintenanceOf(u.code).map(m => { const c = m.custodianContract ? S().contract(m.custodianContract) : En().activeContractOf(u.code, U().d(m.date) || U().today()); const cc = c ? S().client(c.clientCode) : null; return { ...m, custodianName: m.custodianName || (cc ? cc.name : ''), custodianContract: c ? c.code : '' }; });
     const assets = u.assets || [];
     const body = [
       head(u.label.slice(0, 3), `وحدة ${u.label}`, u.code, [UI().badge(s.status, En().USTATUS_AR[s.status]), h('span', { class: 'badge info' }, typeAr(u.type))], [h('a', { onclick: () => ctx.open('project', p.code) }, p.name), p.address, u.floor ? 'الدور ' + u.floor : '', u.area ? u.area + ' م²' : '']),
@@ -409,5 +417,5 @@ window.Egary = window.Egary || {};
 
   const PAGES = { dashboard, ledger, insights, projects, units, clients, contracts, payments, maintenance, quality, audit, settings };
   function render(name, el, ctx) { (PAGES[name] || dashboard)(el, ctx); }
-  E.Views = { render, profile, monthEvidence, arrearsEvidence, unitsEvidence, renewalsEvidence, depositsEvidence, forecastEvidence, maintenanceEvidence, contractsEvidence, paymentsEvidence, openEvidence, insightEl, renew, del };
+  E.Views = { render, profile, monthEvidence, arrearsEvidence, pendingEvidence, unitsEvidence, renewalsEvidence, depositsEvidence, forecastEvidence, maintenanceEvidence, contractsEvidence, paymentsEvidence, openEvidence, insightEl, renew, del };
 })(window.Egary);

@@ -66,7 +66,7 @@ window.Egary = window.Egary || {};
     resize();
     window.addEventListener('resize', resize);
     raf = requestAnimationFrame(frame);
-    return { setTilt(x, y) { tilt = { x, y }; }, destroy() { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); } };
+    return { setTilt(x, y) { tilt = { x, y }; }, resume() { cancelAnimationFrame(raf); t0 = performance.now(); raf = requestAnimationFrame(frame); }, destroy() { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); } };
   }
 
   /* ---------- عدّاد متحرك ---------- */
@@ -84,7 +84,7 @@ window.Egary = window.Egary || {};
     const hero = buildHero();
     const board = h('div', { class: 'board', id: 'bi-board' });
     const dock = buildDock();
-    root = h('div', { id: 'bi' }, h('div', { class: 'sky' }), h('div', { class: 'layer stars' }), canvas, h('div', { class: 'vignette' }), h('button', { class: 'exit', id: 'bi-exit', onclick: close }, UI().icon('back'), 'العودة إلى البرنامج'), hero, board, dock);
+    root = h('div', { id: 'bi' }, h('div', { class: 'sky' }), h('div', { class: 'layer stars' }), canvas, h('div', { class: 'vignette' }), h('button', { class: 'exit', id: 'bi-exit', onclick: () => close() }, UI().icon('back'), 'العودة إلى البرنامج'), hero, board, dock);
     document.body.appendChild(root);
     city = makeCity(canvas);
     root.addEventListener('mousemove', (e) => { const x = (e.clientX / window.innerWidth - .5) * 2, y = (e.clientY / window.innerHeight - .5) * 2; city.setTilt(x, y); const card = root.querySelector('.hero-card'); if (card && !reduced()) card.style.transform = `rotateY(${x * 6}deg) rotateX(${-y * 5}deg)`; root.querySelectorAll('.layer').forEach(l => { l.style.transform = `translate(${-x * 10}px, ${-y * 6}px)`; }); });
@@ -92,15 +92,15 @@ window.Egary = window.Egary || {};
     unsub = S().subscribe(() => { if (root && board.classList.contains('in')) renderBoard(); });
     document.addEventListener('keydown', onKey);
   }
-  function onVis() { if (!city) return; if (document.hidden) cancelAnimationFrame(raf); }
+  function onVis() { if (!city) return; if (document.hidden) cancelAnimationFrame(raf); else city.resume(); }
   function onKey(e) { if (e.key === 'Escape' && root && !document.querySelector('.overlay, .drawer')) close(); }
-  function close() {
+  function close(keepHash) {
     if (!root) return;
     city && city.destroy(); city = null; root.remove(); root = null;
     document.removeEventListener('visibilitychange', onVis); document.removeEventListener('keydown', onKey);
     if (unsub) unsub(); unsub = null;
     document.documentElement.dataset.theme = prevTheme || 'light';
-    if (location.hash === '#/bi') location.hash = '#/dashboard';
+    if (!keepHash && location.hash === '#/bi') location.hash = '#/dashboard';
   }
   function buildHero() {
     const k = En().kpis({});
@@ -141,10 +141,11 @@ window.Egary = window.Egary || {};
     const mo = k.month;
     body.appendChild(h('div', { class: 'tiles' },
       tile(mo.rate >= .9 ? 'ok' : mo.rate >= .6 ? 'warn' : 'danger', `تحصيل ${U().periodLabel(k.period)}`, fm(mo.collected), `${fp(mo.rate)} من ${fm(mo.due)}`, () => V().monthEvidence(c, k.period)),
+      k.pending.periods.length ? tile('warn', 'بانتظار التسجيل', fn(k.pending.contracts), `${k.pending.periods.map(p => U().periodLabel(p)).join('، ')} — ${fm(k.pending.due)}`, () => V().pendingEvidence(c, k.pending)) : null,
       tile('accent', 'محصَّل السنة', fm(k.ytd.collected), `${k.counts.payments} دفعة`, () => V().paymentsEvidence(c, k.ytd.rows, 'مدفوعات السنة')),
       tile(k.arrears.total ? 'danger' : 'ok', 'المتأخرات', fm(k.arrears.total), `${k.arrears.byClient.length} عميل · ${k.arrears.rows.length} شهر`, () => V().arrearsEvidence(c, k.arrears)),
       tile(k.occupancy.rate >= .9 ? 'ok' : 'warn', 'الإشغال', fp(k.occupancy.rate), `${k.occupancy.occupiedCount} من ${k.occupancy.total}`, () => V().unitsEvidence(c, [...k.occupancy.occupied, ...k.occupancy.ending], 'المؤجَّرة')),
-      tile(k.occupancy.longVacant.length ? 'danger' : 'ok', `شاغرة > ${S().state().settings.vacancyMonths} شهور`, fn(k.occupancy.longVacant.length), `${k.occupancy.vacant.length} شاغرة إجمالًا`, () => V().unitsEvidence(c, k.occupancy.vacant, 'الوحدات الشاغرة')),
+      tile(k.occupancy.longVacant.length ? 'danger' : 'ok', `شاغرة > ${S().state().settings.vacancyMonths} شهور`, fn(k.occupancy.longVacant.length), `${k.occupancy.vacant.length} شاغرة إجمالًا`, () => V().unitsEvidence(c, k.occupancy.longVacant, `شاغرة أكثر من ${S().state().settings.vacancyMonths} شهور`)),
       tile(k.renewals.soon.length ? 'warn' : 'ok', 'تنتهي خلال 90 يومًا', fn(k.renewals.soon.length), `إيجار ${fm(U().sum(k.renewals.soon, r => r.rent))}`, () => V().renewalsEvidence(c, k.renewals.soon, 'تنتهي خلال 90 يومًا')),
       tile('info', 'تأمينات محتفظ بها', fm(k.deposits.total), `${k.deposits.endedStillHeld.length} لعقود منتهية`, () => V().depositsEvidence(c, k.deposits)),
       tile('accent', 'إيراد 12 شهرًا', fm(k.next12.total), `إيجار شهري ${fm(k.monthlyRentRoll)}`, () => V().forecastEvidence(c, k)),
@@ -178,8 +179,8 @@ window.Egary = window.Egary || {};
     body.appendChild(h('div', { class: 'tiles' },
       tile('danger', 'إجمالي المتأخرات', fm(a.total), `${a.rows.length} شهر`, () => V().arrearsEvidence(c, a)),
       tile('danger', 'أكثر من 90 يومًا', fm(a.buckets.b90p), fp(a.total ? a.buckets.b90p / a.total : 0), () => V().arrearsEvidence(c, a, 'b90p')),
-      tile('warn', '31–90 يومًا', fm(a.buckets.b60 + a.buckets.b90), '', () => V().arrearsEvidence(c, a)),
-      tile('info', 'حتى 30 يومًا', fm(a.buckets.b30), '', () => V().arrearsEvidence(c, a)),
+      tile('warn', '31–90 يومًا', fm(a.buckets.b60 + a.buckets.b90), '', () => V().arrearsEvidence(c, a, 'b31_90')),
+      tile('info', 'حتى 30 يومًا', fm(a.buckets.b30), '', () => V().arrearsEvidence(c, a, 'b30')),
       tile('danger', 'عملاء متأخرون', fn(a.byClient.length), a.byClient[0] ? `أكبرهم ${a.byClient[0].clientName}` : '', () => V().arrearsEvidence(c, a, null, 'clients')),
     ));
     body.appendChild(h('div', { class: 'grid2' },
