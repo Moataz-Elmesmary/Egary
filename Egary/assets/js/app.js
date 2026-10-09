@@ -44,10 +44,11 @@ window.Egary = window.Egary || {};
   function loadSnapshot() { try { return JSON.parse(localStorage.getItem(SNAP_KEY) || 'null'); } catch (e) { return null; } }
 
   /* ---------- المزامنة ---------- */
+  let lastBytes = null; // آخر ملف مقروء/مكتوب — لحفظ الأوراق التي أضافها المكتب كما هي
   function initSync() {
     E.Sync.init({
-      serialize: async () => { const buf = await W().write(S().state()); saveSnapshot(); E.FileLink.saveBackup(buf); return buf; },
-      deserialize: async (buf) => { const r = await W().read(buf, { snapshot: loadSnapshot() }); S().load(r.state); App.flags = r.flags; saveSnapshot(); E.FileLink.saveBackup(buf); },
+      serialize: async () => { const buf = await W().write(S().state(), { base: lastBytes }); lastBytes = buf; saveSnapshot(); E.FileLink.saveBackup(buf); return buf; },
+      deserialize: async (buf) => { const r = await W().read(buf, { snapshot: loadSnapshot() }); lastBytes = buf; S().load(r.state); App.flags = r.flags; saveSnapshot(); E.FileLink.saveBackup(buf); },
       applyOps: ops => S().applyOps(ops),
       onStatus: renderSync,
       onExternalChange: () => { UI().toast('تم تحديث البيانات من ملف الإكسيل', 'ok'); render(); },
@@ -64,7 +65,7 @@ window.Egary = window.Egary || {};
     else if (st.state === 'error') banner.appendChild(h('div', { class: 'banner danger' }, UI().icon('warning'), h('span', null, 'خطأ في المزامنة: ' + (st.error || '')), h('button', { class: 'btn sm', onclick: () => E.Sync.flush() }, 'إعادة المحاولة')));
     else if (App.mode === 'preview' || App.mode === 'demo' || App.mode === 'file') banner.appendChild(h('div', { class: 'banner info' }, UI().icon('info'), h('span', null, App.mode === 'demo' ? 'وضع تجريبي ببيانات نموذجية — التعديلات لا تُحفظ. اربط ملف الإكسيل لبدء العمل الحقيقي.' : 'الملف مفتوح للعرض بلا ربط — التعديلات تبقى في الذاكرة فقط. يمكنك تنزيل نسخة إكسيل محدثة أو ربط الملف للحفظ التلقائي.'), E.FileLink.supported ? h('button', { class: 'btn sm primary', onclick: linkFile }, UI().icon('link'), 'ربط ملف الإكسيل') : null, h('button', { class: 'btn sm', onclick: downloadCopy }, UI().icon('download'), 'تنزيل نسخة إكسيل')));
   }
-  async function downloadCopy() { const buf = await W().write(S().state()); E.FileLink.downloadBytes(buf, 'Egary.xlsx'); UI().toast('تم تنزيل نسخة الإكسيل', 'ok'); }
+  async function downloadCopy() { const buf = await W().write(S().state(), { base: lastBytes }); E.FileLink.downloadBytes(buf, 'Egary.xlsx'); UI().toast('تم تنزيل نسخة الإكسيل', 'ok'); }
   async function downloadBackup() { const b = await E.FileLink.loadBackup(); if (!b || !b.bytes) { UI().toast('لا توجد نسخة احتياطية بعد', 'warn'); return; } E.FileLink.downloadBytes(b.bytes, 'Egary-backup-' + new Date(b.at).toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.xlsx'); UI().toast('تم تنزيل النسخة الاحتياطية (' + new Date(b.at).toLocaleString('ar-EG') + ')', 'ok'); }
 
   async function linkFile() {
@@ -88,7 +89,7 @@ window.Egary = window.Egary || {};
   }
   async function openWithoutLink(file) {
     const buf = await file.arrayBuffer();
-    const r = await W().read(buf, { snapshot: null });
+    const r = await W().read(buf, { snapshot: null }); lastBytes = buf;
     S().load(r.state); App.flags = r.flags; App.mode = 'file'; S().setRecorder(null);
     showApp(); renderSync(E.Sync.status);
   }
@@ -100,7 +101,7 @@ window.Egary = window.Egary || {};
     if (!/^https?:/.test(location.protocol)) return false;
     try {
       const res = await fetch('Egary.xlsx', { cache: 'no-store' }); if (!res.ok) return false;
-      const buf = await res.arrayBuffer(); const r = await W().read(buf, { snapshot: null });
+      const buf = await res.arrayBuffer(); const r = await W().read(buf, { snapshot: null }); lastBytes = buf;
       S().load(r.state); App.flags = r.flags; App.mode = 'preview'; S().setRecorder(null);
       showApp(); renderSync(E.Sync.status); return true;
     } catch (e) { return false; }

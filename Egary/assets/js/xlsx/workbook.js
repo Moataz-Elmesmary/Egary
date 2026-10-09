@@ -313,9 +313,19 @@ window.Egary = window.Egary || {};
   /* =====================================================================
      الكتابة
      ===================================================================== */
-  async function write(state) {
+  async function write(state, opts) {
+    opts = opts || {};
     const En = E.Engine, S = E.Store;
     const wb = new (XL().Workbook)();
+    // الأوراق غير المعروفة (أضافها المكتب) تُحفظ كما هي: نبدأ من آخر ملف مقروء ونستبدل أوراقنا فقط
+    let foreign = [];
+    if (opts.base && opts.base.byteLength) {
+      try {
+        await wb.xlsx.load(opts.base);
+        const managed = new Set(Object.values(SH));
+        for (const ws of wb.worksheets.slice()) { if (/^\d{4}$/.test(ws.name.trim()) || managed.has(ws.name)) wb.removeWorksheet(ws.id); else foreign.push(ws.name); }
+      } catch (e) { foreign = []; for (const ws of wb.worksheets.slice()) wb.removeWorksheet(ws.id); }
+    }
     wb.creator = 'Egary'; wb.created = new Date();
     const asOf = U().today();
     const years = Array.from(new Set((state.settings.ledgerYears || []).concat(state.payments.map(p => parseInt(p.period.slice(0, 4), 10))).concat([asOf.getUTCFullYear()]))).filter(y => y > 1900).sort();
@@ -324,6 +334,9 @@ window.Egary = window.Egary || {};
     for (const y of years) sheetsMeta[y] = writeLedger(wb, state, String(y), asOf);
     writeSummary(wb, state, String(years[years.length - 1]), sheetsMeta[years[years.length - 1]]);
     writeProjects(wb, state, asOf); writeUnits(wb, state, asOf); writeAssets(wb, state); writeClients(wb, state, asOf); writeContracts(wb, state, asOf); writePayments(wb, state); writeMaintenance(wb, state, asOf); writeSettings(wb, state); writeAudit(wb, state);
+    // ترتيب الأوراق: أوراق السنوات ثم الملخص ثم أوراقنا ثم أوراق المكتب
+    let order = 1; for (const ws of wb.worksheets) if (!foreign.includes(ws.name)) ws.orderNo = order++;
+    for (const name of foreign) { const ws = wb.getWorksheet(name); if (ws) ws.orderNo = order++; }
     wb.views = [{ x: 0, y: 0, width: 20000, height: 12000, firstSheet: 0, activeTab: 0, visibility: 'visible', rightToLeft: true }];
     const buf = await wb.xlsx.writeBuffer();
     return buf instanceof ArrayBuffer ? buf : new Uint8Array(buf).buffer.slice(buf.byteOffset || 0, (buf.byteOffset || 0) + buf.byteLength);

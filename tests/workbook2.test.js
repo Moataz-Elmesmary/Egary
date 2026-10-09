@@ -81,3 +81,28 @@ wb.save(sys.argv[2]); print(json.dumps({'ok': True}))`, base, edited);
   assert.equal(r2.state.payments.filter(p => p.contractCode === 'T0007').length, 0);
   assert.equal(r2.state.contracts.length, 72);
 });
+
+test('sheets the office adds by hand (e.g. ملاحظات) survive a website save, keep their content, and stay after our sheets', async () => {
+  const E = load({ today: '2026-10-09' });
+  const { state } = await E.Workbook.read(readFile(SOURCE)); E.Store.load(state);
+  const buf = await E.Workbook.write(state);
+  const base = path.join(OUT, 'foreign_base.xlsx'), withExtra = path.join(OUT, 'foreign_extra.xlsx'); fs.writeFileSync(base, Buffer.from(buf));
+  py(`
+import sys, json, openpyxl
+wb = openpyxl.load_workbook(sys.argv[1]); ws = wb.create_sheet('ملاحظات المكتب'); ws['A1'] = 'تذكير'; ws['B1'] = 'اتصل بالمحامي'; ws['A1'].font = openpyxl.styles.Font(bold=True)
+wb.save(sys.argv[2]); print(json.dumps({'ok': True}))`, base, withExtra);
+  const extraBytes = readFile(withExtra);
+  const r2 = await E.Workbook.read(extraBytes); E.Store.load(r2.state);
+  E.Store.upsert('projects', { code: 'P04', name: 'مشروع بعد الورقة الغريبة' });
+  const out = await E.Workbook.write(E.Store.state(), { base: extraBytes });
+  const f = path.join(OUT, 'foreign_out.xlsx'); fs.writeFileSync(f, Buffer.from(out));
+  const info = py(`
+import sys, json, openpyxl
+wb = openpyxl.load_workbook(sys.argv[1]); ws = wb['ملاحظات المكتب']
+print(json.dumps({'sheets': wb.sheetnames, 'a1': ws['A1'].value, 'b1': ws['B1'].value, 'bold': ws['A1'].font.bold, 'p4': any(r[1].value == 'مشروع بعد الورقة الغريبة' for r in wb['المشاريع'].iter_rows(min_row=2))}, ensure_ascii=False))`, f);
+  assert.equal(info.a1, 'تذكير'); assert.equal(info.b1, 'اتصل بالمحامي'); assert.equal(info.bold, true); assert.equal(info.p4, true);
+  assert.equal(info.sheets[0], '2026'); assert.equal(info.sheets[info.sheets.length - 1], 'ملاحظات المكتب');
+  assert.equal(info.sheets.filter(n => n === '2026').length, 1);
+  // وبلا base (أول استخدام) يُكتب ملف نظيف
+  const r3 = await E.Workbook.read(out); assert.equal(r3.state.projects.length, 4);
+});
