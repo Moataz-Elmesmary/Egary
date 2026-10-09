@@ -12,55 +12,100 @@ window.Egary = window.Egary || {};
   let root = null, raf = 0, city = null, prevTheme = null, section = 'overview', unsub = null;
   const reduced = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* ---------- المدينة الليلية (canvas) ---------- */
+  /* ---------- المدينة الليلية (canvas) ----------
+     أفق مدينة بثلاث طبقات عمق: البعيدة باهتة ومزرقّة (ضباب)، القريبة داكنة وحادة.
+     المباني بأشكال متنوعة (تدرّجات، أسطح، هوائيات، تيجان مضيئة)، والنوافذ تضيء وتنطفئ
+     بتدرّج بطيء (لا وميض)، والحركة: انزياح هادئ جدًا للطبقات البعيدة + parallax ناعم مع الماوس. */
   function makeCity(canvas) {
     const ctx = canvas.getContext('2d');
     let W = 0, H = 0, dpr = Math.min(2, window.devicePixelRatio || 1);
-    const layers = [{ depth: .25, speed: .08, color: '#0D1730', n: 26, hmin: .18, hmax: .42, wmin: 40, wmax: 90, winOn: .10 }, { depth: .5, speed: .16, color: '#101E40', n: 18, hmin: .25, hmax: .6, wmin: 60, wmax: 120, winOn: .22 }, { depth: 1, speed: .3, color: '#152753', n: 12, hmin: .3, hmax: .72, wmin: 80, wmax: 170, winOn: .35 }];
-    let bld = [];
-    function seed() {
-      bld = [];
-      for (const L of layers) {
-        let x = -200; const arr = [];
-        while (x < W + 400) {
-          const w = L.wmin + Math.random() * (L.wmax - L.wmin), hh = H * (L.hmin + Math.random() * (L.hmax - L.hmin));
-          const cols = Math.max(2, Math.floor(w / 14)), rows = Math.max(2, Math.floor(hh / 16));
-          const wins = new Uint8Array(cols * rows); for (let i = 0; i < wins.length; i++) wins[i] = Math.random() < L.winOn ? 1 : 0;
-          arr.push({ x, w, h: hh, cols, rows, wins, roof: Math.random() < .3, antenna: Math.random() < .25 });
-          x += w + 6 + Math.random() * 18;
-        }
-        bld.push({ L, arr, offset: 0 });
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const LAYERS = [
+      { depth: .18, drift: 1.2, base: [22, 34, 66], fog: .55, n: 30, hmin: .14, hmax: .40, wmin: 46, wmax: 110, lit: .28, warm: [190, 205, 255] },
+      { depth: .45, drift: 2.6, base: [16, 26, 52], fog: .28, n: 20, hmin: .22, hmax: .58, wmin: 58, wmax: 140, lit: .34, warm: [255, 214, 150] },
+      { depth: 1.0, drift: 0,   base: [10, 17, 34], fog: 0,   n: 13, hmin: .28, hmax: .74, wmin: 76, wmax: 190, lit: .38, warm: [255, 221, 160] },
+    ];
+    let layers = [];
+    function building(L, x) {
+      const w = rnd(L.wmin, L.wmax), h = H * rnd(L.hmin, L.hmax);
+      const kind = Math.random() < .22 ? 'setback' : Math.random() < .14 ? 'spire' : 'flat';
+      const colW = L.depth === 1 ? 20 : L.depth === .45 ? 16 : 13, rowH = L.depth === 1 ? 24 : L.depth === .45 ? 19 : 15;
+      const cols = Math.max(2, Math.floor((w - 12) / colW)), rows = Math.max(2, Math.floor((h - 18) / rowH));
+      const wins = [];
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const lit = Math.random() < L.lit;
+        wins.push({ r, c, level: lit ? rnd(.5, 1) : 0, target: lit ? 1 : 0, tone: Math.random() });
       }
+      return { x, w, h, kind, cols, rows, colW, rowH, wins, antenna: Math.random() < .3, tank: Math.random() < .35, crown: L.depth === 1 && Math.random() < .35, hue: rnd(-6, 6) };
+    }
+    function seed() {
+      layers = LAYERS.map(L => {
+        const arr = []; let x = -160;
+        const span = W + 520;
+        while (x < span) { const b = building(L, x); arr.push(b); x += b.w + rnd(4, 22); }
+        return { L, arr, span: x + 160, drift: 0 };
+      });
     }
     function resize() { W = canvas.clientWidth; H = canvas.clientHeight; canvas.width = W * dpr; canvas.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); seed(); }
-    let tilt = { x: 0, y: 0 }, t0 = performance.now();
-    function frame(now) {
-      const dt = Math.min(50, now - t0); t0 = now;
-      ctx.clearRect(0, 0, W, H);
-      for (const layer of bld) {
-        const L = layer.L;
-        if (!reduced()) layer.offset = (layer.offset + L.speed * dt / 16) % 100000;
-        // نوافذ تضيء وتنطفئ عشوائيًا
-        if (!reduced() && Math.random() < .5) { const b = layer.arr[Math.floor(Math.random() * layer.arr.length)]; const i = Math.floor(Math.random() * b.wins.length); b.wins[i] = b.wins[i] ? 0 : 1; }
-        const px = tilt.x * 28 * L.depth, py = tilt.y * 10 * L.depth;
-        const total = layer.arr.reduce((s, b) => s + b.w + 12, 0);
-        for (const b of layer.arr) {
-          let x = ((b.x - layer.offset) % (total + 400)); if (x < -b.w - 200) x += total + 400;
-          x += px; const y = H - b.h + py + (1 - L.depth) * 40;
-          ctx.fillStyle = L.color; ctx.fillRect(x, y, b.w, b.h + 60);
-          if (b.roof) ctx.fillRect(x + b.w * .3, y - 10, b.w * .4, 10);
-          if (b.antenna) { ctx.fillRect(x + b.w / 2 - 1, y - 28, 2, 28); ctx.fillStyle = 'rgba(239,107,103,' + (0.4 + 0.6 * Math.abs(Math.sin(now / 600))) + ')'; ctx.fillRect(x + b.w / 2 - 2, y - 31, 4, 4); }
-          const cw = b.w / b.cols, ch = (b.h) / b.rows;
-          for (let r = 0; r < b.rows; r++) for (let c = 0; c < b.cols; c++) {
-            if (!b.wins[r * b.cols + c]) continue;
-            const wx = x + c * cw + cw * .22, wy = y + r * ch + ch * .25;
-            ctx.fillStyle = L.depth === 1 ? 'rgba(255, 221, 150, .85)' : L.depth === .5 ? 'rgba(255, 221, 150, .55)' : 'rgba(200, 215, 255, .35)';
-            ctx.fillRect(wx, wy, cw * .5, ch * .45);
-          }
-        }
+    let tilt = { x: 0, y: 0 }, cur = { x: 0, y: 0 }, t0 = performance.now(), time = 0;
+    const still = () => reduced();
+    function rgba(c, a, k) { k = k || 0; return `rgba(${c[0] + k},${c[1] + k},${c[2] + k},${a})`; }
+    function drawBuilding(b, L, x, y) {
+      // الجسم بتدرّج رأسي خفيف + حافة مضيئة على الجانب الأيسر (ضوء القمر)
+      const g = ctx.createLinearGradient(0, y, 0, y + b.h + 80);
+      g.addColorStop(0, rgba(L.base, 1, 10 + b.hue)); g.addColorStop(1, rgba(L.base, 1, -4 + b.hue));
+      ctx.fillStyle = g;
+      if (b.kind === 'setback') { const t = b.w * .62, hh = b.h * .78; ctx.fillRect(x, y + (b.h - hh), b.w, hh + 80); ctx.fillRect(x + (b.w - t) / 2, y, t, b.h - hh + 2); }
+      else if (b.kind === 'spire') { ctx.fillRect(x, y + 26, b.w, b.h + 60); ctx.beginPath(); ctx.moveTo(x, y + 26); ctx.lineTo(x + b.w / 2, y - 18); ctx.lineTo(x + b.w, y + 26); ctx.closePath(); ctx.fill(); }
+      else ctx.fillRect(x, y, b.w, b.h + 80);
+      if (L.depth >= .45) { ctx.fillStyle = rgba(L.base, .9, 26 + b.hue); ctx.fillRect(x, y + (b.kind === 'spire' ? 26 : 0), 1.5, b.h); }
+      // السطح
+      if (b.antenna) { ctx.fillStyle = rgba(L.base, 1, 18); ctx.fillRect(x + b.w * .5 - 1, y - 30, 2, 30); const bl = .45 + .55 * Math.abs(Math.sin(time * 1.6 + b.x)); ctx.fillStyle = `rgba(255,96,96,${bl})`; ctx.beginPath(); ctx.arc(x + b.w * .5, y - 31, 2.2, 0, 7); ctx.fill(); }
+      if (b.tank && b.kind !== 'spire') { ctx.fillStyle = rgba(L.base, 1, 14); ctx.fillRect(x + b.w * .68, y - 12, 14, 12); }
+      if (b.crown) { ctx.fillStyle = `rgba(${L.warm[0]},${L.warm[1]},${L.warm[2]},${.55 + .2 * Math.sin(time * .8 + b.x)})`; ctx.fillRect(x + 4, y + (b.kind === 'spire' ? 28 : 2), b.w - 8, 2); }
+      // النوافذ: شبكة منتظمة، كل نافذة تُضيء/تنطفئ بتدرّج
+      const x0 = x + (b.w - b.cols * b.colW) / 2 + 3, y0 = y + (b.kind === 'spire' ? 34 : 12);
+      const ww = b.colW * .5, wh = b.rowH * .46;
+      for (const win of b.wins) {
+        if (win.level < .02) continue;
+        const wx = x0 + win.c * b.colW, wy = y0 + win.r * b.rowH;
+        if (wy + wh > y + b.h - 4) continue;
+        const tone = win.tone < .75 ? L.warm : [205, 222, 255];
+        const a = win.level * (L.depth === 1 ? .95 : L.depth === .45 ? .7 : .45);
+        if (L.depth === 1 && win.level > .6) { ctx.fillStyle = `rgba(${tone[0]},${tone[1]},${tone[2]},${a * .18})`; ctx.fillRect(wx - 2, wy - 2, ww + 4, wh + 4); }
+        ctx.fillStyle = `rgba(${tone[0]},${tone[1]},${tone[2]},${a})`; ctx.fillRect(wx, wy, ww, wh);
       }
-      // ضباب أرضي
-      const g = ctx.createLinearGradient(0, H - 120, 0, H); g.addColorStop(0, 'rgba(7,11,20,0)'); g.addColorStop(1, 'rgba(7,11,20,.9)'); ctx.fillStyle = g; ctx.fillRect(0, H - 120, W, 120);
+    }
+    function frame(now) {
+      const dt = Math.min(50, now - t0) / 1000; t0 = now; if (!still()) time += dt;
+      // parallax ناعم: نقترب من هدف الماوس تدريجيًا
+      cur.x += (tilt.x - cur.x) * Math.min(1, dt * 3); cur.y += (tilt.y - cur.y) * Math.min(1, dt * 3);
+      ctx.clearRect(0, 0, W, H);
+      // القمر وهالته
+      const mx = W * .76 + cur.x * -14, my = H * .17 + cur.y * -8;
+      const halo = ctx.createRadialGradient(mx, my, 10, mx, my, 160); halo.addColorStop(0, 'rgba(210,225,255,.22)'); halo.addColorStop(1, 'rgba(210,225,255,0)');
+      ctx.fillStyle = halo; ctx.fillRect(mx - 170, my - 170, 340, 340);
+      ctx.fillStyle = 'rgba(236,242,255,.92)'; ctx.beginPath(); ctx.arc(mx, my, 22, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(200,214,240,.35)'; ctx.beginPath(); ctx.arc(mx - 7, my - 4, 5, 0, 7); ctx.arc(mx + 6, my + 7, 3.5, 0, 7); ctx.fill();
+      // الطبقات من البعيد إلى القريب
+      for (const layer of layers) {
+        const L = layer.L;
+        if (!still()) layer.drift = (layer.drift + L.drift * dt) % layer.span;
+        const px = -cur.x * 34 * L.depth, py = -cur.y * 12 * L.depth + (1 - L.depth) * 46;
+        // تحديث النوافذ: تغييرات نادرة وبطيئة
+        if (!still()) { for (let i = 0; i < 2; i++) { const b = layer.arr[Math.floor(Math.random() * layer.arr.length)]; if (Math.random() < .35) { const wn = b.wins[Math.floor(Math.random() * b.wins.length)]; wn.target = wn.target ? 0 : 1; } } }
+        for (const b of layer.arr) {
+          if (!still()) for (const wn of b.wins) { if (wn.level !== wn.target) { wn.level += (wn.target - wn.level) * Math.min(1, dt * .9); if (Math.abs(wn.level - wn.target) < .01) wn.level = wn.target; } }
+          let x = b.x - layer.drift; if (x < -b.w - 200) x += layer.span;
+          x += px;
+          if (x > W + 40 || x + b.w < -40) continue;
+          drawBuilding(b, L, x, H - b.h + py);
+        }
+        // ضباب العمق فوق الطبقة البعيدة
+        if (L.fog) { const fg = ctx.createLinearGradient(0, H * .35, 0, H); fg.addColorStop(0, `rgba(28,46,90,0)`); fg.addColorStop(1, `rgba(28,46,90,${L.fog})`); ctx.fillStyle = fg; ctx.fillRect(0, 0, W, H); }
+      }
+      // توهّج الشارع أسفل الأفق
+      const g = ctx.createLinearGradient(0, H - 140, 0, H); g.addColorStop(0, 'rgba(7,11,20,0)'); g.addColorStop(.6, 'rgba(12,16,30,.75)'); g.addColorStop(1, 'rgba(7,11,20,1)'); ctx.fillStyle = g; ctx.fillRect(0, H - 140, W, 140);
       raf = requestAnimationFrame(frame);
     }
     resize();

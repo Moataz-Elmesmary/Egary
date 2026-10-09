@@ -3,14 +3,14 @@
    ===================================================================== */
 #bi { position: fixed; inset: 0; z-index: 80; background: #070B14; color: #E9EEF6; overflow: hidden; font-family: var(--font); direction: rtl; }
 #bi * { box-sizing: border-box; }
-#bi .sky { position: absolute; inset: 0; background: radial-gradient(1200px 700px at 70% -10%, #1C2E5A 0%, #0B1630 45%, #070B14 100%); }
+#bi .sky { position: absolute; inset: 0; background: radial-gradient(1400px 800px at 76% 10%, #1A2B55 0%, #0D1833 40%, #070B14 100%); }
 #bi .sky::after { content: ""; position: absolute; inset: 0; background: radial-gradient(800px 400px at 20% 20%, rgba(14, 143, 132, .18), transparent 60%), radial-gradient(600px 300px at 85% 60%, rgba(36, 87, 197, .22), transparent 60%); animation: bi-aurora 14s ease-in-out infinite alternate; }
 @keyframes bi-aurora { from { transform: translateX(-2%) scale(1); opacity: .8; } to { transform: translateX(2%) scale(1.06); opacity: 1; } }
 #bi canvas.city { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transition: opacity .8s ease, filter .8s ease; }
 #bi.boarded canvas.city { opacity: .5; filter: blur(1px); }
 #bi.boarded .stars { opacity: .35; }
 #bi .layer { position: absolute; inset: 0; pointer-events: none; will-change: transform; transition: transform 120ms linear; }
-#bi .stars { position: absolute; inset: 0; background-image: radial-gradient(1.5px 1.5px at 20% 30%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 70% 20%, #fff 50%, transparent 51%), radial-gradient(1.2px 1.2px at 40% 70%, #cfe0ff 50%, transparent 51%), radial-gradient(1px 1px at 85% 45%, #fff 50%, transparent 51%), radial-gradient(1.4px 1.4px at 10% 80%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 55% 10%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 30% 50%, #fff 50%, transparent 51%), radial-gradient(1.2px 1.2px at 92% 80%, #cfe0ff 50%, transparent 51%); opacity: .7; animation: bi-twinkle 5s ease-in-out infinite alternate; }
+#bi .stars { position: absolute; inset: 0 0 40% 0; background-image: radial-gradient(1.5px 1.5px at 20% 30%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 70% 20%, #fff 50%, transparent 51%), radial-gradient(1.2px 1.2px at 40% 70%, #cfe0ff 50%, transparent 51%), radial-gradient(1px 1px at 85% 45%, #fff 50%, transparent 51%), radial-gradient(1.4px 1.4px at 10% 80%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 55% 10%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 30% 50%, #fff 50%, transparent 51%), radial-gradient(1.2px 1.2px at 92% 80%, #cfe0ff 50%, transparent 51%); opacity: .7; animation: bi-twinkle 5s ease-in-out infinite alternate; }
 @keyframes bi-twinkle { from { opacity: .45; } to { opacity: .85; } }
 #bi .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, .55)); pointer-events: none; }
 
