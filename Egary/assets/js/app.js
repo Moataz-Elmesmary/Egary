@@ -46,8 +46,8 @@ window.Egary = window.Egary || {};
   /* ---------- المزامنة ---------- */
   function initSync() {
     E.Sync.init({
-      serialize: async () => { const buf = await W().write(S().state()); saveSnapshot(); return buf; },
-      deserialize: async (buf) => { const r = await W().read(buf, { snapshot: loadSnapshot() }); S().load(r.state); App.flags = r.flags; saveSnapshot(); },
+      serialize: async () => { const buf = await W().write(S().state()); saveSnapshot(); E.FileLink.saveBackup(buf); return buf; },
+      deserialize: async (buf) => { const r = await W().read(buf, { snapshot: loadSnapshot() }); S().load(r.state); App.flags = r.flags; saveSnapshot(); E.FileLink.saveBackup(buf); },
       applyOps: ops => S().applyOps(ops),
       onStatus: renderSync,
       onExternalChange: () => { UI().toast('تم تحديث البيانات من ملف الإكسيل', 'ok'); render(); },
@@ -65,6 +65,7 @@ window.Egary = window.Egary || {};
     else if (App.mode === 'preview' || App.mode === 'demo' || App.mode === 'file') banner.appendChild(h('div', { class: 'banner info' }, UI().icon('info'), h('span', null, App.mode === 'demo' ? 'وضع تجريبي ببيانات نموذجية — التعديلات لا تُحفظ. اربط ملف الإكسيل لبدء العمل الحقيقي.' : 'الملف مفتوح للعرض بلا ربط — التعديلات تبقى في الذاكرة فقط. يمكنك تنزيل نسخة إكسيل محدثة أو ربط الملف للحفظ التلقائي.'), E.FileLink.supported ? h('button', { class: 'btn sm primary', onclick: linkFile }, UI().icon('link'), 'ربط ملف الإكسيل') : null, h('button', { class: 'btn sm', onclick: downloadCopy }, UI().icon('download'), 'تنزيل نسخة إكسيل')));
   }
   async function downloadCopy() { const buf = await W().write(S().state()); E.FileLink.downloadBytes(buf, 'Egary.xlsx'); UI().toast('تم تنزيل نسخة الإكسيل', 'ok'); }
+  async function downloadBackup() { const b = await E.FileLink.loadBackup(); if (!b || !b.bytes) { UI().toast('لا توجد نسخة احتياطية بعد', 'warn'); return; } E.FileLink.downloadBytes(b.bytes, 'Egary-backup-' + new Date(b.at).toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.xlsx'); UI().toast('تم تنزيل النسخة الاحتياطية (' + new Date(b.at).toLocaleString('ar-EG') + ')', 'ok'); }
 
   async function linkFile() {
     try {
@@ -274,7 +275,7 @@ window.Egary = window.Egary || {};
   /* واجهة للاختبارات: ربط محوِّل ذاكرة مباشرة */
   async function linkAdapter(adapter) { App.mode = 'linked'; S().setRecorder(op => E.Sync.record(op)); await E.Sync.link(adapter, { writeOnLink: false }); showApp(); return true; }
 
-  Object.assign(App, { boot, go, open, evidence, render, setFilter, filterBar, linkFile, linkAdapter, downloadCopy, loadDemo, openWithoutLink, ctx, VIEWS, saveSnapshot, loadSnapshot, toggleTheme });
+  Object.assign(App, { boot, go, open, evidence, render, setFilter, filterBar, linkFile, linkAdapter, downloadCopy, downloadBackup, loadDemo, openWithoutLink, ctx, VIEWS, saveSnapshot, loadSnapshot, toggleTheme });
   E.App = App;
   document.addEventListener('DOMContentLoaded', () => { if (!window.__EGARY_NO_BOOT) boot(); });
 })(window.Egary);

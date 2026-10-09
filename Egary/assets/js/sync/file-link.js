@@ -32,6 +32,9 @@ window.Egary = window.Egary || {};
   const saveHandle = (h) => tx('readwrite', st => st.put(h, KEY)).catch(() => null);
   const loadHandle = () => tx('readonly', st => st.get(KEY)).catch(() => null);
   const clearHandle = () => tx('readwrite', st => st.delete(KEY)).catch(() => null);
+  /* نسخة احتياطية من آخر ملف سليم قُرئ أو كُتب (داخل المتصفح) — شبكة أمان لو تلف الملف */
+  const saveBackup = (buf) => tx('readwrite', st => st.put({ at: Date.now(), bytes: buf.slice(0) }, 'backup')).catch(() => null);
+  const loadBackup = () => tx('readonly', st => st.get('backup')).catch(() => null);
 
   /* ---------- محوِّل ملف حقيقي (Chrome / Edge) ---------- */
   function fileHandleAdapter(handle) {
@@ -97,5 +100,5 @@ window.Egary = window.Egary || {};
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
-  E.FileLink = { supported, pick, restore, saveHandle, loadHandle, clearHandle, fileHandleAdapter, memoryAdapter, downloadBytes };
+  E.FileLink = { supported, pick, restore, saveHandle, loadHandle, clearHandle, saveBackup, loadBackup, fileHandleAdapter, memoryAdapter, downloadBytes };
 })(window.Egary);

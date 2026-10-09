@@ -1,0 +1,13 @@
+{
+  "name": "egary",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Egary (إيجاري) — rental management with Excel as the single source of truth; static app, no build.",
+  "scripts": {
+    "test": "node --test tests/sync.test.js tests/workbook.test.js tests/workbook2.test.js",
+    "test:e2e": "NODE_PATH=/opt/node22/lib/node_modules node --test tests/e2e.test.js tests/bi.test.js",
+    "build:workbook": "node tests/build_workbook.js",
+    "smoke": "NODE_PATH=/opt/node22/lib/node_modules node tests/smoke.js && NODE_PATH=/opt/node22/lib/node_modules node tests/smoke_bi.js"
+  },
+  "license": "MIT"
+}
