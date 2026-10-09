@@ -7,7 +7,7 @@ function load(opts) {
   global.window = { Egary: {} };
   global.localStorage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } };
   global.ExcelJS = require(path.join(ROOT, 'assets/vendor/exceljs.min.js'));
-  for (const f of ['core/util', 'core/model', 'core/codes', 'core/store', 'core/engine', 'xlsx/workbook', 'sync/file-link', 'sync/sync']) {
+  for (const f of ['core/util', 'core/model', 'core/codes', 'core/store', 'core/engine', 'xlsx/workbook', 'sync/file-link', 'sync/sync', 'sync/backup']) {
     const p = path.join(ROOT, 'assets/js', f + '.js'); delete require.cache[p]; require(p);
   }
   const E = window.Egary;

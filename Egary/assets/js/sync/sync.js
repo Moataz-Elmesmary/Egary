@@ -93,6 +93,7 @@ window.Egary = window.Egary || {};
       lastSeen = await adapter.lastModified();
       pending = []; saveJournal();
       emit({ state: 'linked', lastSync: Date.now(), error: null });
+      if (cfg.onWritten) { try { cfg.onWritten(buf); } catch (e) { /* النسخ الاحتياطي لا يعطّل الحفظ */ } }
       writing = false;
       if (flushAgain) { flushAgain = false; return flush(); }
       return true;

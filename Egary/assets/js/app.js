@@ -53,8 +53,40 @@ window.Egary = window.Egary || {};
       applyOps: ops => S().applyOps(ops),
       onStatus: renderSync,
       onExternalChange: () => { UI().toast('تم تحديث البيانات من ملف الإكسيل', 'ok'); render(); },
+      onWritten: (buf) => { E.Backup.write(buf, '', false); },
       pollMs: 2000,
     });
+    E.Backup.subscribe(() => { if (App.route.view === 'settings') render(); });
+  }
+  /* ---------- النسخ الاحتياطي على القرص ---------- */
+  async function restoreBackupDir() {
+    if (!E.FileLink.dirSupported) return false;
+    const h = await E.FileLink.loadDirHandle(); if (!h) return false;
+    try { if ((await E.FileLink.dirPermission(h, true)) !== 'granted') return false; } catch (e) { return false; }
+    await E.Backup.setDir(h); return true;
+  }
+  async function enableBackups() {
+    try {
+      const h = await E.FileLink.pickDirectory();
+      await E.Backup.setDir(h);
+      if (lastBytes) await E.Backup.write(lastBytes, 'original', true);
+      UI().toast('تم تفعيل النسخ الاحتياطي التلقائي في مجلد backups', 'ok');
+      render(); return true;
+    } catch (e) { if (e && e.name !== 'AbortError') UI().toast('تعذّر اختيار المجلد: ' + (e.message || e), 'danger'); return false; }
+  }
+  async function backupNow(label) {
+    if (!lastBytes) { UI().toast('لا توجد بيانات محمَّلة بعد', 'warn'); return false; }
+    if (!E.Backup.status().enabled) { E.FileLink.saveBackup(lastBytes); return 'browser'; }
+    const n = await E.Backup.write(lastBytes, label || 'manual', true);
+    if (n && !label) UI().toast('حُفظت نسخة احتياطية: ' + n, 'ok');
+    return n;
+  }
+  function offerBackupFolder() {
+    if (!E.FileLink.dirSupported || App.mode !== 'linked' || E.Backup.status().enabled) return;
+    let shown = false; try { shown = localStorage.getItem('egary-backup-offered') === '1'; } catch (e) { }
+    if (shown) return;
+    try { localStorage.setItem('egary-backup-offered', '1'); } catch (e) { }
+    const m = UI().modal({ title: 'تفعيل النسخ الاحتياطي التلقائي', size: 'sm', body: h('div', null, h('p', null, 'ليبقى عندك دائمًا نسخة من الإكسيل على القرص: اختر مجلد البرنامج نفسه (المجلد الذي فيه Egary.xlsx) مرة واحدة، وسيحفظ البرنامج نسخًا تلقائية في مجلد فرعي باسم ', h('span', { class: 'code' }, 'backups'), ' بعد كل تعديل وقبل أي حذف.'), h('p', { class: 'muted small mt-s' }, 'يمكنك تفعيله لاحقًا من الإعدادات.')), footer: [h('button', { class: 'btn', onclick: () => m.close() }, 'لاحقًا'), h('button', { class: 'btn primary', id: 'btn-enable-backups', onclick: async () => { m.close(); await enableBackups(); } }, UI().icon('shield'), 'اختيار مجلد البرنامج')] });
   }
   function renderSync(st) {
     const el = App.els.sync; if (!el) return;
@@ -87,6 +119,7 @@ window.Egary = window.Egary || {};
     showApp();
     if (App.flags.some(f => f.sev === 'danger' || f.sev === 'warn')) UI().toast(`تمت قراءة الملف — ${App.flags.length} ملاحظة في «جودة البيانات»`, 'warn', 5000);
     else UI().toast('تم ربط ملف الإكسيل — كل تعديل يُحفظ فيه تلقائيًا', 'ok');
+    restoreBackupDir().then(ok => { if (ok && lastBytes) E.Backup.write(lastBytes, '', false); else setTimeout(offerBackupFolder, 1200); });
     return true;
   }
   async function openWithoutLink(file) {
@@ -281,7 +314,7 @@ window.Egary = window.Egary || {};
   /* واجهة للاختبارات: ربط محوِّل ذاكرة مباشرة */
   async function linkAdapter(adapter) { App.mode = 'linked'; S().setRecorder(op => E.Sync.record(op)); await E.Sync.link(adapter, { writeOnLink: false }); showApp(); return true; }
 
-  Object.assign(App, { boot, go, open, evidence, render, setFilter, filterBar, linkFile, linkAdapter, downloadCopy, downloadBackup, downloadOriginal, loadDemo, openWithoutLink, ctx, VIEWS, saveSnapshot, loadSnapshot, toggleTheme });
+  Object.assign(App, { boot, go, open, evidence, render, setFilter, filterBar, linkFile, linkAdapter, downloadCopy, downloadBackup, downloadOriginal, enableBackups, backupNow, loadDemo, openWithoutLink, ctx, VIEWS, saveSnapshot, loadSnapshot, toggleTheme });
   E.App = App;
   document.addEventListener('DOMContentLoaded', () => { if (!window.__EGARY_NO_BOOT) boot(); });
 })(window.Egary);

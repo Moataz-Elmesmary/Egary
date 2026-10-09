@@ -32,9 +32,37 @@ window.Egary = window.Egary || {};
   const saveHandle = (h) => tx('readwrite', st => st.put(h, KEY)).catch(() => null);
   const loadHandle = () => tx('readonly', st => st.get(KEY)).catch(() => null);
   const clearHandle = () => tx('readwrite', st => st.delete(KEY)).catch(() => null);
-  /* نسخة احتياطية من آخر ملف سليم قُرئ أو كُتب (داخل المتصفح) — شبكة أمان لو تلف الملف */
-  const saveBackup = (buf) => tx('readwrite', st => st.put({ at: Date.now(), bytes: buf.slice(0) }, 'backup')).catch(() => null);
+  /* نسخ احتياطية داخل المتصفح: آخر 12 ملفًا سليمًا (شبكة أمان لو تلف الملف أو غاب المجلد) */
+  const saveBackup = async (buf) => {
+    const cur = (await tx('readonly', st => st.get('backups')).catch(() => null)) || [];
+    const list = Array.isArray(cur) ? cur : [];
+    const last = list[0];
+    if (last && Date.now() - last.at < 60000) { list[0] = { at: Date.now(), bytes: buf.slice(0) }; } else list.unshift({ at: Date.now(), bytes: buf.slice(0) });
+    while (list.length > 12) list.pop();
+    await tx('readwrite', st => st.put(list, 'backups')).catch(() => null);
+    await tx('readwrite', st => st.put({ at: Date.now(), bytes: buf.slice(0) }, 'backup')).catch(() => null);
+  };
   const loadBackup = () => tx('readonly', st => st.get('backup')).catch(() => null);
+  const listBrowserBackups = async () => { const l = (await tx('readonly', st => st.get('backups')).catch(() => null)) || []; return Array.isArray(l) ? l : []; };
+  /* مجلد النسخ الاحتياطي على القرص (مجلد البرنامج نفسه): يُختار مرة ويُحفظ مقبضه */
+  const saveDirHandle = (h) => tx('readwrite', st => st.put(h, 'dir')).catch(() => null);
+  const loadDirHandle = () => tx('readonly', st => st.get('dir')).catch(() => null);
+  const clearDirHandle = () => tx('readwrite', st => st.delete('dir')).catch(() => null);
+  const dirSupported = typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
+  async function pickDirectory() { const h = await window.showDirectoryPicker({ mode: 'readwrite', id: 'egary-folder' }); await saveDirHandle(h); return h; }
+  async function dirPermission(h, ask) { const o = { mode: 'readwrite' }; let p = await h.queryPermission(o); if (p !== 'granted' && ask) p = await h.requestPermission(o); return p; }
+  async function writeFileIn(dir, sub, name, buf) {
+    const d = sub ? await dir.getDirectoryHandle(sub, { create: true }) : dir;
+    const fh = await d.getFileHandle(name, { create: true });
+    const w = await fh.createWritable(); try { await w.write(buf); } finally { await w.close(); }
+  }
+  async function listFilesIn(dir, sub) {
+    const out = [];
+    let d; try { d = sub ? await dir.getDirectoryHandle(sub, { create: false }) : dir; } catch (e) { return out; }
+    for await (const [name, h] of d.entries()) if (h.kind === 'file') { let f = null; try { f = await h.getFile(); } catch (e) { } out.push({ name, size: f ? f.size : 0, at: f ? f.lastModified : 0 }); }
+    return out.sort((a, b) => b.at - a.at);
+  }
+  async function removeFileIn(dir, sub, name) { try { const d = sub ? await dir.getDirectoryHandle(sub, { create: false }) : dir; await d.removeEntry(name); return true; } catch (e) { return false; } }
   /* الملف الأصلي قبل أول تحويل: يُحفظ مرة واحدة ولا يُستبدل أبدًا */
   const saveOriginal = async (buf, name) => { const cur = await tx('readonly', st => st.get('original')).catch(() => null); if (cur && cur.bytes) return false; await tx('readwrite', st => st.put({ at: Date.now(), name: name || 'Egary.xlsx', bytes: buf.slice(0) }, 'original')).catch(() => null); return true; };
   const loadOriginal = () => tx('readonly', st => st.get('original')).catch(() => null);
@@ -103,5 +131,5 @@ window.Egary = window.Egary || {};
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
-  E.FileLink = { supported, pick, restore, saveHandle, loadHandle, clearHandle, saveBackup, loadBackup, saveOriginal, loadOriginal, fileHandleAdapter, memoryAdapter, downloadBytes };
+  E.FileLink = { supported, pick, restore, saveHandle, loadHandle, clearHandle, saveBackup, loadBackup, listBrowserBackups, saveOriginal, loadOriginal, dirSupported, pickDirectory, dirPermission, saveDirHandle, loadDirHandle, clearDirHandle, writeFileIn, listFilesIn, removeFileIn, fileHandleAdapter, memoryAdapter, downloadBytes };
 })(window.Egary);
