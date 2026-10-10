@@ -86,7 +86,7 @@ window.Egary = window.Egary || {};
     const api = { el: overlay, box, body, close };
     stack.push(api);
     document.body.appendChild(overlay);
-    const first = body.querySelector('input, select, textarea, button'); if (first) setTimeout(() => first.focus(), 30);
+    const first = body.querySelector('input, select, textarea, button'); if (first) setTimeout(() => { const a = document.activeElement; if (!a || a === document.body || !body.contains(a)) first.focus(); }, 30); // لا نسرق التركيز لو بدأ المستخدم الكتابة
     return api;
   }
   document.addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; if (stack.length) { stack[stack.length - 1].close(); return; } if (drawerApi) drawerApi.close(); });
