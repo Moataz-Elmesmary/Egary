@@ -23,7 +23,8 @@ window.Egary = window.Egary || {};
   async function hashPassword(password) { const salt = globalThis.crypto.getRandomValues(new Uint8Array(16)); return `pbkdf2$${ITER}$${hex(salt)}$${await pbkdf2(password, salt, ITER)}`; }
   async function verifyPassword(password, stored) {
     const m = /^pbkdf2\$(\d+)\$([0-9a-f]+)\$([0-9a-f]+)$/.exec(String(stored || '').trim()); if (!m) return false;
-    const h = await pbkdf2(password || '', unhex(m[2]), parseInt(m[1], 10));
+    const iter = parseInt(m[1], 10); if (!(iter >= 1 && iter <= 5000000) || m[2].length % 2 || m[3].length !== 64) return false; // سجل تالف (عُدِّل في الإكسيل) ⇒ رفض هادئ بلا استثناء
+    const h = await pbkdf2(password || '', unhex(m[2]), iter);
     if (h.length !== m[3].length) return false; let d = 0; for (let i = 0; i < h.length; i++) d |= h.charCodeAt(i) ^ m[3].charCodeAt(i); return d === 0; // مقارنة بزمن ثابت
   }
   function validatePassword(p) { p = String(p || ''); if (p.length < 6) return 'كلمة المرور 6 أحرف على الأقل'; return ''; }
@@ -41,30 +42,55 @@ window.Egary = window.Egary || {};
   function find(username) { const k = normUser(username); return users().find(u => normUser(u.code) === k) || null; }
   function hasUsers() { return users().some(u => u.enabled !== false && u.passwordHash); }
   function roleOf(u) { return ROLES.some(r => r.key === u.role) ? u.role : 'staff'; }
-  function setCurrent(u, remember, source) {
+  /* الرمز المحفوظ مرتبط بكلمة المرور (آخر 16 خانة من التجزئة) وباسم الملف: تغيير كلمة المرور أو ملف آخر ينهي الجلسة المحفوظة */
+  const fileName = () => { try { return (E.Sync && E.Sync.status && E.Sync.status.name) || ''; } catch (e) { return ''; } };
+  const tokenFor = (u) => JSON.stringify({ u: u.code, at: Date.now(), h: String(u.passwordHash || '').slice(-16), f: fileName() });
+  const tokenValid = (tok, u) => !!tok && !!u && u.enabled !== false && String(tok.h || '') === String(u.passwordHash || '').slice(-16) && (!tok.f || !fileName() || tok.f === fileName());
+  /* mode: 'login' (يكتب الرموز حسب remember) · 'restore' (لا يلمس «تذكرني») · 'refresh' (يجدد الرموز الموجودة) */
+  function setCurrent(u, remember, source, mode) {
     current = { username: u.code, name: u.name || u.code, role: roleOf(u), source: source || 'login' };
-    const tok = JSON.stringify({ u: u.code, at: Date.now() });
-    try { sessionStorage.setItem(SESSION_KEY, tok); } catch (e) { }
-    try { if (remember) localStorage.setItem(REMEMBER_KEY, tok); else localStorage.removeItem(REMEMBER_KEY); } catch (e) { }
+    mode = mode || 'login';
+    if (mode === 'login') {
+      try { sessionStorage.setItem(SESSION_KEY, tokenFor(u)); } catch (e) { }
+      try { if (remember) localStorage.setItem(REMEMBER_KEY, tokenFor(u)); else localStorage.removeItem(REMEMBER_KEY); } catch (e) { }
+    } else if (mode === 'refresh') {
+      try { if (sessionStorage.getItem(SESSION_KEY)) sessionStorage.setItem(SESSION_KEY, tokenFor(u)); } catch (e) { }
+      try { if (localStorage.getItem(REMEMBER_KEY)) localStorage.setItem(REMEMBER_KEY, tokenFor(u)); } catch (e) { }
+    } else { try { sessionStorage.setItem(SESSION_KEY, tokenFor(u)); } catch (e) { } }
     emit();
   }
+  const DUMMY = `pbkdf2$${ITER}$${'0'.repeat(32)}$${'0'.repeat(64)}`; // نفس عدد التكرارات حتى لا يكشف زمن الرد وجود المستخدم
   async function login(username, password, remember) {
     const u = find(username);
-    // نتحقق دائمًا من كلمة مرور (ولو وهمية) حتى لا يكشف زمن الرد وجود المستخدم
-    const ok = await verifyPassword(password, u && u.enabled !== false ? u.passwordHash : 'pbkdf2$1000$00$00');
+    let ok = false; try { ok = await verifyPassword(password, u && u.enabled !== false ? u.passwordHash : DUMMY); } catch (e) { ok = false; }
     if (!u || u.enabled === false || !ok) return { ok: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة' };
-    setCurrent(u, remember);
+    setCurrent(u, remember, 'login', 'login');
     try { if (S().log) S().log({ action: 'دخول', entity: 'مستخدم', code: u.code, summary: current.name + (remember ? ' (تذكرني)' : '') }); } catch (e) { }
     return { ok: true, user: current };
   }
-  function restore() { // بعد قراءة الملف: جلسة محفوظة لمستخدم ما زال موجودًا ومفعَّلًا
-    let tok = null, remembered = false;
+  function restore() { // بعد قراءة الملف: جلسة محفوظة (النافذة أو «تذكرني») لمستخدم ما زال موجودًا ومفعَّلًا وبنفس كلمة المرور
+    let tok = null;
     try { tok = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null'); } catch (e) { }
-    if (!tok) { try { tok = JSON.parse(localStorage.getItem(REMEMBER_KEY) || 'null'); remembered = true; if (tok && Date.now() - tok.at > REMEMBER_DAYS * 864e5) tok = null; } catch (e) { tok = null; } }
-    if (!tok) return null;
-    const u = find(tok.u); if (!u || u.enabled === false) { logout(); return null; }
-    setCurrent(u, remembered, 'restored'); return current;
+    let u = tok ? find(tok.u) : null;
+    if (!tokenValid(tok, u)) {
+      try { sessionStorage.removeItem(SESSION_KEY); } catch (e) { }
+      tok = null; try { tok = JSON.parse(localStorage.getItem(REMEMBER_KEY) || 'null'); if (tok && !(Date.now() - tok.at <= REMEMBER_DAYS * 864e5)) tok = null; } catch (e) { tok = null; }
+      u = tok ? find(tok.u) : null;
+      if (!tokenValid(tok, u)) { if (tok) { try { localStorage.removeItem(REMEMBER_KEY); } catch (e) { } } return null; }
+    }
+    setCurrent(u, false, 'restored', 'restore'); return current;
   }
+  /* لو أُعيدت قراءة الملف (تعديل خارجي أو جهاز آخر) نعيد التحقق من المستخدم الحالي: حُذف/عُطِّل ⇒ خروج، تغيّر دوره أو اسمه ⇒ تحديث */
+  function revalidate() {
+    if (!current || current.source === 'demo') return true;
+    const u = find(current.username);
+    if (!u || u.enabled === false) { logout(); return false; }
+    const changed = current.role !== roleOf(u) || current.name !== (u.name || u.code);
+    current.role = roleOf(u); current.name = u.name || u.code;
+    if (changed) emit();
+    return true;
+  }
+  function hasAdmin() { return users().some(u => u.role === 'admin' && u.enabled !== false && u.passwordHash); }
   function demo(name) { current = { username: 'demo', name: name || 'تجربة', role: 'admin', source: 'demo' }; emit(); return current; }
   function logout() { current = null; try { sessionStorage.removeItem(SESSION_KEY); } catch (e) { } try { localStorage.removeItem(REMEMBER_KEY); } catch (e) { } emit(); }
   function user() { return current; }
@@ -112,6 +138,7 @@ window.Egary = window.Egary || {};
     const e = validatePassword(password); if (e) return { errors: [e] };
     const rec = Object.assign({}, u, { passwordHash: await hashPassword(password) });
     S().upsert('users', rec, `تغيير كلمة مرور: ${rec.name}`);
+    if (current && normUser(current.username) === normUser(code)) setCurrent(rec, false, current.source, 'refresh');
     return { record: rec };
   }
   function removeUser(code) {
@@ -122,5 +149,5 @@ window.Egary = window.Egary || {};
     return { ok: true };
   }
 
-  E.Auth = { ROLES, ROLE_AR, login, logout, restore, demo, user, role, can, hasUsers, users, find, normUser, hashPassword, verifyPassword, validatePassword, validateUsername, createUser, updateUser, setPassword, removeUser, subscribe, get supported() { return !!subtle(); } };
+  E.Auth = { ROLES, ROLE_AR, login, logout, restore, revalidate, hasAdmin, demo, user, role, can, hasUsers, users, find, normUser, hashPassword, verifyPassword, validatePassword, validateUsername, createUser, updateUser, setPassword, removeUser, subscribe, get supported() { return !!subtle(); } };
 })(window.Egary);

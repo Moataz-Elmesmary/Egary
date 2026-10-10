@@ -41,6 +41,7 @@ window.Egary = window.Egary || {};
         defaultIncreasePct: 10,
         ledgerYears: [2026],     // أوراق السنوات الموجودة في الإكسيل
         invoicePrefix: 'INV',
+        codeSeq: {},             // أعلى رقم تسلسلي صدر لكل نوع كود (لا يُعاد استخدام كود محذوف): { P, C, T, M, 'INV-2026' }
         currency: 'ج',
         enteredThrough: '',      // آخر شهر مكتمل التسجيل في الورقة ('' = يُكتشف تلقائيًا)
         tolerancePct: 0.5,       // فرق مقبول بين المسدَّد والمستحق (٪ من المستحق) قبل اعتبار الشهر جزئيًا

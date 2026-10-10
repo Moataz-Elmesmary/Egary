@@ -86,20 +86,21 @@ window.Egary = window.Egary || {};
       const rec = M().blank[entity] ? M().blank[entity]() : {};
       let any = false;
       for (const [field, ar] of cols) {
-        if (field.startsWith('_')) continue;
+        if (field.startsWith('_') && field !== '_project' && field !== '_unit' && field !== '_client') continue;
         const col = findCol(map, ar); if (!col) continue;
         const v = row.getCell(col).value; const txt = U().cellText(v);
         if (txt !== '') any = true;
+        if (field.startsWith('_')) { if (txt !== '') rec[field] = txt; continue; }
         if (DATE_FIELDS.has(field)) rec[field] = U().toIso(v instanceof Date ? v : (v && v.result instanceof Date ? v.result : txt));
         else if (NUM_FIELDS.has(field) && !(entity === 'projects' && field === 'area')) {
           const n = U().toNum(v);
           rec[field] = n == null ? (field === 'dueDay' ? 1 : (field === 'area' ? '' : (field === 'ledgerOrder' ? null : 0))) : n;
         }
-        else if (LISTS[entity + '.' + field]) rec[field] = M().keyOf(LISTS[entity + '.' + field](), txt) || (field === 'method' || field === 'source' ? '' : rec[field]);
+        else if (LISTS[entity + '.' + field]) rec[field] = M().keyOf(LISTS[entity + '.' + field](), txt) || (entity === 'users' ? (LISTS['users.role']().find(r => r.key === txt.trim().toLowerCase() || U().normalize(txt).startsWith(U().normalize(r.ar)) || (U().normalize(txt).length >= 3 && U().normalize(r.ar).startsWith(U().normalize(txt)))) || {}).key || rec[field] : (field === 'method' || field === 'source' ? '' : rec[field]));
         else if (field === 'rentOverrides') rec[field] = parseOverrides(txt);
         else if (field === 'period') { const iso = v instanceof Date ? U().toIso(v) : (/^\d{4}-\d{2}-\d{2}/.test(txt) ? txt : ''); rec[field] = iso ? iso.slice(0, 7) : txt.replace(/[٠-٩]/g, ch => '٠١٢٣٤٥٦٧٨٩'.indexOf(ch)).replace(/\//g, '-').slice(0, 7); }
         else if (field === 'present' || field === 'inferred') rec[field] = /^(نعم|✓|yes|true|1|موجود)$/i.test(txt);
-        else if (field === 'enabled') rec[field] = txt === '' ? true : /^(نعم|✓|yes|true|1)$/i.test(txt);
+        else if (field === 'enabled') rec[field] = !/^(لا|no|false|0|معطل|معطَّل|معطّل|x|✗)$/i.test(txt.trim()); // لا يُعطَّل إلا بنفي صريح
         else rec[field] = txt;
       }
       if (any) { rec._row = r; out.push(rec); }
@@ -115,19 +116,53 @@ window.Egary = window.Egary || {};
     for (const ent of ['projects', 'units', 'clients', 'contracts', 'payments', 'maintenance']) {
       const ws = wb.getWorksheet(SH[ent]); if (!ws) continue;
       const rows = readTable(ws, ent);
-      for (const r of rows) { const rowNo = r._row; delete r._row; if (!r.code) { r._needsCode = true; } state[ent].push(r); r._rowNo = rowNo; }
+      const seen = new Set();
+      for (const r of rows) {
+        const rowNo = r._row; delete r._row;
+        if (r.code && seen.has(U().foldCode(r.code))) { flags.push({ sev: 'danger', entity: ent, code: r.code, text: `ورقة ${SH[ent]} صف ${rowNo}: الكود ${r.code} مكرر — أُعطي الصف كودًا جديدًا (راجع الصفين)` }); r.code = ''; }
+        if (!r.code) { r._needsCode = true; } else seen.add(U().foldCode(r.code));
+        state[ent].push(r); r._rowNo = rowNo;
+      }
     }
+    // مفاتيح مكتوبة بالاسم بدل الكود (صفوف يدوية): نحلّها بالاسم كما في ورقة السنة
+    const byName = (list, name) => name ? list.find(x => U().normalize(x.name) === U().normalize(name)) || null : null;
+    const unitByLabel = (projectCode, label) => label ? state.units.find(u => (!projectCode || u.projectCode === projectCode) && U().normalize(u.label) === U().normalize(label)) || null : null;
     // أكواد للصفوف المضافة يدويًا في الإكسيل
     for (const p of state.projects) if (p._needsCode) { p.code = C().nextProject(state); flags.push({ sev: 'info', entity: 'projects', code: p.code, text: `صف مشروع جديد من الإكسيل أُعطي الكود ${p.code}` }); }
     for (const u of state.units) {
-      if (!u.projectCode && u._project) { const p = state.projects.find(p => U().normalize(p.name) === U().normalize(u._project)); if (p) u.projectCode = p.code; }
+      if (!u.projectCode && u._project) { const p = byName(state.projects, u._project); if (p) u.projectCode = p.code; }
+      if (!u.projectCode && u._needsCode) { flags.push({ sev: 'danger', entity: 'units', code: u.label, text: `ورقة الوحدات صف ${u._rowNo}: الوحدة «${u.label}» بلا مشروع معروف — اكتب كود المشروع أو اسمه كما في ورقة المشاريع` }); u._drop = true; continue; }
       if (u._needsCode) { u.code = C().unitCode(state, u.projectCode || 'P00', u.label); if (!u.type) u.type = C().inferType(u.label); if (!u.floor) u.floor = C().inferFloor(u.label); flags.push({ sev: 'info', entity: 'units', code: u.code, text: `صف وحدة جديد من الإكسيل أُعطي الكود ${u.code}` }); }
     }
+    state.units = state.units.filter(u => !u._drop);
     for (const c of state.clients) if (c._needsCode) { c.code = C().nextClient(state); flags.push({ sev: 'info', entity: 'clients', code: c.code, text: `عميل جديد من الإكسيل أُعطي الكود ${c.code}` }); }
-    for (const c of state.contracts) if (c._needsCode) { c.code = C().nextContract(state); flags.push({ sev: 'info', entity: 'contracts', code: c.code, text: `عقد جديد من الإكسيل أُعطي الكود ${c.code}` }); }
-    for (const p of state.payments) if (p._needsCode) { p.code = C().nextInvoice(state, (p.period || '0000').slice(0, 4)); p.source = p.source || 'excel'; }
-    for (const m of state.maintenance) if (m._needsCode) { m.code = C().nextMaintenance(state); }
-    for (const ent of ['projects', 'units', 'clients', 'contracts', 'payments', 'maintenance']) for (const r of state[ent]) { delete r._needsCode; delete r._rowNo; delete r._project; delete r._unit; delete r._client; }
+    for (const c of state.contracts) {
+      if (!c.unitCode && c._unit) { const p = byName(state.projects, c._project); const u = unitByLabel(p ? p.code : '', c._unit); if (u) c.unitCode = u.code; }
+      if (!c.clientCode && c._client) { const cl = byName(state.clients, c._client); if (cl) c.clientCode = cl.code; }
+      if (c._needsCode) { c.code = C().nextContract(state); flags.push({ sev: 'info', entity: 'contracts', code: c.code, text: `عقد جديد من الإكسيل أُعطي الكود ${c.code}` }); }
+    }
+    for (const p of state.payments) {
+      if (!p.contractCode && (p._client || p._unit)) { const cl = byName(state.clients, p._client); const cands = state.contracts.filter(c => (!cl || c.clientCode === cl.code) && (!p._unit || U().normalize((state.units.find(u => u.code === c.unitCode) || {}).label) === U().normalize(p._unit))); const inRange = cands.find(c => p.period && c.start && c.end && c.start.slice(0, 7) <= p.period && c.end.slice(0, 7) >= p.period); const pick = inRange || cands.sort((a, b) => U().cmp(b.start, a.start))[0]; if (pick) p.contractCode = pick.code; }
+      if (p._needsCode) { p.code = C().nextInvoice(state, (p.period || '0000').slice(0, 4)); p.source = p.source || 'excel'; }
+    }
+    for (const m of state.maintenance) {
+      if (!m.unitCode && m._unit) { const p = byName(state.projects, m._project); const u = unitByLabel(p ? p.code : '', m._unit); if (u) m.unitCode = u.code; }
+      if (m._needsCode) { m.code = C().nextMaintenance(state); }
+    }
+    // المفاتيح الأجنبية المكتوبة بصيغة مختلفة (أرقام عربية، حروف صغيرة، مسافات) تُوحَّد إلى الكود الأصلي؛ والمفقودة تُعلَّم
+    const canon = (ent) => new Map(state[ent].map(r => [U().foldCode(r.code), r.code]));
+    const cP = canon('projects'), cU = canon('units'), cC = canon('clients'), cT = canon('contracts');
+    const fix = (rec, field, map, ent, entAr, optional) => {
+      const v = rec[field]; if (!v) return;
+      const exact = map.get(U().foldCode(v));
+      if (exact === undefined) { if (!optional) flags.push({ sev: 'danger', entity: ent, code: rec.code, text: `${M().ENTITY_AR[ent]} ${rec.code}: ${entAr} «${v}» غير موجود — راجع الكود في الإكسيل` }); return; }
+      if (exact !== v) { rec[field] = exact; flags.push({ sev: 'info', entity: ent, code: rec.code, text: `${M().ENTITY_AR[ent]} ${rec.code}: ${entAr} كُتب «${v}» وصُحِّح إلى ${exact}` }); }
+    };
+    for (const u of state.units) fix(u, 'projectCode', cP, 'units', 'كود المشروع');
+    for (const c of state.contracts) { fix(c, 'unitCode', cU, 'contracts', 'كود الوحدة'); fix(c, 'clientCode', cC, 'contracts', 'كود العميل'); fix(c, 'prevCode', cT, 'contracts', 'العقد السابق', true); }
+    for (const p of state.payments) fix(p, 'contractCode', cT, 'payments', 'كود العقد');
+    for (const m of state.maintenance) { fix(m, 'unitCode', cU, 'maintenance', 'كود الوحدة'); fix(m, 'custodianContract', cT, 'maintenance', 'عقد العهدة', true); }
+    for (const ent of ['projects', 'units', 'clients', 'contracts', 'payments', 'maintenance']) for (const r of state[ent]) { delete r._needsCode; delete r._rowNo; delete r._project; delete r._unit; delete r._client; delete r._drop; }
     // المستخدمون (حسابات الدخول)
     const wu = wb.getWorksheet(SH.users);
     if (wu) for (const r of readTable(wu, 'users')) { delete r._row; r.code = String(r.code || '').trim().toLowerCase(); if (r.code) state.users.push(r); }
@@ -135,7 +170,8 @@ window.Egary = window.Egary || {};
     const wa = wb.getWorksheet(SH.assets);
     if (wa) {
       const byUnit = new Map();
-      for (const a of readTable(wa, 'assets')) { if (!a.unitCode) continue; if (!byUnit.has(a.unitCode)) byUnit.set(a.unitCode, []); byUnit.get(a.unitCode).push({ name: a.name, present: !!a.present, details: a.details || '' }); }
+      const cUnits = new Map(state.units.map(u => [U().foldCode(u.code), u.code]));
+      for (const a of readTable(wa, 'assets')) { if (!a.unitCode) continue; const uc = cUnits.get(U().foldCode(a.unitCode)) || a.unitCode; if (!byUnit.has(uc)) byUnit.set(uc, []); byUnit.get(uc).push({ name: a.name, present: !!a.present, details: a.details || '' }); }
       for (const u of state.units) u.assets = byUnit.get(u.code) || [];
     }
     // الإعدادات
@@ -147,6 +183,7 @@ window.Egary = window.Egary || {};
         const f = SETTINGS_KEYS.find(s => U().normalize(s.ar) === U().normalize(k)); if (!f) continue;
         if (f.type === 'num') state.settings[f.key] = U().toNum(v) == null ? state.settings[f.key] : U().toNum(v);
         else if (f.type === 'years') state.settings[f.key] = txt.split(/[,،\s]+/).map(x => parseInt(x, 10)).filter(x => x > 1900);
+        else if (f.type === 'json') { try { const o = JSON.parse(txt || '{}'); state.settings[f.key] = o && typeof o === 'object' ? o : {}; } catch (e) { state.settings[f.key] = state.settings[f.key] || {}; } }
         else if (f.key === 'officeName') state.meta.officeName = txt || state.meta.officeName;
         else state.settings[f.key] = txt || state.settings[f.key];
       }
@@ -157,7 +194,7 @@ window.Egary = window.Egary || {};
   const SETTINGS_KEYS = [
     { key: 'officeName', ar: 'اسم المكتب', type: 'text' }, { key: 'graceDays', ar: 'أيام السماح بعد الاستحقاق', type: 'num' }, { key: 'dueDay', ar: 'يوم الاستحقاق الافتراضي', type: 'num' },
     { key: 'vacancyMonths', ar: 'عتبة الشغور الطويل (شهور)', type: 'num' }, { key: 'trackingFrom', ar: 'بداية المحاسبة (سنة-شهر)', type: 'text' }, { key: 'defaultIncreasePct', ar: 'الزيادة السنوية الافتراضية %', type: 'num' },
-    { key: 'ledgerYears', ar: 'سنوات الورقة', type: 'years' }, { key: 'invoicePrefix', ar: 'بادئة رقم الفاتورة', type: 'text' }, { key: 'currency', ar: 'العملة', type: 'text' },
+    { key: 'ledgerYears', ar: 'سنوات الورقة', type: 'years' }, { key: 'codeSeq', ar: 'أعلى أرقام الأكواد الصادرة', type: 'json' }, { key: 'invoicePrefix', ar: 'بادئة رقم الفاتورة', type: 'text' }, { key: 'currency', ar: 'العملة', type: 'text' },
     { key: 'enteredThrough', ar: 'آخر شهر مسجَّل في الورقة (سنة-شهر أو فارغ = تلقائي)', type: 'text' }, { key: 'tolerancePct', ar: 'فرق مقبول في السداد %', type: 'num' }, { key: 'toleranceMin', ar: 'الحد الأدنى للفرق المقبول (ج)', type: 'num' }, { key: 'prorationBasis', ar: 'أساس الشهر المقطوع (30 أو actual)', type: 'text' },
   ];
 
@@ -186,9 +223,10 @@ window.Egary = window.Egary || {};
         codeT: cCodeT ? U().cellText(row.getCell(cCodeT).value) : '', codeU: cCodeU ? U().cellText(row.getCell(cCodeU).value) : '', codeC: cCodeC ? U().cellText(row.getCell(cCodeC).value) : '', codeP: cCodeP ? U().cellText(row.getCell(cCodeP).value) : '',
         months: monthCols.map((cc, i) => { if (!cc) return { period: year + '-' + U().pad(i + 1, 2), num: null, text: '' }; const v = row.getCell(cc).value; const num = U().toNum(v); const text = U().cellText(v); return { period: year + '-' + U().pad(i + 1, 2), num, text: num == null ? text : '', raw: v }; }),
       };
-      if (L.codeT && seen.has(U().foldCode(L.codeT))) { flags.push({ sev: 'warn', entity: 'sheet', code: year + ':' + r, text: `ورقة ${year} صف ${r}: كود العقد ${L.codeT} مكرر — تم تجاهل الصف` }); continue; }
-      if (L.codeT) seen.add(U().foldCode(L.codeT));
-      mergeLedgerRow(L, year, state, flags, snapshot, migrating);
+      const L2 = stripStaleCodes(L, year, state, flags);
+      if (L2.codeT && seen.has(U().foldCode(L2.codeT))) { flags.push({ sev: 'warn', entity: 'sheet', code: year + ':' + r, text: `ورقة ${year} صف ${r}: كود العقد ${L2.codeT} مكرر — تم تجاهل الصف` }); continue; }
+      if (L2.codeT) seen.add(U().foldCode(L2.codeT));
+      mergeLedgerRow(L2, year, state, flags, snapshot, migrating);
     }
   }
 
@@ -197,6 +235,17 @@ window.Egary = window.Egary || {};
   function isCompany(name) { const n = U().normalize(name); return /شركه|شركة|مؤسسه|للتجاره|للاستشارات|للاستيراد|للتصدير|للانتاج|للخدمات|للتنميه|للمقاولات|للتسويق|company|co\b|ltd|llc|inc|group|قروب|مبادرات|وزاره|جمعيه|مركز|معهد|صالون|مطعم|كافيه|مكتب|برودكشن|ميديا|لابز|زون/.test(n); }
 
   /* دمج صف ورقة السنة مع الحالة: إنشاء الكيانات الناقصة، مطابقة الأكواد، مطابقة المدفوعات */
+  /* صف منسوخ بأعمدة أكواد قديمة (العميل والوحدة فيه لا يطابقان العقد الذي يشير إليه الكود) ⇒ نتجاهل الأكواد ونعامله كصف جديد بدل إعادة تسمية العقد القديم */
+  function stripStaleCodes(L, year, state, flags) {
+    if (!L.codeT) return L;
+    const byT = state.contracts.find(c => U().foldCode(c.code) === U().foldCode(L.codeT));
+    if (!byT) return L;
+    const cl0 = state.clients.find(c => c.code === byT.clientCode), u0 = state.units.find(u => u.code === byT.unitCode);
+    const nameMatch = !!cl0 && U().normalize(L.name) === U().normalize(cl0.name), labelMatch = !!u0 && U().normalize(L.unit) === U().normalize(u0.label);
+    if (nameMatch || labelMatch) return L;
+    flags.push({ sev: 'warn', entity: 'contracts', code: byT.code, text: `ورقة ${year} صف ${L.row}: الأكواد تشير إلى ${byT.code} (${cl0 ? cl0.name : '?'} / ${u0 ? u0.label : '?'}) لكن الصف باسم «${L.name}» ووحدة «${L.unit}» — عومل كصف جديد والأكواد القديمة تجاهلت` });
+    return Object.assign({}, L, { codeT: '', codeU: '', codeC: '' });
+  }
   function mergeLedgerRow(L, year, state, flags, snapshot, migrating) {
     // المشروع
     let project = L.codeP ? state.projects.find(p => U().foldCode(p.code) === U().foldCode(L.codeP)) : null;
@@ -530,9 +579,9 @@ window.Egary = window.Egary || {};
   function writeSettings(wb, state) {
     const ws = wb.addWorksheet(SH.settings, { views: [{ state: 'frozen', ySplit: 1, rightToLeft: true }] });
     ws.getRow(1).values = ['الإعداد', 'القيمة', 'الشرح']; styleHeader(ws.getRow(1)); ws.getColumn(1).width = 30; ws.getColumn(2).width = 20; ws.getColumn(3).width = 60;
-    const help = { enteredThrough: 'الشهور بعده تُعرض «بانتظار التسجيل» لا «متأخرة»', tolerancePct: 'يُقبل المبلغ كسداد كامل لو الفرق أقل من هذه النسبة', toleranceMin: 'حد أدنى للفرق المقبول بالجنيه', prorationBasis: '30 = الشهر 30 يومًا (النصف 15/30) كما يحسب المكتب', officeName: 'يظهر أعلى الورقة والموقع', graceDays: 'بعدها يُعتبر الشهر متأخرًا', dueDay: 'يوم الشهر الذي يستحق فيه الإيجار ما لم يحدد العقد غيره', vacancyMonths: 'الوحدة الشاغرة أطول من ذلك تظهر كتنبيه', trackingFrom: 'الشهور قبله لا تُحاسَب (بداية الورقة)', defaultIncreasePct: 'تُقترح عند إنشاء عقد جديد', ledgerYears: 'أوراق السنوات الموجودة (تُضاف تلقائيًا)', invoicePrefix: 'مثل INV-2026-0001', currency: 'رمز العملة في العرض' };
+    const help = { enteredThrough: 'الشهور بعده تُعرض «بانتظار التسجيل» لا «متأخرة»', tolerancePct: 'يُقبل المبلغ كسداد كامل لو الفرق أقل من هذه النسبة', toleranceMin: 'حد أدنى للفرق المقبول بالجنيه', prorationBasis: '30 = الشهر 30 يومًا (النصف 15/30) كما يحسب المكتب', officeName: 'يظهر أعلى الورقة والموقع', graceDays: 'بعدها يُعتبر الشهر متأخرًا', dueDay: 'يوم الشهر الذي يستحق فيه الإيجار ما لم يحدد العقد غيره', vacancyMonths: 'الوحدة الشاغرة أطول من ذلك تظهر كتنبيه', trackingFrom: 'الشهور قبله لا تُحاسَب (بداية الورقة)', defaultIncreasePct: 'تُقترح عند إنشاء عقد جديد', ledgerYears: 'أوراق السنوات الموجودة (تُضاف تلقائيًا)', codeSeq: 'لا تُعدَّل: تضمن ألا يُعاد استخدام كود محذوف', invoicePrefix: 'مثل INV-2026-0001', currency: 'رمز العملة في العرض' };
     let r = 2;
-    for (const s of SETTINGS_KEYS) { ws.getCell(r, 1).value = s.ar; const v = s.key === 'officeName' ? state.meta.officeName : state.settings[s.key]; ws.getCell(r, 2).value = Array.isArray(v) ? v.join(', ') : (v == null ? '' : v); ws.getCell(r, 3).value = help[s.key] || ''; r++; }
+    for (const s of SETTINGS_KEYS) { ws.getCell(r, 1).value = s.ar; const v = s.key === 'officeName' ? state.meta.officeName : state.settings[s.key]; ws.getCell(r, 2).value = Array.isArray(v) ? v.join(', ') : (v && typeof v === 'object' ? JSON.stringify(v) : (v == null ? '' : v)); ws.getCell(r, 3).value = help[s.key] || ''; r++; }
     ws.getCell(r + 1, 1).value = 'آخر كتابة من الموقع'; ws.getCell(r + 1, 2).value = new Date().toISOString().slice(0, 19).replace('T', ' ');
     ws.getCell(r + 2, 1).value = 'إصدار البنية'; ws.getCell(r + 2, 2).value = 2;
   }

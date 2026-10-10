@@ -49,7 +49,7 @@ window.Egary = window.Egary || {};
   function initSync() {
     E.Sync.init({
       serialize: async () => { const buf = await W().write(S().state(), { base: lastBytes }); lastBytes = buf; saveSnapshot(); E.FileLink.saveBackup(buf); return buf; },
-      deserialize: async (buf) => { if (App.mode === 'linked' && E.Sync.adapter) await E.FileLink.saveOriginal(buf, E.Sync.adapter.name); const r = await W().read(buf, { snapshot: loadSnapshot() }); lastBytes = buf; S().load(r.state); App.flags = r.flags; saveSnapshot(); E.FileLink.saveBackup(buf); },
+      deserialize: async (buf) => { if (App.mode === 'linked' && E.Sync.adapter) await E.FileLink.saveOriginal(buf, E.Sync.adapter.name); const r = await W().read(buf, { snapshot: loadSnapshot() }); lastBytes = buf; S().load(r.state); App.flags = r.flags; saveSnapshot(); E.FileLink.saveBackup(buf); if (E.Auth.user() && !E.Auth.revalidate()) { UI().toast('أُلغي حسابك أو عُطِّل — سيُعاد فتح شاشة الدخول', 'warn', 4000); setTimeout(() => location.reload(), 1500); } },
       applyOps: ops => S().applyOps(ops),
       onStatus: renderSync,
       onExternalChange: () => { UI().toast('تم تحديث البيانات من ملف الإكسيل', 'ok'); render(); },
@@ -95,7 +95,7 @@ window.Egary = window.Egary || {};
     el.className = 'sync ' + st.state; UI().clear(el); el.append(h('span', { class: 'dot' }), h('span', null, t)); el.title = sub;
     const banner = App.els.banner; if (!banner) return; UI().clear(banner);
     if (st.state === 'locked') banner.appendChild(h('div', { class: 'banner warn' }, UI().icon('warning'), h('span', null, `ملف الإكسيل مفتوح في برنامج Excel، لذلك لا يمكن الحفظ الآن. تعديلاتك (${st.pending}) محفوظة مؤقتًا وستُكتب تلقائيًا بمجرد إغلاق الملف.`), h('button', { class: 'btn sm', onclick: () => E.Sync.flush() }, 'حاول الآن')));
-    else if (st.state === 'error') banner.appendChild(h('div', { class: 'banner danger' }, UI().icon('warning'), h('span', null, 'خطأ في المزامنة: ' + (st.error || '')), h('button', { class: 'btn sm', onclick: () => E.Sync.flush() }, 'إعادة المحاولة'), E.FileLink.supported ? h('button', { class: 'btn sm primary', onclick: linkFile }, UI().icon('link'), 'ربط الملف من جديد') : null));
+    else if (st.state === 'error') banner.appendChild(h('div', { class: 'banner danger' }, UI().icon('warning'), h('span', null, 'خطأ في المزامنة: ' + (st.error || '')), h('button', { class: 'btn sm', onclick: () => E.Sync.flush() }, 'إعادة المحاولة'), E.FileLink.supported && (!E.Auth.user() || E.Auth.can('unlink')) ? h('button', { class: 'btn sm primary', onclick: linkFile }, UI().icon('link'), 'ربط الملف من جديد') : null));
     else if (App.mode === 'preview' || App.mode === 'demo' || App.mode === 'file') banner.appendChild(h('div', { class: 'banner info' }, UI().icon('info'), h('span', null, App.mode === 'demo' ? 'وضع تجريبي ببيانات نموذجية — التعديلات لا تُحفظ. اربط ملف الإكسيل لبدء العمل الحقيقي.' : 'الملف مفتوح للعرض بلا ربط — التعديلات تبقى في الذاكرة فقط. يمكنك تنزيل نسخة إكسيل محدثة أو ربط الملف للحفظ التلقائي.'), E.FileLink.supported ? h('button', { class: 'btn sm primary', onclick: linkFile }, UI().icon('link'), 'ربط ملف الإكسيل') : null, h('button', { class: 'btn sm', onclick: downloadCopy }, UI().icon('download'), 'تنزيل نسخة إكسيل')));
   }
   async function downloadCopy() { const buf = await W().write(S().state(), { base: lastBytes }); E.FileLink.downloadBytes(buf, 'Egary.xlsx'); UI().toast('تم تنزيل نسخة الإكسيل', 'ok'); }
@@ -153,8 +153,8 @@ window.Egary = window.Egary || {};
     const A = E.Auth;
     if (App.mode === 'demo') { A.demo('تجربة'); return true; }
     if (!A.supported) { A.demo('بلا تسجيل دخول'); UI().toast('المتصفح لا يدعم تشفير كلمات المرور هنا — فُتح البرنامج بلا تسجيل دخول', 'warn', 6000); return true; }
-    if (!A.hasUsers()) {
-      if (App.mode === 'linked') { await setupScreen(); return true; }
+    if (!A.hasUsers() || (App.mode === 'linked' && !A.hasAdmin())) {
+      if (App.mode === 'linked') { await setupScreen(A.hasUsers() ? 'recover' : ''); return true; } // لا مدير مفعَّل (ورقة المستخدمين عُدِّلت يدويًا) ⇒ استعادة
       A.demo('عرض'); return true; // ملف للعرض بلا حسابات بعد
     }
     if (A.restore()) return true;
@@ -179,7 +179,7 @@ window.Egary = window.Egary || {};
       const eye = h('button', { type: 'button', class: 'eye', title: 'إظهار/إخفاء كلمة المرور', onclick: () => { pass.type = pass.type === 'password' ? 'text' : 'password'; } }, UI().icon('eye'));
       const remember = h('input', { type: 'checkbox', id: 'login-remember' });
       const go = h('button', { type: 'submit', class: 'btn-go', id: 'login-go' }, UI().icon('key'), 'دخول');
-      const form = h('form', { class: 'lf', id: 'login-form', onsubmit: async (e) => { e.preventDefault(); err.classList.remove('on'); if (!user.value.trim() || !pass.value) { err.textContent = 'أدخل اسم المستخدم وكلمة المرور'; err.classList.add('on'); return; } go.disabled = true; const r = await E.Auth.login(user.value, pass.value, remember.checked); go.disabled = false; if (!r.ok) { err.textContent = r.error; err.classList.add('on'); pass.value = ''; pass.focus(); return; } resolve(r.user); } },
+      const form = h('form', { class: 'lf', id: 'login-form', onsubmit: async (e) => { e.preventDefault(); err.classList.remove('on'); if (!user.value.trim() || !pass.value) { err.textContent = 'أدخل اسم المستخدم وكلمة المرور'; err.classList.add('on'); return; } go.disabled = true; let r; try { r = await E.Auth.login(user.value, pass.value, remember.checked); } catch (ex) { r = { ok: false, error: 'تعذّر التحقق من كلمة المرور (سجل المستخدم تالف؟) — اطلب من المدير إعادة تعيينها' }; } go.disabled = false; if (!r.ok) { err.textContent = r.error; err.classList.add('on'); pass.value = ''; pass.focus(); return; } resolve(r.user); } },
         h('div', null, h('label', { for: 'login-user' }, 'اسم المستخدم'), user),
         h('div', null, h('label', { for: 'login-pass' }, 'كلمة المرور'), h('div', { class: 'in' }, pass, eye)),
         h('div', { class: 'row' }, h('label', null, remember, 'تذكرني على هذا الجهاز (14 يومًا)'), h('span', null, E.Sync.status.name || '')),
@@ -190,8 +190,10 @@ window.Egary = window.Egary || {};
       loginShell(card); setTimeout(() => user.focus(), 60);
     });
   }
-  function setupScreen() {
+  function setupScreen(mode) {
+    const recover = mode === 'recover';
     return new Promise(resolve => {
+      let adminDone = false;
       const err = h('div', { class: 'err', id: 'setup-err', role: 'alert' });
       const f = (id, label, type, ph, auto) => { const i = h('input', { type: type || 'text', id, placeholder: ph || '', autocomplete: auto || 'off', dir: type === 'password' || /user/.test(id) ? 'ltr' : null }); return [i, h('div', null, h('label', { for: id }, label), i)]; };
       const [au, auEl] = f('su-admin-user', 'اسم مستخدم المدير', 'text', 'مثال: admin', 'username'), [an, anEl] = f('su-admin-name', 'اسم المدير (يظهر في سجل التعديلات)', 'text', 'مثال: أ. محمد'), [ap, apEl] = f('su-admin-pass', 'كلمة مرور المدير', 'password', '6 أحرف على الأقل', 'new-password'), [ap2, ap2El] = f('su-admin-pass2', 'تأكيد كلمة مرور المدير', 'password', '', 'new-password');
@@ -199,23 +201,31 @@ window.Egary = window.Egary || {};
       const go = h('button', { type: 'submit', class: 'btn-go', id: 'setup-go' }, UI().icon('check'), 'إنشاء الحسابات والدخول');
       const form = h('form', { class: 'lf two', id: 'setup-form', onsubmit: async (e) => {
         e.preventDefault(); err.classList.remove('on'); const errs = [];
-        if (ap.value !== ap2.value) errs.push('تأكيد كلمة مرور المدير غير مطابق');
-        if (E.Auth.normUser(au.value) && E.Auth.normUser(au.value) === E.Auth.normUser(su.value)) errs.push('اسما المستخدمين متطابقان');
+        // التحقق من الكتلتين معًا قبل إنشاء أي حساب حتى لا نقف في منتصف الطريق
+        if (!adminDone) { const e1 = E.Auth.validateUsername(au.value); if (e1) errs.push('المدير: ' + e1); const e2 = E.Auth.validatePassword(ap.value); if (e2) errs.push('المدير: ' + e2); if (ap.value !== ap2.value) errs.push('تأكيد كلمة مرور المدير غير مطابق'); }
+        if (!recover) { const e3 = E.Auth.validateUsername(su.value); if (e3) errs.push('الموظف: ' + e3); const e4 = E.Auth.validatePassword(sp.value); if (e4) errs.push('الموظف: ' + e4); if (E.Auth.normUser(au.value) && E.Auth.normUser(au.value) === E.Auth.normUser(su.value)) errs.push('اسما المستخدمين متطابقان'); }
         if (errs.length) { err.textContent = errs.join(' · '); err.classList.add('on'); return; }
         go.disabled = true;
-        const r1 = await E.Auth.createUser({ code: au.value, name: an.value || au.value, role: 'admin' }, ap.value);
-        if (r1.errors) { go.disabled = false; err.textContent = 'المدير: ' + r1.errors.join(' · '); err.classList.add('on'); return; }
-        const r2 = await E.Auth.createUser({ code: su.value, name: sn.value || su.value, role: 'staff' }, sp.value);
-        if (r2.errors) { go.disabled = false; err.textContent = 'الموظف: ' + r2.errors.join(' · ') + ' — حساب المدير أُنشئ؛ أكمل الموظف.'; err.classList.add('on'); return; }
+        if (!adminDone) {
+          const r1 = await E.Auth.createUser({ code: au.value, name: an.value || au.value, role: 'admin' }, ap.value);
+          if (r1.errors) { go.disabled = false; err.textContent = 'المدير: ' + r1.errors.join(' · '); err.classList.add('on'); return; }
+          adminDone = true; [au, an, ap, ap2].forEach(i => { i.disabled = true; });
+        }
+        if (!recover) {
+          const r2 = await E.Auth.createUser({ code: su.value, name: sn.value || su.value, role: 'staff' }, sp.value);
+          if (r2.errors) { go.disabled = false; err.textContent = 'الموظف: ' + r2.errors.join(' · ') + ' — حساب المدير أُنشئ؛ صحّح بيانات الموظف واضغط مرة أخرى.'; err.classList.add('on'); return; }
+        }
         const r = await E.Auth.login(au.value, ap.value, false); go.disabled = false;
         if (r.ok) resolve(r.user); else { err.textContent = r.error; err.classList.add('on'); }
       } },
-        h('div', { class: 'full role-note' }, h('b', null, 'أول تشغيل:'), ' أنشئ حسابين على الأقل — ', h('b', null, 'مدير'), ' (كل الصلاحيات: الإعدادات والمستخدمون والحذف) و', h('b', null, 'موظف'), ' (الإدخال والتعديل، بلا إعدادات ولا حذف للمشاريع والوحدات والعملاء والعقود). تُحفظ الحسابات داخل Egary.xlsx وكلمات المرور مشفّرة.'),
+        recover
+          ? h('div', { class: 'full role-note' }, h('b', null, 'استعادة الدخول:'), ' لا يوجد حساب مدير مفعَّل في ورقة «المستخدمون» (عُدِّلت يدويًا على الأرجح). أنشئ حساب مدير جديدًا وستبقى الحسابات الأخرى كما هي، ويمكنك إصلاحها من الإعدادات بعد الدخول.')
+          : h('div', { class: 'full role-note' }, h('b', null, 'أول تشغيل:'), ' أنشئ حسابين على الأقل — ', h('b', null, 'مدير'), ' (كل الصلاحيات: الإعدادات والمستخدمون والحذف) و', h('b', null, 'موظف'), ' (الإدخال والتعديل، بلا إعدادات ولا حذف للمشاريع والوحدات والعملاء والعقود). تُحفظ الحسابات داخل Egary.xlsx وكلمات المرور مشفّرة.'),
         auEl, anEl, apEl, ap2El,
-        h('div', { class: 'full', style: { height: '1px', background: 'rgba(255,255,255,.08)', margin: '2px 0' } }),
-        suEl, snEl, spEl, h('div'),
+        recover ? null : h('div', { class: 'full', style: { height: '1px', background: 'rgba(255,255,255,.08)', margin: '2px 0' } }),
+        recover ? null : suEl, recover ? null : snEl, recover ? null : spEl, recover ? null : h('div'),
         h('div', { class: 'full' }, err), h('div', { class: 'full' }, go));
-      const card = h('div', { class: 'login-card wide' }, h('div', { class: 'login-logo' }, UI().icon('shield', 32)), h('h1', null, 'إنشاء حسابات الدخول'), h('div', { class: 'sub' }, (S().state().meta.officeName || 'إيجاري') + ' — ' + (E.Sync.status.name || 'Egary.xlsx')), form);
+      const card = h('div', { class: 'login-card wide' }, h('div', { class: 'login-logo' }, UI().icon('shield', 32)), h('h1', null, recover ? 'استعادة حساب المدير' : 'إنشاء حسابات الدخول'), h('div', { class: 'sub' }, (S().state().meta.officeName || 'إيجاري') + ' — ' + (E.Sync.status.name || 'Egary.xlsx')), form);
       loginShell(card); setTimeout(() => au.focus(), 60);
     });
   }
@@ -353,11 +363,12 @@ window.Egary = window.Egary || {};
       if (years.includes(y)) { err.textContent = 'هذه السنة موجودة بالفعل'; err.style.display = 'block'; return; }
       const next = Array.from(new Set(years.concat([y]))).sort();
       const rec = { ledgerYears: next };
-      if (U().cmp(String(next[0]) + '-01', st.settings.trackingFrom || '9999-99') < 0) rec.trackingFrom = String(next[0]) + '-01';
+      const canSettings = !E.Auth || E.Auth.can('settings');
+      if (canSettings && U().cmp(String(next[0]) + '-01', st.settings.trackingFrom || '9999-99') < 0) rec.trackingFrom = String(next[0]) + '-01';
       S().applyOp({ type: 'settings', record: rec }); S().notify('change');
       if (E.Sync) E.Sync.record({ type: 'settings', at: new Date().toISOString(), record: rec });
       try { S().log({ action: 'إضافة', entity: 'سنة', code: String(y), summary: 'ورقة سنة جديدة ' + y }); } catch (e) { }
-      App.year = String(y); m.close(); render(); UI().toast(`أُضيفت سنة ${y} — ستظهر ورقتها في الإكسيل مع أول حفظ`, 'ok');
+      App.year = String(y); m.close(); render(); UI().toast(`أُضيفت سنة ${y} — ستظهر ورقتها في الإكسيل مع أول حفظ` + (!canSettings && U().cmp(String(y) + '-01', st.settings.trackingFrom || '9999-99') < 0 ? ' (بداية المحاسبة لا تتغيّر إلا من المدير في الإعدادات)' : ''), 'ok', 5000);
     } }, 'إضافة')] });
   }
 
