@@ -165,7 +165,7 @@ window.Egary = window.Egary || {};
     const mo = k.month;
     body.appendChild(h('div', { class: 'tiles' },
       tile(mo.rate >= .9 ? 'ok' : mo.rate >= .6 ? 'warn' : 'danger', `تحصيل ${U().periodLabel(k.period)}`, fm(mo.collected), `${fp(mo.rate)} من ${fm(mo.due)}`, () => V().monthEvidence(c, k.period)),
-      k.pending.periods.length ? tile('warn', 'بانتظار التسجيل', fn(k.pending.contracts), `${k.pending.periods.map(p => U().periodLabel(p)).join('، ')} — ${fm(k.pending.due)}`, () => V().pendingEvidence(c, k.pending)) : null,
+      k.pending.periods.length ? tile('warn', 'إيجار شهور لم تُسجَّل بعد', fm(k.pending.due), `${k.pending.periods.map(p => U().periodLabel(p)).join('، ')} · ${fn(k.pending.contracts)} عقدًا · آخر شهر مسجَّل: ${U().periodLabel(k.enteredThrough, true)}`, () => V().pendingEvidence(c, k.pending)) : null,
       tile('accent', 'محصَّل السنة', fm(k.ytd.collected), `${k.ytd.rows.length} دفعة`, () => V().paymentsEvidence(c, k.ytd.rows, 'مدفوعات السنة')),
       tile(k.arrears.total ? 'danger' : 'ok', 'المتأخرات', fm(k.arrears.total), `${k.arrears.byClient.length} عميل · ${k.arrears.rows.length} شهر`, () => V().arrearsEvidence(c, k.arrears)),
       tile(k.occupancy.rate >= .9 ? 'ok' : 'warn', 'الإشغال', fp(k.occupancy.rate), `${k.occupancy.occupiedCount} من ${k.occupancy.total}`, () => V().unitsEvidence(c, [...k.occupancy.occupied, ...k.occupancy.ending], 'المؤجَّرة')),

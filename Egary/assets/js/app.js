@@ -128,7 +128,8 @@ window.Egary = window.Egary || {};
       await startWith(adapter);
     } catch (e) { if (e && e.name !== 'AbortError') UI().toast('تعذّر ربط الملف: ' + (e.message || e), 'danger'); }
   }
-  async function startWith(adapter) {
+  /* ربط الملف فقط (إذن + قراءة) بلا شاشات — تستعمله شاشة الدخول الأولى وزر «متابعة» */
+  async function attach(adapter) {
     const perm = await adapter.permission(true);
     if (perm !== 'granted') { UI().toast('لم يُسمح بالوصول إلى الملف', 'danger'); return false; }
     App.mode = 'linked';
@@ -136,11 +137,17 @@ window.Egary = window.Egary || {};
     try {
       await E.Sync.link(adapter, { writeOnLink: true });
     } catch (e) { UI().toast('تعذّر قراءة الملف: ' + (e.message || e), 'danger'); App.mode = 'none'; S().setRecorder(null); return false; }
-    await gate();
-    showApp();
+    return true;
+  }
+  function afterLink() {
     if (App.flags.some(f => f.sev === 'danger' || f.sev === 'warn')) UI().toast(`تمت قراءة الملف — ${App.flags.length} ملاحظة في «جودة البيانات»`, 'warn', 5000);
     else UI().toast('تم ربط ملف الإكسيل — كل تعديل يُحفظ فيه تلقائيًا', 'ok');
     restoreBackupDir().then(ok => { if (ok && lastBytes) E.Backup.write(lastBytes, '', false); else setTimeout(offerBackupFolder, 1200); });
+  }
+  async function startWith(adapter) {
+    if (!(await attach(adapter))) return false;
+    await gate();
+    showApp(); afterLink();
     return true;
   }
   async function openWithoutLink(file) {
@@ -169,14 +176,20 @@ window.Egary = window.Egary || {};
   }
 
   /* ---------- بوابة الدخول ---------- */
+  /* بعد قراءة ملف مربوط: هل نحتاج شاشة الدخول؟ (ملف بلا حسابات ⇒ تُنشأ الحسابات الجاهزة تلقائيًا — لا شاشة إنشاء) */
+  async function needsLogin() {
+    const A = E.Auth;
+    if (!A.supported) { A.demo('بلا تسجيل دخول'); UI().toast('المتصفح لا يدعم تشفير كلمات المرور هنا — فُتح البرنامج بلا تسجيل دخول', 'warn', 6000); return false; }
+    if (!A.hasUsers() || !A.hasAdmin()) { try { App.seeded = await A.seedDefaults(A.hasUsers() ? 'admin' : 'all'); } catch (e) { console.error(e); } }
+    if (A.restore()) return false;
+    return true;
+  }
   async function gate() {
     const A = E.Auth;
     if (App.mode === 'demo') { A.demo('تجربة'); return true; }
-    if (!A.supported) { A.demo('بلا تسجيل دخول'); UI().toast('المتصفح لا يدعم تشفير كلمات المرور هنا — فُتح البرنامج بلا تسجيل دخول', 'warn', 6000); return true; }
-    if (!A.hasUsers() || (App.mode === 'linked' && !A.hasAdmin())) {
-      if (App.mode === 'linked') { await setupScreen(A.hasUsers() ? 'recover' : ''); return true; } // لا مدير مفعَّل (ورقة المستخدمين عُدِّلت يدويًا) ⇒ استعادة
-      A.demo('عرض'); return true; // ملف للعرض بلا حسابات بعد
-    }
+    if (App.mode === 'linked') { if (await needsLogin()) await loginScreen(); return true; }
+    if (!A.supported) { A.demo('بلا تسجيل دخول'); return true; }
+    if (!A.hasUsers()) { A.demo('عرض'); return true; } // ملف للعرض/معاينة بلا حسابات
     if (A.restore()) return true;
     await loginScreen(); return true;
   }
@@ -190,9 +203,12 @@ window.Egary = window.Egary || {};
     box.addEventListener('mousemove', (e) => { if (reduced) return; const x = (e.clientX / window.innerWidth - .5) * 2, y = (e.clientY / window.innerHeight - .5) * 2; if (city && city.setTilt) city.setTilt(x, y); box.style.setProperty('--px', x.toFixed(3)); box.style.setProperty('--py', y.toFixed(3)); card.style.transform = `rotateY(${(x * 4).toFixed(2)}deg) rotateX(${(-y * 3).toFixed(2)}deg)`; });
     return box;
   }
-  function loginScreen() {
+  /* شاشة الدخول — هي أول شاشة دائمًا. opts.acquire: دالة تربط الملف وتقرؤه عند أول «دخول» (أول تشغيل أو إذن يحتاج نقرة) */
+  function loginScreen(opts) {
+    opts = opts || {};
     return new Promise(resolve => {
-      const st = S().state();
+      const A = E.Auth;
+      let needFile = typeof opts.acquire === 'function', busy = false, stageEl = null;
       const err = h('div', { class: 'err', id: 'login-err', role: 'alert' });
       const user = h('input', { type: 'text', id: 'login-user', name: 'username', autocomplete: 'username', placeholder: 'اسم المستخدم', autocapitalize: 'off', spellcheck: false, dir: 'auto' });
       const pass = h('input', { type: 'password', id: 'login-pass', name: 'password', autocomplete: 'current-password', placeholder: '••••••••', dir: 'ltr' });
@@ -200,16 +216,49 @@ window.Egary = window.Egary || {};
       const remember = h('input', { type: 'checkbox', id: 'login-remember' });
       const go = h('button', { type: 'submit', class: 'btn-go', id: 'login-go' }, UI().icon('key'), 'دخول');
       const kb = h('div', { class: 'kb-hint', id: 'kb-hint', role: 'status' });
-      const kbCheck = (e) => { const ar = /[\u0600-\u06FF]/.test(user.value + pass.value); const caps = e && e.getModifierState && e.getModifierState('CapsLock'); kb.textContent = ar ? 'لوحة المفاتيح على العربية — بدّلها إلى English (Alt+Shift) ثم أعد الكتابة' : caps ? 'زر Caps Lock مفعَّل' : ''; kb.classList.toggle('on', !!kb.textContent); };
+      const kbCheck = (e) => { const ar = /[؀-ۿ]/.test(user.value + pass.value); const caps = e && e.getModifierState && e.getModifierState('CapsLock'); kb.textContent = ar ? 'لوحة المفاتيح على العربية — بدّلها إلى English (Alt+Shift) ثم أعد الكتابة' : caps ? 'زر Caps Lock مفعَّل' : ''; kb.classList.toggle('on', !!kb.textContent); };
       user.addEventListener('input', kbCheck); pass.addEventListener('input', kbCheck); pass.addEventListener('keyup', kbCheck);
-      const form = h('form', { class: 'lf', id: 'login-form', onsubmit: async (e) => { e.preventDefault(); err.classList.remove('on'); if (!user.value.trim() || !pass.value) { err.textContent = 'أدخل اسم المستخدم وكلمة المرور'; err.classList.add('on'); return; } go.disabled = true; let r; try { r = await E.Auth.login(user.value, pass.value, remember.checked); } catch (ex) { r = { ok: false, error: 'تعذّر التحقق من كلمة المرور (سجل المستخدم تالف؟) — اطلب من المدير إعادة تعيينها' }; } go.disabled = false; if (!r.ok) { err.textContent = r.error; err.classList.add('on'); pass.value = ''; pass.focus(); return; } resolve(r.user); } },
+      const fileTag = h('span', { class: 'file-tag', id: 'login-file' }, UI().icon('excel'), h('span', null, E.Sync.status.name || opts.restoredName || 'Egary.xlsx'));
+      const title = h('h1', null, (S().state().meta && S().state().meta.officeName) || 'إيجاري');
+      const showErr = (t) => { err.textContent = t; err.classList.add('on'); };
+      const hint = h('div', { class: 'hint', id: 'login-hint' });
+      const refreshHint = () => {
+        UI().clear(hint);
+        if (App.mode === 'preview') { hint.append('نسخة العرض — للتجربة: ', h('b', null, 'admin / admin@2026'), ' (مدير) أو ', h('b', null, 'office / office@2026'), ' (موظف)'); return; }
+        if (needFile) { hint.append('اكتب اسم المستخدم وكلمة المرور ثم اضغط «دخول»', opts.restoredName ? ' — سيطلب المتصفح السماح بالوصول إلى ' + opts.restoredName + ' مرة واحدة.' : ' — في أول مرة فقط سيُطلب منك اختيار ملف Egary.xlsx من مجلد البرنامج.'); return; }
+        const ready = (A.DEFAULT_ACCOUNTS || []).filter(a => A.find(a.code));
+        if (App.seeded && App.seeded.length) hint.append(h('b', null, 'أُنشئت حسابات الدخول الجاهزة تلقائيًا في هذا الملف: '), App.seeded.join(' · '), ' — كلمات المرور في ملف «حسابات-الدخول.txt» بجوار البرنامج.');
+        else if (ready.length) hint.append('الحسابات الجاهزة: ', ...ready.flatMap((a, i) => [i ? ' · ' : '', h('b', null, a.code), ' (' + A.ROLE_AR(a.role) + ')']), ' — كلمات المرور في ملف «حسابات-الدخول.txt». نسيت كلمة المرور؟ المدير يعيد تعيينها من الإعدادات ← المستخدمون.');
+        else hint.append('نسيت كلمة المرور؟ يعيد المدير تعيينها من الإعدادات ← المستخدمون.');
+      };
+      // ربط الملف وقراءته (أول تشغيل) ثم: حسابات جاهزة لو الملف بلا حسابات، وجلسة محفوظة ⇒ دخول مباشر
+      const acquireNow = async () => {
+        if (busy) return false; busy = true; go.disabled = true; err.classList.remove('on');
+        let ok = false;
+        try { ok = await opts.acquire(); } catch (e) { if (!e || e.name !== 'AbortError') showErr('تعذّر ربط الملف: ' + ((e && e.message) || e)); }
+        busy = false; go.disabled = false;
+        if (!ok) { if (!err.classList.contains('on')) showErr('لم يُربط ملف الإكسيل — اختر ملف Egary.xlsx من مجلد البرنامج ثم اضغط «دخول»'); return false; }
+        needFile = false; if (stageEl) stageEl.dataset.stage = 'auth';
+        title.textContent = (S().state().meta && S().state().meta.officeName) || 'إيجاري'; fileTag.lastChild.textContent = E.Sync.status.name || '';
+        if (!(await needsLogin())) { resolve(A.user()); return 'done'; }
+        refreshHint(); return true;
+      };
+      const form = h('form', { class: 'lf', id: 'login-form', onsubmit: async (e) => {
+        e.preventDefault(); err.classList.remove('on');
+        if (!user.value.trim() || !pass.value) { showErr('أدخل اسم المستخدم وكلمة المرور'); return; }
+        if (needFile) { const r = await acquireNow(); if (r !== true) return; }
+        go.disabled = true; let r;
+        try { r = await A.login(user.value, pass.value, remember.checked); } catch (ex) { r = { ok: false, error: 'تعذّر التحقق من كلمة المرور (سجل المستخدم تالف؟) — اطلب من المدير إعادة تعيينها' }; }
+        go.disabled = false;
+        if (!r.ok) { showErr(r.error); pass.value = ''; pass.focus(); return; }
+        resolve(r.user);
+      } },
         h('div', null, h('label', { for: 'login-user' }, 'اسم المستخدم'), user),
         h('div', null, h('label', { for: 'login-pass' }, 'كلمة المرور'), h('div', { class: 'in' }, pass, eye), kb),
-        h('div', { class: 'row' }, h('label', null, remember, 'تذكرني على هذا الجهاز (14 يومًا)'), h('span', { class: 'file-tag' }, UI().icon('excel'), E.Sync.status.name || '')),
+        h('div', { class: 'row' }, h('label', null, remember, 'تذكرني على هذا الجهاز (14 يومًا)'), fileTag),
         err, go);
-      const hint = App.mode === 'preview' ? h('div', { class: 'hint' }, 'نسخة العرض — للتجربة: ', h('b', null, 'admin / admin@2026'), ' (مدير) أو ', h('b', null, 'office / office@2026'), ' (موظف)') : h('div', { class: 'hint' }, 'نسيت كلمة المرور؟ يعيد المدير تعيينها من الإعدادات ← المستخدمون.');
-      const card = h('div', { class: 'login-card' }, h('div', { class: 'login-logo' }, UI().icon('building', 32)), h('h1', null, st.meta.officeName || 'إيجاري'), h('div', { class: 'sub' }, 'تسجيل الدخول إلى نظام إدارة الإيجارات'), form, hint,
-        App.mode === 'linked' ? h('div', { class: 'foot-links' }, h('button', { type: 'button', id: 'login-other-file', onclick: async () => { E.Sync.unlink(); await E.FileLink.clearHandle(); location.reload(); } }, 'ربط ملف إكسيل آخر')) : null);
+      refreshHint();
+      const card = h('div', { class: 'login-card' }, h('div', { class: 'login-logo' }, UI().icon('building', 32)), title, h('div', { class: 'sub' }, 'تسجيل الدخول إلى نظام إدارة الإيجارات'), form, hint);
       // حساب جديد من شاشة الدخول: يُسجَّل في الإكسيل بدور «موظف» (المدير يغيّر الدور من الإعدادات)
       const su = h('input', { type: 'text', id: 'signup-user', placeholder: 'اسم المستخدم (لاتيني)', autocomplete: 'off', autocapitalize: 'off', spellcheck: false, dir: 'auto' });
       const sn = h('input', { type: 'text', id: 'signup-name', placeholder: 'الاسم كما يظهر في السجل', autocomplete: 'off' });
@@ -220,56 +269,33 @@ window.Egary = window.Egary || {};
       const signup = h('form', { class: 'lf signup hidden', id: 'signup-form', onsubmit: async (e) => {
         e.preventDefault(); serr.classList.remove('on');
         if (sp.value !== sp2.value) { serr.textContent = 'تأكيد كلمة المرور غير مطابق'; serr.classList.add('on'); return; }
+        if (needFile) { const r = await acquireNow(); if (r !== true) { if (r === false) { serr.textContent = err.textContent; serr.classList.add('on'); } return; } }
         sgo.disabled = true;
-        const r = await E.Auth.createUser({ code: su.value, name: sn.value || su.value, role: 'staff' }, sp.value);
+        const r = await A.createUser({ code: su.value, name: sn.value || su.value, role: 'staff' }, sp.value);
         if (r.errors) { sgo.disabled = false; serr.textContent = r.errors.join(' · '); serr.classList.add('on'); return; }
-        const l = await E.Auth.login(su.value, sp.value, false); sgo.disabled = false;
+        const l = await A.login(su.value, sp.value, false); sgo.disabled = false;
         if (l.ok) resolve(l.user); else { serr.textContent = l.error; serr.classList.add('on'); }
       } }, h('div', { class: 'role-note' }, 'الحساب الجديد يُحفظ في الإكسيل بدور ', h('b', null, 'موظف'), ' (إدخال وتعديل). المدير يستطيع رفعه إلى مدير أو تعطيله من الإعدادات.'), su, sn, h('div', { class: 'in' }, sp), sp2, serr, sgo);
       const toggle = h('button', { type: 'button', id: 'login-signup', onclick: () => { const on = signup.classList.toggle('hidden'); form.classList.toggle('hidden', !on); toggle.textContent = on ? 'حساب جديد' : 'لديّ حساب — دخول'; (on ? user : su).focus(); } }, 'حساب جديد');
       card.insertBefore(signup, hint);
-      const links = card.querySelector('.foot-links') || card.appendChild(h('div', { class: 'foot-links' }));
-      links.insertBefore(toggle, links.firstChild);
-      loginShell(card); setTimeout(() => user.focus(), 60);
-    });
-  }
-  function setupScreen(mode) {
-    const recover = mode === 'recover';
-    return new Promise(resolve => {
-      let adminDone = false;
-      const err = h('div', { class: 'err', id: 'setup-err', role: 'alert' });
-      const f = (id, label, type, ph, auto) => { const i = h('input', { type: type || 'text', id, placeholder: ph || '', autocomplete: auto || 'off', dir: type === 'password' ? 'ltr' : /user/.test(id) ? 'auto' : null }); const eyeBtn = type === 'password' ? h('button', { type: 'button', class: 'eye', title: 'إظهار/إخفاء', onclick: () => { i.type = i.type === 'password' ? 'text' : 'password'; } }, UI().icon('eye')) : null; return [i, h('div', null, h('label', { for: id }, label), type === 'password' ? h('div', { class: 'in' }, i, eyeBtn) : i)]; };
-      const [au, auEl] = f('su-admin-user', 'اسم مستخدم المدير', 'text', 'مثال: admin', 'username'), [an, anEl] = f('su-admin-name', 'اسم المدير (يظهر في سجل التعديلات)', 'text', 'مثال: أ. محمد'), [ap, apEl] = f('su-admin-pass', 'كلمة مرور المدير', 'password', '6 أحرف على الأقل', 'new-password'), [ap2, ap2El] = f('su-admin-pass2', 'تأكيد كلمة مرور المدير', 'password', '', 'new-password');
-      const [su, suEl] = f('su-staff-user', 'اسم مستخدم الموظف', 'text', 'مثال: office'), [sn, snEl] = f('su-staff-name', 'اسم الموظف', 'text', 'مثال: موظف المكتب'), [sp, spEl] = f('su-staff-pass', 'كلمة مرور الموظف', 'password', '6 أحرف على الأقل', 'new-password'), [sp2, sp2El] = f('su-staff-pass2', 'تأكيد كلمة مرور الموظف', 'password', '', 'new-password');
-      const go = h('button', { type: 'submit', class: 'btn-go', id: 'setup-go' }, UI().icon('check'), 'إنشاء الحسابات والدخول');
-      const form = h('form', { class: 'lf two', id: 'setup-form', onsubmit: async (e) => {
-        e.preventDefault(); err.classList.remove('on'); const errs = [];
-        // التحقق من الكتلتين معًا قبل إنشاء أي حساب حتى لا نقف في منتصف الطريق
-        if (!adminDone) { const e1 = E.Auth.validateUsername(au.value); if (e1) errs.push('المدير: ' + e1); const e2 = E.Auth.validatePassword(ap.value); if (e2) errs.push('المدير: ' + e2); if (ap.value !== ap2.value) errs.push('تأكيد كلمة مرور المدير غير مطابق'); }
-        if (!recover) { const e3 = E.Auth.validateUsername(su.value); if (e3) errs.push('الموظف: ' + e3); const e4 = E.Auth.validatePassword(sp.value); if (e4) errs.push('الموظف: ' + e4); if (sp.value !== sp2.value) errs.push('تأكيد كلمة مرور الموظف غير مطابق'); if (E.Auth.normUser(au.value) && E.Auth.normUser(au.value) === E.Auth.normUser(su.value)) errs.push('اسما المستخدمين متطابقان'); }
-        if (errs.length) { err.textContent = errs.join(' · '); err.classList.add('on'); return; }
-        go.disabled = true;
-        if (!adminDone) {
-          const r1 = await E.Auth.createUser({ code: au.value, name: an.value || au.value, role: 'admin' }, ap.value);
-          if (r1.errors) { go.disabled = false; err.textContent = 'المدير: ' + r1.errors.join(' · '); err.classList.add('on'); return; }
-          adminDone = true; [au, an, ap, ap2].forEach(i => { i.disabled = true; });
-        }
-        if (!recover) {
-          const r2 = await E.Auth.createUser({ code: su.value, name: sn.value || su.value, role: 'staff' }, sp.value);
-          if (r2.errors) { go.disabled = false; err.textContent = 'الموظف: ' + r2.errors.join(' · ') + ' — حساب المدير أُنشئ؛ صحّح بيانات الموظف واضغط مرة أخرى.'; err.classList.add('on'); return; }
-        }
-        const r = await E.Auth.login(au.value, ap.value, false); go.disabled = false;
-        if (r.ok) resolve(r.user); else { err.textContent = r.error; err.classList.add('on'); }
-      } },
-        recover
-          ? h('div', { class: 'full role-note' }, h('b', null, 'استعادة الدخول:'), ' لا يوجد حساب مدير مفعَّل في ورقة «المستخدمون» (عُدِّلت يدويًا على الأرجح). أنشئ حساب مدير جديدًا وستبقى الحسابات الأخرى كما هي، ويمكنك إصلاحها من الإعدادات بعد الدخول.')
-          : h('div', { class: 'full role-note' }, h('b', null, 'أول تشغيل:'), ' أنشئ حسابين على الأقل — ', h('b', null, 'مدير'), ' (كل الصلاحيات: الإعدادات والمستخدمون والحذف) و', h('b', null, 'موظف'), ' (الإدخال والتعديل، بلا إعدادات ولا حذف للمشاريع والوحدات والعملاء والعقود). تُحفظ الحسابات داخل Egary.xlsx وكلمات المرور مشفّرة.'),
-        auEl, anEl, apEl, ap2El,
-        recover ? null : h('div', { class: 'full', style: { height: '1px', background: 'rgba(255,255,255,.08)', margin: '2px 0' } }),
-        recover ? null : suEl, recover ? null : snEl, recover ? null : spEl, recover ? null : sp2El,
-        h('div', { class: 'full' }, err), h('div', { class: 'full' }, go));
-      const card = h('div', { class: 'login-card wide' }, h('div', { class: 'login-logo' }, UI().icon('shield', 32)), h('h1', null, recover ? 'استعادة حساب المدير' : 'إنشاء حسابات الدخول'), h('div', { class: 'sub' }, (S().state().meta.officeName || 'إيجاري') + ' — ' + (E.Sync.status.name || 'Egary.xlsx')), form);
-      loginShell(card); setTimeout(() => au.focus(), 60);
+      const links = card.appendChild(h('div', { class: 'foot-links' }));
+      links.appendChild(toggle);
+      if (needFile) {
+        // أول تشغيل: روابط مساعدة (اختيار الملف صراحةً / متابعة الملف السابق / عرض فقط / تجربة)
+        const fileInput = h('input', { type: 'file', accept: '.xlsx', class: 'hidden', onchange: (e) => { if (e.target.files[0]) openWithoutLink(e.target.files[0]); } });
+        if (opts.restoredName) links.appendChild(h('button', { type: 'button', id: 'btn-resume', onclick: async () => { const r = await acquireNow(); if (r === true) user.focus(); } }, 'متابعة العمل على ' + opts.restoredName));
+        if (E.FileLink.supported) links.appendChild(h('button', { type: 'button', id: 'btn-link', onclick: async () => { if (opts.pick) opts.acquire = opts.pick; const r = await acquireNow(); if (r === true) user.focus(); } }, opts.restoredName ? 'ربط ملف إكسيل آخر' : 'اختيار ملف الإكسيل'));
+        links.appendChild(h('button', { type: 'button', id: 'btn-open', onclick: () => fileInput.click() }, 'فتح ملف للعرض فقط'));
+        links.appendChild(h('button', { type: 'button', id: 'btn-demo', onclick: loadDemo }, 'تجربة ببيانات نموذجية'));
+        links.appendChild(fileInput);
+        if (!E.FileLink.supported) card.insertBefore(h('div', { class: 'banner warn mt-s' }, UI().icon('warning'), h('span', null, 'هذا المتصفح لا يدعم المزامنة التلقائية — افتح البرنامج بـ Microsoft Edge أو Google Chrome (ملف Open-Egary.bat)، أو استخدم «فتح ملف للعرض فقط».')), hint);
+      } else if (App.mode === 'linked') {
+        links.appendChild(h('button', { type: 'button', id: 'login-other-file', onclick: async () => { E.Sync.unlink(); await E.FileLink.clearHandle(); location.reload(); } }, 'ربط ملف إكسيل آخر'));
+      }
+      const box = loginShell(card); box.dataset.stage = needFile ? 'file' : 'auth'; // file = لم يُربط الملف بعد · auth = جاهز لكلمة المرور
+      stageEl = box;
+      // تركيز تلقائي على اسم المستخدم — إلا لو بدأ المستخدم الكتابة في حقل آخر بالفعل (لا نسرق التركيز)
+      setTimeout(() => { const a = document.activeElement; if (!a || a === document.body || !box.contains(a) || a.tagName !== 'INPUT') user.focus(); }, 60);
     });
   }
   const initials = (n) => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('');
@@ -291,29 +317,12 @@ window.Egary = window.Egary || {};
     E.Auth.logout(); location.reload();
   }
 
-  /* ---------- شاشة البداية ---------- */
-  function welcome(restored) {
-    const root = App.els.root; UI().clear(root); document.body.classList.add('no-app');
-    const fileInput = h('input', { type: 'file', accept: '.xlsx', class: 'hidden', onchange: (e) => { if (e.target.files[0]) openWithoutLink(e.target.files[0]); } });
-    const box = h('div', { class: 'box' },
-      h('div', { class: 'logo' }, UI().icon('building', 38)),
-      h('h1', null, 'إيجاري'),
-      h('p', { class: 'muted' }, 'إدارة الإيجارات — مصدر البيانات ملف الإكسيل الموجود بجوار البرنامج'),
-      restored ? h('div', { class: 'banner ok mt' }, UI().icon('check'), h('span', null, `الملف المربوط سابقًا: ${restored.name}`)) : null,
-      restored ? h('div', { class: 'mt' }, h('button', { class: 'btn primary', id: 'btn-resume', onclick: () => startWith(restored) }, UI().icon('link'), 'متابعة العمل على ' + restored.name)) : null,
-      !restored ? h('div', { class: 'steps' },
-        h('div', null, h('b', null, '1'), h('span', null, 'اضغط «ربط ملف الإكسيل» واختر ملف ', h('span', { class: 'code' }, 'Egary.xlsx'), ' الموجود في نفس المجلد.')),
-        h('div', null, h('b', null, '2'), h('span', null, 'اسمح للمتصفح بالقراءة والكتابة (مرة واحدة). من هنا كل تعديل في البرنامج يُحفظ في الإكسيل فورًا، وأي تعديل في الإكسيل يظهر في البرنامج.')),
-        h('div', null, h('b', null, '3'), h('span', null, 'لو ملف الإكسيل مفتوح في برنامج Excel، سيُحفظ التعديل تلقائيًا بعد إغلاقه.')),
-      ) : null,
-      h('div', { class: 'flex wrap mt', style: { justifyContent: 'center' } },
-        E.FileLink.supported ? h('button', { class: 'btn primary', id: 'btn-link', onclick: linkFile }, UI().icon('link'), restored ? 'ربط ملف آخر' : 'ربط ملف الإكسيل') : h('div', { class: 'banner warn' }, UI().icon('warning'), h('span', null, 'هذا المتصفح لا يدعم المزامنة التلقائية — افتح البرنامج بـ Microsoft Edge أو Google Chrome (ملف Open-Egary.bat).')),
-        fileInput,
-      ),
-      h('div', { class: 'flex wrap mt-s small', style: { justifyContent: 'center' } }, h('span', { class: 'muted' }, 'خيارات أخرى:'), h('button', { class: 'btn ghost sm', id: 'btn-open', onclick: () => fileInput.click() }, UI().icon('upload'), 'فتح ملف للعرض فقط'), h('button', { class: 'btn ghost sm', id: 'btn-demo', onclick: loadDemo }, UI().icon('eye'), 'تجربة ببيانات نموذجية')),
-      h('p', { class: 'small muted mt' }, 'يعمل بالكامل على جهازك بلا إنترنت ولا خادم. المتصفح الموصى به: Edge أو Chrome.'),
-    );
-    root.appendChild(h('div', { class: 'welcome' }, box));
+  /* ---------- أول شاشة: الدخول مباشرة (الملف يُربط عند أول «دخول») ---------- */
+  async function entry(restored) {
+    const pick = async () => { const adapter = await E.FileLink.pick(); return attach(adapter); };
+    const acquire = restored ? () => attach(restored) : (E.FileLink.supported ? pick : async () => { UI().toast('هذا المتصفح لا يدعم المزامنة التلقائية — افتح البرنامج بـ Edge أو Chrome', 'warn', 6000); return false; });
+    await loginScreen({ acquire, pick, restoredName: restored ? restored.name : '' });
+    showApp(); afterLink();
   }
 
   /* ---------- الهيكل ---------- */
@@ -495,11 +504,11 @@ window.Egary = window.Egary || {};
       if (restored) {
         // لو الإذن ما زال ممنوحًا (Chrome يحفظه) نبدأ مباشرة بلا نقرة
         try { if ((await restored.permission(false)) === 'granted') { if (await startWith(restored)) return; } } catch (e) { }
-        welcome(restored); return;
+        entry(restored); return;
       }
     }
     if (await tryPreview()) return;
-    welcome(null);
+    entry(null);
   }
   /* واجهة للاختبارات: ربط محوِّل ذاكرة مباشرة */
   async function linkAdapter(adapter) { App.mode = 'linked'; S().setRecorder(op => E.Sync.record(op)); await E.Sync.link(adapter, { writeOnLink: false }); await gate(); showApp(); return true; }

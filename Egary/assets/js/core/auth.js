@@ -110,6 +110,26 @@ window.Egary = window.Egary || {};
   const ROLE_AR = (r) => (ROLES.find(x => x.key === r) || {}).ar || r;
 
   /* ---------- إدارة المستخدمين (تمر عبر Store ⇒ تُكتب في الإكسيل) ---------- */
+  /* الحسابات الجاهزة: تُنشأ تلقائيًا في أي ملف بلا حسابات (أو بلا مدير مفعَّل) حتى لا يُطلب من المكتب «إنشاء» أي شيء —
+     كلمات المرور في ملف «حسابات-الدخول.txt» المرفق مع البرنامج، والمدير يغيّرها من الإعدادات */
+  const DEFAULT_ACCOUNTS = [
+    { code: 'admin', name: 'المدير', role: 'admin', password: 'Egary@2026' },
+    { code: 'office', name: 'موظف المكتب', role: 'staff', password: 'Office@2026' },
+    { code: 'zaer', name: 'زائر', role: 'viewer', password: 'Zaer@2026' },
+  ];
+  async function seedDefaults(mode) { // 'all' = لا حسابات صالحة · 'admin' = حسابات بلا مدير مفعَّل
+    const list = mode === 'admin' ? DEFAULT_ACCOUNTS.filter(a => a.role === 'admin') : DEFAULT_ACCOUNTS;
+    const done = [];
+    for (const a of list) {
+      const ex = find(a.code);
+      if (ex && ex.enabled !== false && ex.passwordHash && (mode !== 'admin' || ex.role === 'admin')) continue; // حساب صالح موجود
+      const u = Object.assign(E.M.blank.users(), ex || {}, { code: a.code, name: (ex && ex.name) || a.name, role: a.role, passwordHash: await hashPassword(a.password), enabled: true, createdAt: (ex && ex.createdAt) || E.U.iso(E.U.today()) });
+      S().upsert('users', u, (ex ? 'استعادة الحساب الجاهز ' : 'إنشاء الحساب الجاهز ') + a.code + ' (' + ROLE_AR(a.role) + ')');
+      done.push(a.code);
+    }
+    if (done.length) { try { S().log({ action: 'إنشاء', entity: 'المستخدمون', code: done.join('/'), summary: 'أُنشئت حسابات الدخول الجاهزة تلقائيًا: ' + done.join('، ') + ' — كلمات المرور في ملف حسابات-الدخول.txt' }); } catch (e) { } }
+    return done;
+  }
   async function createUser(rec, password) {
     const errs = []; const e1 = validateUsername(rec.code); if (e1) errs.push(e1);
     if (!rec.name || !String(rec.name).trim()) errs.push('الاسم مطلوب');
@@ -151,5 +171,5 @@ window.Egary = window.Egary || {};
     return { ok: true };
   }
 
-  E.Auth = { ROLES, ROLE_AR, login, logout, restore, revalidate, hasAdmin, demo, user, role, can, hasUsers, users, find, normUser, hashPassword, verifyPassword, validatePassword, validateUsername, createUser, updateUser, setPassword, removeUser, subscribe, get supported() { return !!subtle(); } };
+  E.Auth = { ROLES, ROLE_AR, DEFAULT_ACCOUNTS, seedDefaults, login, logout, restore, revalidate, hasAdmin, demo, user, role, can, hasUsers, users, find, normUser, hashPassword, verifyPassword, validatePassword, validateUsername, createUser, updateUser, setPassword, removeUser, subscribe, get supported() { return !!subtle(); } };
 })(window.Egary);

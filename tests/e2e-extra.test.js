@@ -53,7 +53,7 @@ function e2e(name, fn, opts) {
 }
 const ADMIN = ['admin', 'admin@2026'], STAFF = ['office', 'office@2026'], VIEWER = ['zaer', 'view@2026'];
 async function loginAs(page, creds, remember) {
-  await page.waitForSelector('#login-form', { timeout: 20000 });
+  await page.waitForSelector('#login[data-stage="auth"] #login-form', { timeout: 20000 });
   await page.fill('#login-user', creds[0]); await page.fill('#login-pass', creds[1]);
   if (remember) await page.check('#login-remember');
   await page.click('#login-go');
@@ -783,7 +783,7 @@ e2e('E13. users card (admin): disable a user and reset another’s password → 
   await page.waitForSelector('#btn-demo', { timeout: 20000 });
   await page.evaluate(t => Egary.U.setToday(t), TODAY);
   await linkReal(page, null, bytes);
-  await page.waitForSelector('#login-form');
+  await page.waitForSelector('#login[data-stage="auth"] #login-form');
   await page.fill('#login-user', 'office'); await page.fill('#login-pass', 'office@2026'); await page.click('#login-go');
   await page.waitForSelector('#login-err.on');
   assert.ok((await page.textContent('#login-err')).includes('غير صحيحة'));

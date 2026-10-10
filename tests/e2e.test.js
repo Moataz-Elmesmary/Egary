@@ -59,11 +59,14 @@ function e2e(name, fn, opts) {
 /* الوضع المرتبط: الملف الحقيقي في محوِّل ذاكرة (بلا منتقي ملفات) */
 const ADMIN = ['admin', 'admin@2026'], STAFF = ['office', 'office@2026'], VIEWER = ['zaer', 'view@2026'];
 async function loginAs(page, creds, remember) {
-  await page.waitForSelector('#login-form', { timeout: 20000 });
+  await page.waitForSelector('#login[data-stage="auth"] #login-form', { timeout: 20000 });
   await page.fill('#login-user', creds[0]); await page.fill('#login-pass', creds[1]);
   if (remember) await page.check('#login-remember');
   await page.click('#login-go');
-  await page.waitForSelector('#login', { state: 'detached', timeout: 20000 });
+  try { await page.waitForSelector('#login', { state: 'detached', timeout: 20000 }); } catch (e) {
+    const diag = await page.evaluate(() => ({ err: (document.querySelector('#login-err') || {}).textContent, stage: (document.querySelector('#login') || { dataset: {} }).dataset.stage, forms: document.querySelectorAll('#login-form').length, user: Egary.Auth.user() && Egary.Auth.user().username, mode: Egary.App.mode, sync: Egary.Sync.status.state, pending: Egary.Sync.status.pending, goDisabled: (document.querySelector('#login-go') || {}).disabled, userVal: (document.querySelector('#login-user') || {}).value })).catch(x => String(x));
+    e.message += '\n[login diag] ' + JSON.stringify(diag); throw e;
+  }
 }
 async function linkReal(page, creds, b64) {
   await page.evaluate(() => { if (location.hash && location.hash !== '#/dashboard') location.hash = '#/dashboard'; }); // بعد إعادة تحميل من صفحة أخرى
@@ -127,9 +130,11 @@ async function payFromCell(page, cellKey, expectAmount) {
 /* =====================================================================
    1. شاشة البداية + الوضع التجريبي
    ===================================================================== */
-e2e('1. welcome screen shows the three buttons; demo mode renders the dashboard tiles and the info banner', async (page) => {
+e2e('1. the first screen is the login screen (with the file/open/demo links); demo mode renders the dashboard tiles and the info banner', async (page) => {
+  assert.ok(await page.isVisible('#login-form'), 'login form is the first screen');
   for (const id of ['#btn-link', '#btn-open', '#btn-demo']) assert.ok(await page.isVisible(id), id + ' visible');
-  assert.ok((await page.textContent('.welcome')).includes('Egary.xlsx'));
+  assert.ok((await page.textContent('#login')).includes('Egary.xlsx'));
+  assert.equal(await page.$('#setup-form'), null, 'no account-creation screen');
   await page.click('#btn-demo');
   await page.waitForSelector('#content .kpis .kpi');
   assert.ok((await page.locator('#content .kpis .kpi').count()) >= 12);
@@ -804,7 +809,7 @@ e2e('11. insights page lists ≥ 8 insights (first one opens evidence); quality 
   const firstTitle = (await page.locator('#content .insight b').first().textContent()).trim();
   assert.ok(firstTitle.length > 0, firstTitle);
   // أكتوبر وسبتمبر لم يُسجَّلا بعد في الورقة ⇒ ملاحظة «بانتظار التسجيل» موجودة
-  assert.ok((await page.textContent('#content')).includes('لم يُسجَّل تحصيل'));
+  assert.ok((await page.textContent('#content')).includes('لم تُسجَّل في الورقة بعد'));
   const hashBefore = await page.evaluate(() => location.hash);
   await page.locator('#content .insight').first().click();
   await page.waitForFunction(h => document.querySelector('.drawer') || location.hash !== h, hashBefore);
@@ -986,7 +991,7 @@ e2e('15. WhatsApp reminder (text from the numbers, wa.me link with the normalize
 e2e('16. login: wrong password shows an error, eye toggles, admin logs in (chip shows name/role), logout returns to login; staff cannot delete a project or edit settings but can delete a payment; viewer cannot edit; admin manages users and the sheet stores hashes', async (page) => {
   // ربط بلا دخول ⇒ شاشة الدخول فوق أفق المدينة
   await linkReal(page, null);
-  await page.waitForSelector('#login-form');
+  await page.waitForSelector('#login[data-stage="auth"] #login-form');
   assert.ok(await page.$('#login svg.skyline'), 'skyline backdrop');
   await page.fill('#login-user', 'admin'); await page.fill('#login-pass', 'nope'); await page.click('#login-go');
   await page.waitForSelector('#login-err.on');
@@ -1048,29 +1053,35 @@ e2e('16. login: wrong password shows an error, eye toggles, admin logs in (chip 
 });
 
 /* =====================================================================
-   17. أول تشغيل: ملف بلا حسابات ⇒ شاشة إنشاء الحسابات ⇒ الدخول كمدير والحسابات في الإكسيل؛ «تذكرني» يستعيد الجلسة بعد إعادة التحميل
+   17. أول تشغيل: ملف بلا حسابات ⇒ لا شاشة إنشاء: تُنشأ الحسابات الجاهزة تلقائيًا وتُكتب في الإكسيل، والدخول بها يعمل؛ «تذكرني» يستعيد الجلسة بعد إعادة التحميل
    ===================================================================== */
-e2e('17. first run: a workbook without users shows the setup screen, creates owner + staff, logs in as owner, writes the sheet; remember-me restores the session after reload', async (page) => {
+e2e('17. first run: a workbook without users shows the login screen directly, seeds the ready accounts (admin/office/zaer) into the sheet, admin logs in; remember-me restores the session after reload', async (page) => {
   const SRC = fs.readFileSync(path.resolve(__dirname, 'fixtures', 'source-anon.xlsx')).toString('base64');
   await linkReal(page, null, SRC);
-  await page.waitForSelector('#setup-form');
-  await page.fill('#su-admin-user', 'owner'); await page.fill('#su-admin-name', 'المالك'); await page.fill('#su-admin-pass', 'own@2026'); await page.fill('#su-admin-pass2', 'own@2027');
-  await page.fill('#su-staff-user', 'office'); await page.fill('#su-staff-name', 'موظف'); await page.fill('#su-staff-pass', 'off@2026'); await page.fill('#su-staff-pass2', 'off@2026');
-  await page.click('#setup-go'); await page.waitForSelector('#setup-err.on');
-  assert.ok((await page.textContent('#setup-err')).includes('غير مطابق'));
-  await page.fill('#su-admin-pass2', 'own@2026'); await page.click('#setup-go');
+  await page.waitForSelector('#login[data-stage="auth"] #login-form', { timeout: 30000 });
+  assert.equal(await page.$('#setup-form'), null, 'no setup screen');
+  assert.ok((await page.textContent('#login-hint')).includes('أُنشئت حسابات الدخول الجاهزة'), await page.textContent('#login-hint'));
+  // كلمة مرور خاطئة ⇒ رسالة، ثم الدخول بالحساب الجاهز
+  await page.fill('#login-user', 'admin'); await page.fill('#login-pass', 'wrong'); await page.click('#login-go'); await page.waitForSelector('#login-err.on');
+  await loginAs(page, ['admin', 'Egary@2026']);
   await page.waitForSelector('#content .kpis .kpi', { timeout: 30000 });
-  assert.equal(await page.evaluate(() => Egary.Auth.user().username), 'owner');
-  await waitWrite(page, 0);
+  assert.deepEqual(await page.evaluate(() => [Egary.Auth.user().username, Egary.Auth.user().role]), ['admin', 'admin']);
+  await page.waitForFunction(() => Egary.Sync.status.state === 'linked' && Egary.Sync.status.pending === 0);
   const rows = await sheetRows(page, 'المستخدمون');
-  assert.deepEqual(rows.slice(1).map(r => [r[0], r[2]]).sort(), [['office', 'موظف'], ['owner', 'مدير']]);
-  // تذكرني ⇒ بعد إعادة التحميل والربط من جديد لا تظهر شاشة الدخول
+  assert.deepEqual(rows.slice(1).map(r => [r[0], r[2]]).sort(), [['admin', 'مدير'], ['office', 'موظف'], ['zaer', 'مشاهدة فقط']]);
+  assert.ok(rows.slice(1).every(r => /^pbkdf2\$/.test(r[3])), 'hashed passwords only');
+  const audit = await sheetRows(page, 'سجل التعديلات');
+  assert.ok(audit.some(r => r && String(r.join(' ')).includes('حسابات الدخول الجاهزة')), 'seeding is audited');
+  // الموظف الجاهز يدخل أيضًا
   const bytes = await page.evaluate(() => { const u = new Uint8Array(window.__adapter.bytes()); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); });
   await page.click('#user-chip'); await page.waitForSelector('#btn-logout'); await page.click('#btn-logout');
   await page.waitForSelector('#btn-demo', { timeout: 20000 });
   await linkReal(page, null, bytes);
-  await loginAs(page, ['owner', 'own@2026'], true);
+  await page.waitForSelector('#login[data-stage="auth"] #login-form', { timeout: 30000 });
+  assert.ok((await page.textContent('#login-hint')).includes('الحسابات الجاهزة'), 'hint lists the ready accounts');
+  await loginAs(page, ['office', 'Office@2026'], true);
   await page.waitForSelector('#content .kpis .kpi');
+  assert.equal(await page.evaluate(() => Egary.Auth.user().role), 'staff');
   assert.ok(await page.evaluate(() => !!localStorage.getItem('egary-remember')));
   await page.evaluate(() => sessionStorage.removeItem('egary-session')); // كأن النافذة أُغلقت: يبقى «تذكرني» وحده
   await page.reload(); await page.waitForSelector('#btn-demo');
@@ -1078,7 +1089,7 @@ e2e('17. first run: a workbook without users shows the setup screen, creates own
   await linkReal(page, null, bytes);
   await page.waitForSelector('#content .kpis .kpi', { timeout: 20000 });
   assert.equal(await page.$('#login'), null, 'remembered session: no login screen');
-  assert.equal(await page.evaluate(() => Egary.Auth.user().username), 'owner');
+  assert.equal(await page.evaluate(() => Egary.Auth.user().username), 'office');
   assert.equal(await page.evaluate(() => Egary.Auth.user().source), 'restored');
 });
 
@@ -1087,7 +1098,7 @@ e2e('17. first run: a workbook without users shows the setup screen, creates own
    ===================================================================== */
 e2e('18. sign-up from the login screen creates a staff account written to the users sheet and logs in; the settings page shows the operations log card and a CSV download; the accounting-start slicer appears only when more than one year is available', async (page) => {
   await linkReal(page, null);
-  await page.waitForSelector('#login-form');
+  await page.waitForSelector('#login[data-stage="auth"] #login-form');
   await page.click('#login-signup'); await page.waitForSelector('#signup-form:not(.hidden)');
   await page.fill('#signup-user', 'nour'); await page.fill('#signup-name', 'نور'); await page.fill('#signup-pass', 'nour@2026'); await page.fill('#signup-pass2', 'nour@2027');
   await page.click('#signup-go'); await page.waitForSelector('#signup-err.on');

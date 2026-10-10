@@ -116,7 +116,7 @@ window.Egary = window.Egary || {};
     if (paid > 0) return { ...base, status: 'partial', late };
     return { ...base, status: late ? 'late' : 'due', late };
   }
-  const STATUS_AR = { paid: 'مسدَّد', partial: 'جزئي', late: 'متأخر', due: 'مستحق', upcoming: 'قادم', advance: 'مقدَّم', pending: 'بانتظار التسجيل', none: '—', history: 'قبل التتبع', orphan: 'خارج العقد' };
+  const STATUS_AR = { paid: 'مسدَّد', partial: 'جزئي', late: 'متأخر', due: 'مستحق', upcoming: 'قادم', advance: 'مقدَّم', pending: 'لم يُسجَّل بعد', none: '—', history: 'قبل التتبع', orphan: 'خارج العقد' };
 
   /* ---------- حالة عقد / وحدة ---------- */
   function contractStatus(c, asOf) {
@@ -363,7 +363,7 @@ window.Egary = window.Egary || {};
   function insights(k) {
     const out = [], f = U().fmtMoney, pct = U().fmtPct;
     const push = (sev, title, text, evidence) => out.push({ sev, title, text, evidence });
-    if (k.pending && k.pending.periods.length) push('warn', `لم يُسجَّل تحصيل ${k.pending.periods.map(p => U().periodLabel(p)).join(' و')} بعد`, `${k.pending.contracts} عقد بمستحق ${f(k.pending.due)} بانتظار التسجيل في الورقة — آخر شهر مكتمل: ${U().periodLabel(k.enteredThrough, true)}. هذه الشهور لا تُحتسب متأخرات حتى تُسجَّل.`, { view: 'pending' });
+    if (k.pending && k.pending.periods.length) push('warn', `مدفوعات ${k.pending.periods.map(p => U().periodLabel(p)).join(' و')} لم تُسجَّل في الورقة بعد`, `${k.pending.contracts} عقدًا بإيجار ${f(k.pending.due)} — آخر شهر مسجَّل: ${U().periodLabel(k.enteredThrough, true)}. تُعدّ هذه الشهور «لم تُسجَّل بعد» لا «متأخرة» حتى تُدخل مدفوعاتها (كشف التحصيل أو زر التسجيل هنا).`, { view: 'pending' });
     if (k.month.due > 0) {
       const r = k.month.rate || 0;
       push(r >= 0.9 ? 'good' : r >= 0.6 ? 'warn' : 'danger', `تحصيل ${U().periodLabel(k.period, true)}: ${pct(r)}`, `محصَّل ${f(k.month.collected)} من مستحق ${f(k.month.due)} — ${k.month.lateCount} عقد لم يُسجَّل له سداد الشهر.`, { view: 'ledger', period: k.period, status: 'late' });

@@ -390,8 +390,8 @@ input.chip[type="date"] { padding: 0 8px; direction: ltr; }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(5px); } 75% { transform: translateX(-5px); } }
 #login .hint { text-align: center; color: #7F8DAA; font-size: 12px; margin-top: 14px; line-height: 1.7; }
 #login .hint b { color: #B9C4DA; }
-#login .foot-links { display: flex; justify-content: center; gap: 14px; margin-top: 12px; font-size: 12.5px; }
-#login .foot-links button { background: none; border: 0; color: #9DBBFF; cursor: pointer; font: inherit; font-size: 12.5px; }
+#login .foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin-top: 12px; font-size: 12.5px; }
+#login .foot-links button { background: none; border: 0; color: #9DBBFF; cursor: pointer; font: inherit; font-size: 12.5px; white-space: nowrap; padding: 2px 0; }
 #login .foot-links button:hover { text-decoration: underline; }
 #login .role-note { font-size: 12px; color: #9DAAC6; background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .08); border-radius: 10px; padding: 8px 10px; line-height: 1.7; }
 @media (prefers-reduced-motion: reduce) { #login .login-card { transition: none; } }

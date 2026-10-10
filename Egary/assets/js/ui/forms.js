@@ -344,7 +344,7 @@ window.Egary = window.Egary || {};
         field('الزيادة السنوية الافتراضية %', number('defaultIncreasePct', sg.defaultIncreasePct, { min: 0, max: 100 })),
         field('بادئة رقم الفاتورة', input('invoicePrefix', sg.invoicePrefix, { dir: 'ltr' })),
         field('رمز العملة', input('currency', sg.currency)),
-        field('آخر شهر مسجَّل في الورقة', input('enteredThrough', sg.enteredThrough, { dir: 'ltr', placeholder: 'تلقائي (مثال 2026-08)' }), { help: 'الشهور بعده تُعرض «بانتظار التسجيل» لا «متأخرة». اتركه فارغًا ليُكتشف تلقائيًا.' }),
+        field('آخر شهر مسجَّل في الورقة', input('enteredThrough', sg.enteredThrough, { dir: 'ltr', placeholder: 'تلقائي (مثال 2026-08)' }), { help: 'الشهور بعده تُعرض «لم يُسجَّل بعد» لا «متأخرة» (حتى لا تظهر متأخرات وهمية قبل إدخال الورقة). اتركه فارغًا ليُكتشف تلقائيًا من آخر شهر فيه تسجيل.' }),
         field('فرق مقبول في السداد %', number('tolerancePct', sg.tolerancePct, { min: 0, max: 10, step: '0.1' }), { help: 'يُقبل المبلغ كسداد كامل لو الفرق أقل من هذه النسبة من المستحق' }),
         field('الحد الأدنى للفرق المقبول (ج)', number('toleranceMin', sg.toleranceMin, { min: 0, step: 1 })),
       ],
