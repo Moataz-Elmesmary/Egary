@@ -18,6 +18,8 @@ window.Egary = window.Egary || {};
   const settings = () => { const s = st().settings; const tf = OVERRIDE.trackingFrom; if (!tf || tf === s.trackingFrom) return s; if (!_ovCache || _ovCache.base !== s || _ovCache.tf !== tf) _ovCache = { base: s, tf, obj: Object.assign({}, s, { trackingFrom: tf }) }; return _ovCache.obj; };
   function setOverride(o) { OVERRIDE = o || {}; _ovCache = null; }
   function overrideOf() { return OVERRIDE; }
+  /* بداية المحاسبة الفعلية (الإعداد أو سلايسر «المحاسبة من») — تستخدمها الشاشات بدل قراءة الإعداد الخام */
+  function trackingFrom() { return settings().trackingFrom || ''; }
 
   /* ---------- جدول سنوات العقد ---------- */
   function addYears(date, n) { return new Date(Date.UTC(date.getUTCFullYear() + n, date.getUTCMonth(), date.getUTCDate())); }
@@ -436,5 +438,5 @@ window.Egary = window.Egary || {};
     return flags.sort((a, b) => sev[a.sev] - sev[b.sev]);
   }
 
-  E.Engine = { setOverride, overrideOf, schedule, rentOn, currentRent, dueForMonth, dueDateOf, cell, enteredThrough, tolerance, pendingEntry, STATUS_AR, contractStatus, CSTATUS_AR, activeContractOf, unitStatus, USTATUS_AR, scope, row, arrears, monthTotals, collectedBetween, series, occupancy, renewals, deposits, contractedRevenue, reletGaps, punctuality, maintenanceStats, byDimension, kpis, insights, ledger, dataQuality };
+  E.Engine = { setOverride, overrideOf, trackingFrom, schedule, rentOn, currentRent, dueForMonth, dueDateOf, cell, enteredThrough, tolerance, pendingEntry, STATUS_AR, contractStatus, CSTATUS_AR, activeContractOf, unitStatus, USTATUS_AR, scope, row, arrears, monthTotals, collectedBetween, series, occupancy, renewals, deposits, contractedRevenue, reletGaps, punctuality, maintenanceStats, byDimension, kpis, insights, ledger, dataQuality };
 })(window.Egary);

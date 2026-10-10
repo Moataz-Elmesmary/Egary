@@ -113,11 +113,13 @@ window.Egary = window.Egary || {};
   /* ---------- أكواد ---------- */
   function foldCode(s) { return String(s == null ? '' : s).replace(/[٠-٩۰-۹]/g, c => DIGITS[c] || c).replace(/\s+/g, '').toUpperCase(); }
   function pad(n, w) { return String(n).padStart(w, '0'); }
+  /* طابع زمني محلي (ساعة المكتب) 'YYYY-MM-DD HH:MM:SS' — للسجلات والعرض */
+  function stamp(dt) { dt = dt || new Date(); return dt.getFullYear() + '-' + pad(dt.getMonth() + 1, 2) + '-' + pad(dt.getDate(), 2) + ' ' + pad(dt.getHours(), 2) + ':' + pad(dt.getMinutes(), 2) + ':' + pad(dt.getSeconds(), 2); }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function sum(arr, f) { let s = 0; for (const x of arr) s += f ? (f(x) || 0) : (x || 0); return s; }
   function groupBy(arr, f) { const m = new Map(); for (const x of arr) { const k = f(x); if (!m.has(k)) m.set(k, []); m.get(k).push(x); } return m; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
-  E.U = { DAY, d, iso, today, setToday, periodOf, monthFirst, monthLast, daysInMonth, addMonths, addDays, daysBetween, cmp, monthsBetween, periods, toIso, MONTHS_AR, periodLabel, fmtDate, fmtDateTime, fmtTime, fmtMoney, fmtNum, fmtPct, toNum, round2, normalize, matches, cellText, foldCode, pad, uid, clone, sum, groupBy, esc };
+  E.U = { DAY, d, iso, today, setToday, periodOf, monthFirst, monthLast, daysInMonth, addMonths, addDays, daysBetween, cmp, monthsBetween, periods, toIso, MONTHS_AR, periodLabel, fmtDate, fmtDateTime, fmtTime, fmtMoney, fmtNum, fmtPct, toNum, round2, normalize, matches, cellText, foldCode, pad, stamp, uid, clone, sum, groupBy, esc };
 })(window.Egary);

@@ -11,10 +11,12 @@ window.Egary = window.Egary || {};
 
   let STATE = M().emptyState();
   let IDX = null;
+  let REV = 0; // رقم المراجعة: يزيد مع كل تغيير في الحالة (لإبطال ذاكرة المحرّك المؤقتة)
   const listeners = new Set();
   let recorder = null; // دالة تُستدعى بكل عملية (Sync.record)
 
-  function load(state) { STATE = state; IDX = null; notify('load'); }
+  function load(state) { STATE = state; IDX = null; REV++; notify('load'); }
+  function rev() { return REV; }
   function state() { return STATE; }
   function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }
   function notify(reason) { for (const fn of listeners) { try { fn(reason); } catch (e) { console.error(e); } } }
@@ -52,7 +54,7 @@ window.Egary = window.Egary || {};
   /* ---------- تطبيق العمليات ---------- */
   function applyOp(op) {
     if (op && op.type === 'settings') return applySettingsOp(op);
-    if (op && op.type === 'audit') { if (!op.record) return false; STATE.audit.unshift(Object.assign({}, op.record)); if (STATE.audit.length > 500) STATE.audit.length = 500; return true; }
+    if (op && op.type === 'audit') { if (!op.record) return false; STATE.audit.unshift(Object.assign({}, op.record)); if (STATE.audit.length > 500) STATE.audit.length = 500; REV++; return true; }
     const list = STATE[op.entity];
     if (!list) return false;
     const k = U().foldCode(op.code);
@@ -63,7 +65,7 @@ window.Egary = window.Egary || {};
     } else if (op.type === 'delete') {
       if (i >= 0) list.splice(i, 1);
     } else return false;
-    IDX = null;
+    IDX = null; REV++;
     return true;
   }
   function applySettingsOp(op) {
@@ -71,7 +73,7 @@ window.Egary = window.Egary || {};
     const r = Object.assign({}, op.record);
     if (r.officeName) { STATE.meta.officeName = r.officeName; delete r.officeName; }
     Object.assign(STATE.settings, r);
-    IDX = null;
+    IDX = null; REV++;
     return true;
   }
   function applyOps(ops) { // إعادة تطبيق (من دفتر المزامنة) بلا تسجيل جديد
@@ -149,5 +151,5 @@ window.Egary = window.Egary || {};
     return ops;
   }
 
-  E.Store = { load, state, subscribe, notify, setRecorder, idx, get, project, unit, client, contract, unitsOf, contractsOfUnit, contractsOfClient, paymentsOf, paymentsOfCell, maintenanceOf, nextContract, applyOp, applyOps, upsert, remove, log, batch, dependents, cascadeOps };
+  E.Store = { load, state, rev, subscribe, notify, setRecorder, idx, get, project, unit, client, contract, unitsOf, contractsOfUnit, contractsOfClient, paymentsOf, paymentsOfCell, maintenanceOf, nextContract, applyOp, applyOps, upsert, remove, log, batch, dependents, cascadeOps };
 })(window.Egary);
