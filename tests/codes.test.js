@@ -20,7 +20,9 @@ test('codes are never reused: deleting the newest project/client/contract/invoic
   const c1 = S.upsert('clients', { ...M.blank.clients(), code: C.nextClient(state), name: 'عميل مؤقت' }).record;
   S.remove('clients', c1.code);
   const c2 = C.nextClient(state); assert.ok(c2 > c1.code && c1.code > lastClient, `${lastClient} < ${c1.code} < ${c2}`);
-  const t1 = C.nextContract(state); const t2 = C.nextContract(state); assert.notEqual(t1, t2, 'each call advances');
+  const t1 = C.nextContract(state); const t2 = C.nextContract(state); assert.equal(t1, t2, 'previewing a code has no side effect');
+  S.upsert('contracts', { ...M.blank.contracts(), code: t1, unitCode: state.units[0].code, clientCode: state.clients[0].code, start: '2030-01-01', end: '2030-12-31', rent: 1 }); S.remove('contracts', t1);
+  assert.ok(C.nextContract(state) > t1, 'a created-then-deleted contract code is not reused');
   const inv1 = C.nextInvoice(state, '2026');
   S.upsert('payments', { ...M.blank.payments(), code: inv1, contractCode: state.contracts[0].code, period: '2026-12', amount: 1 });
   S.remove('payments', inv1);
@@ -28,13 +30,13 @@ test('codes are never reused: deleting the newest project/client/contract/invoic
   // العدّادات تُحفظ في الإعدادات وتعود بعد إعادة القراءة
   const buf = await E.Workbook.write(state);
   const E2 = load({ today: TODAY }); const r2 = await E2.Workbook.read(buf); E2.Store.load(r2.state);
-  assert.ok(r2.state.settings.codeSeq && r2.state.settings.codeSeq.P >= 5, JSON.stringify(r2.state.settings.codeSeq));
-  assert.equal(E2.Codes.nextProject(r2.state), 'P06');
+  assert.ok(r2.state.settings.codeSeq && r2.state.settings.codeSeq.P >= 4, JSON.stringify(r2.state.settings.codeSeq));
+  assert.equal(E2.Codes.nextProject(r2.state), 'P05', 'P04 (created then deleted) stays retired after a round trip');
   const info = py(`
 import sys, json, openpyxl
 wb = openpyxl.load_workbook(sys.argv[1]); ws = wb['الإعدادات']
 print(json.dumps({r[0]: r[1] for r in ws.iter_rows(min_row=2, values_only=True) if r[0]}))`, (() => { const f = path.join(OUT, 'codes_seq.xlsx'); fs.writeFileSync(f, Buffer.from(buf)); return f; })());
-  assert.ok(String(info['أعلى أرقام الأكواد الصادرة']).includes('"P":5'));
+  assert.ok(String(info['أعلى أرقام الأكواد الصادرة']).includes('"P":4'));
 });
 
 test('invoice prefix is normalised (lowercase, spaces, odd characters) so numbering never collides; kindOf recognises it', () => {

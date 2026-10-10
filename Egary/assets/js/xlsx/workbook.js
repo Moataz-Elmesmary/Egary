@@ -64,17 +64,32 @@ window.Egary = window.Egary || {};
     const names = wb.worksheets.map(w => w.name);
     const flags = [];
     const state = M().emptyState();
-    const ledgerSheets = wb.worksheets.filter(w => /^\d{4}$/.test(w.name.trim()));
+    const isYearName = (n) => /^\d{4}$/.test(U().foldCode(n));
+    const ledgerSheets = wb.worksheets.filter(w => isYearName(w.name));
     const normalized = !!wb.getWorksheet(SH.contracts);
+    // ورقة تشبه ورقة سنة لكن اسمها ليس سنة («2026 (2)» من «نقل أو نسخ» في Excel) ⇒ لا تُقرأ، وننبّه
+    for (const w of wb.worksheets) { if (isYearName(w.name) || Object.values(SH).includes(w.name)) continue; let looks = /^\d{4}\b/.test(U().foldCode(w.name).replace(/\(.*/, '')); if (!looks) { try { const m = headerMap(w, 2); looks = !!(findCol(m, 'المشروع') && findCol(m, 'الاسم') && findCol(m, 'يناير')); } catch (e) { looks = false; } } if (looks) flags.push({ sev: 'warn', entity: 'sheet', code: w.name, text: `الورقة «${w.name}» تشبه ورقة سنة لكن اسمها ليس سنة — سمِّها بالسنة فقط (مثل 2025) لتُقرأ` }); }
+    state._newestYear = ledgerSheets.length ? Math.max(...ledgerSheets.map(w => parseInt(U().foldCode(w.name), 10))) : 0;
     if (normalized) readNormalized(wb, state, flags);
     else state.meta.source = 'migrated';
     for (const ws of ledgerSheets) readLedger(ws, state, flags, opts.snapshot || null, !normalized);
     createPriors(state, flags);
+    if (normalized && ledgerSheets.length > 1) reconcilePriorYears(state, flags);
     if (!ledgerSheets.length && !normalized) throw new Error('الملف لا يحتوي على ورقة سنة (مثل 2026) ولا أوراق إيجاري');
-    state.settings.ledgerYears = Array.from(new Set(ledgerSheets.map(w => parseInt(w.name, 10)).concat(state.settings.ledgerYears || []))).sort();
+    state.settings.ledgerYears = Array.from(new Set(ledgerSheets.map(w => parseInt(U().foldCode(w.name), 10)).concat(state.settings.ledgerYears || []))).sort();
     if (!state.settings.trackingFrom || !normalized) state.settings.trackingFrom = String(state.settings.ledgerYears[0] || new Date().getUTCFullYear()) + '-01';
     // ورقة سنة أقدم أُضيفت (مثل 2025 بجوار 2026): تبدأ المحاسبة من أول سنة موجودة فعلًا
-    if (state.settings.ledgerYears.length && U().cmp(String(state.settings.ledgerYears[0]) + '-01', state.settings.trackingFrom) < 0) state.settings.trackingFrom = String(state.settings.ledgerYears[0]) + '-01';
+    { const y0 = state.settings.ledgerYears[0], ty = parseInt(String(state.settings.trackingFrom || '').slice(0, 4), 10);
+      if (y0 && !(ty >= 1900)) state.settings.trackingFrom = String(y0) + '-01';
+      else if (y0 && y0 < ty && state.settings.trackingMode !== 'manual') { // ورقة سنة أقدم ظهرت: المحاسبة تبدأ منها (ما لم يثبّت المدير البداية يدويًا)
+        const n = state.contracts.filter(c => c.start && c.end && c.start.slice(0, 4) <= String(y0) && c.end.slice(0, 4) >= String(y0)).length;
+        state.settings.trackingFrom = String(y0) + '-01';
+        flags.push({ sev: 'warn', entity: 'sheet', code: String(y0), text: `ورقة ${y0} جعلت المحاسبة تبدأ ${y0}-01: ${n} عقدًا ساريًا في ${y0} — أي شهر بلا مبلغ فيها سيُحسب متأخرًا. لو السنة للتاريخ فقط: ثبّت «بداية المحاسبة» من الإعدادات` });
+      }
+      else if (y0 && y0 < ty && state.settings.trackingMode === 'manual') flags.push({ sev: 'info', entity: 'sheet', code: String(y0), text: `ورقة ${y0} موجودة لكن المحاسبة مثبّتة من ${state.settings.trackingFrom} — الشهور قبلها تاريخ فقط` });
+    }
+    delete state._newestYear;
+    C().syncSeq(state); // العدّادات لا تقل عن أعلى كود موجود
     state.flags = flags;
     return { state, flags, migrated: !normalized, sheets: names };
   }
@@ -96,7 +111,7 @@ window.Egary = window.Egary || {};
           const n = U().toNum(v);
           rec[field] = n == null ? (field === 'dueDay' ? 1 : (field === 'area' ? '' : (field === 'ledgerOrder' ? null : 0))) : n;
         }
-        else if (LISTS[entity + '.' + field]) rec[field] = M().keyOf(LISTS[entity + '.' + field](), txt) || (entity === 'users' ? (LISTS['users.role']().find(r => r.key === txt.trim().toLowerCase() || U().normalize(txt).startsWith(U().normalize(r.ar)) || (U().normalize(txt).length >= 3 && U().normalize(r.ar).startsWith(U().normalize(txt)))) || {}).key || rec[field] : (field === 'method' || field === 'source' ? '' : rec[field]));
+        else if (LISTS[entity + '.' + field]) rec[field] = M().keyOf(LISTS[entity + '.' + field](), txt) || (entity === 'users' ? (LISTS['users.role']().find(r => r.key === txt.trim().toLowerCase() || U().normalize(txt).startsWith(U().normalize(r.ar)) || (U().normalize(txt).length >= 3 && U().normalize(r.ar).startsWith(U().normalize(txt)))) || {}).key || (txt.trim() ? 'viewer' : rec[field]) : (field === 'method' || field === 'source' ? '' : rec[field]));
         else if (field === 'rentOverrides') rec[field] = parseOverrides(txt);
         else if (field === 'period') { const iso = v instanceof Date ? U().toIso(v) : (/^\d{4}-\d{2}-\d{2}/.test(txt) ? txt : ''); rec[field] = iso ? iso.slice(0, 7) : txt.replace(/[٠-٩]/g, ch => '٠١٢٣٤٥٦٧٨٩'.indexOf(ch)).replace(/\//g, '-').slice(0, 7); }
         else if (field === 'present' || field === 'inferred') rec[field] = /^(نعم|✓|yes|true|1|موجود)$/i.test(txt);
@@ -194,7 +209,7 @@ window.Egary = window.Egary || {};
   const SETTINGS_KEYS = [
     { key: 'officeName', ar: 'اسم المكتب', type: 'text' }, { key: 'graceDays', ar: 'أيام السماح بعد الاستحقاق', type: 'num' }, { key: 'dueDay', ar: 'يوم الاستحقاق الافتراضي', type: 'num' },
     { key: 'vacancyMonths', ar: 'عتبة الشغور الطويل (شهور)', type: 'num' }, { key: 'trackingFrom', ar: 'بداية المحاسبة (سنة-شهر)', type: 'text' }, { key: 'defaultIncreasePct', ar: 'الزيادة السنوية الافتراضية %', type: 'num' },
-    { key: 'ledgerYears', ar: 'سنوات الورقة', type: 'years' }, { key: 'codeSeq', ar: 'أعلى أرقام الأكواد الصادرة', type: 'json' }, { key: 'invoicePrefix', ar: 'بادئة رقم الفاتورة', type: 'text' }, { key: 'currency', ar: 'العملة', type: 'text' },
+    { key: 'ledgerYears', ar: 'سنوات الورقة', type: 'years' }, { key: 'codeSeq', ar: 'أعلى أرقام الأكواد الصادرة', type: 'json' }, { key: 'trackingMode', ar: 'بداية المحاسبة (تلقائي/يدوي)', type: 'text' }, { key: 'invoicePrefix', ar: 'بادئة رقم الفاتورة', type: 'text' }, { key: 'currency', ar: 'العملة', type: 'text' },
     { key: 'enteredThrough', ar: 'آخر شهر مسجَّل في الورقة (سنة-شهر أو فارغ = تلقائي)', type: 'text' }, { key: 'tolerancePct', ar: 'فرق مقبول في السداد %', type: 'num' }, { key: 'toleranceMin', ar: 'الحد الأدنى للفرق المقبول (ج)', type: 'num' }, { key: 'prorationBasis', ar: 'أساس الشهر المقطوع (30 أو actual)', type: 'text' },
   ];
 
@@ -306,8 +321,20 @@ window.Egary = window.Egary || {};
       if (changed(L.tax, client.taxId, snap && snap.tax)) client.taxId = L.tax;
       if (changed(L.unit, unit.label, snap && snap.label)) { flags.push({ sev: 'info', entity: 'units', code: unit.code, text: `اسم الوحدة ${unit.code} عُدِّل من ورقة ${year}: «${unit.label}» ← «${L.unit}»` }); unit.label = L.unit; }
       if (changed(L.addr, project.address, snap && snap.addr)) project.address = L.addr;
-      if (from && from !== contract.start && (!snap || snap.start !== from)) { flags.push({ sev: 'info', entity: 'contracts', code: contract.code, text: `بداية العقد ${contract.code} عُدِّلت من ورقة ${year}: ${U().fmtDate(contract.start)} ← ${U().fmtDate(from)}` }); contract.start = from; }
-      if (to && to !== contract.end && (!snap || snap.end !== to)) { flags.push({ sev: 'info', entity: 'contracts', code: contract.code, text: `نهاية العقد ${contract.code} عُدِّلت من ورقة ${year}: ${U().fmtDate(contract.end)} ← ${U().fmtDate(to)}` }); contract.end = to; }
+      const yr = parseInt(year, 10), startYr = parseInt(String(contract.start || '').slice(0, 4), 10) || yr;
+      const datesAuthoritative = migrating || !state._newestYear || yr >= state._newestYear || yr === startYr; // التواريخ تُؤخذ من أحدث ورقة أو من ورقة سنة بداية العقد فقط
+      if (datesAuthoritative) {
+        if (from && from !== contract.start && (!snap || snap.start !== from)) { flags.push({ sev: 'info', entity: 'contracts', code: contract.code, text: `بداية العقد ${contract.code} عُدِّلت من ورقة ${year}: ${U().fmtDate(contract.start)} ← ${U().fmtDate(from)}` }); contract.start = from; }
+        if (to && to !== contract.end && (!snap || snap.end !== to)) { flags.push({ sev: 'info', entity: 'contracts', code: contract.code, text: `نهاية العقد ${contract.code} عُدِّلت من ورقة ${year}: ${U().fmtDate(contract.end)} ← ${U().fmtDate(to)}` }); contract.end = to; }
+      } else if ((from && from !== contract.start) || (to && to !== contract.end)) {
+        const overlaps = U().d(from) && U().d(to) && U().d(contract.start) && U().d(contract.end) && U().d(from) <= U().d(contract.end) && U().d(to) >= U().d(contract.start);
+        if (!overlaps && U().d(from) && U().d(to) && U().d(to) >= U().d(from)) { // فترة سابقة منفصلة لنفس المستأجر ⇒ عقد سابق مستقل مربوط بالعقد الحالي
+          const prior = Object.assign(M().blank.contracts(), { code: C().nextContract(state), unitCode: unit.code, clientCode: client.code, start: from, end: to, rent: contract.rent, increasePct: 0, dueDay: contract.dueDay || 1, notes: `فترة سابقة من ورقة ${year} صف ${L.row}`, ledgerOrder: L.serial != null ? L.serial : 1e6 });
+          state.contracts.push(prior); if (!contract.prevCode) contract.prevCode = prior.code;
+          flags.push({ sev: 'info', entity: 'contracts', code: prior.code, text: `${client.name} / ${unit.label}: ورقة ${year} صف ${L.row} بتواريخ (${U().fmtDate(from)} → ${U().fmtDate(to)}) مختلفة عن العقد ${contract.code} — أُنشئت فترة سابقة ${prior.code} مربوطة به` });
+          contract = prior;
+        } else flags.push({ sev: 'warn', entity: 'contracts', code: contract.code, text: `ورقة ${year} صف ${L.row} تحمل تواريخ (${U().fmtDate(from)} → ${U().fmtDate(to)}) مختلفة عن العقد ${contract.code} (${U().fmtDate(contract.start)} → ${U().fmtDate(contract.end)}) — لم تُطبَّق لأنها ورقة أقدم؛ عدّل العقد من البرنامج أو أضف صفًا للعقد السابق` });
+      }
       if (L.note !== (contract.notes || '') && (!snap || (snap.note || '') !== L.note)) contract.notes = L.note;
       if (L.serial != null) contract.ledgerOrder = L.serial;
     }
@@ -386,6 +413,35 @@ window.Egary = window.Egary || {};
     if (parts.length) flags.push({ sev: 'info', entity: 'contracts', code: contract.code, text: `${client.name} / ${unit.label}: ${parts.join('؛ ')}` });
     queuePrior(state, contract, client, unit, beforeAll, start);
   }
+  /* بعد قراءة كل أوراق السنوات (ملف منظَّم بأكثر من سنة): مبالغ قبل بداية العقد، وإيجار سنوات سابقة مختلف عن المفترض */
+  function reconcilePriorYears(state, flags) {
+    const En = E.Engine; if (!En) return;
+    const byContract = U().groupBy(state.payments, p => p.contractCode);
+    for (const c of state.contracts) {
+      const pays = (byContract.get(c.code) || []).filter(p => p.source !== 'web').sort((a, b) => U().cmp(a.period, b.period));
+      if (!pays.length || !U().d(c.start) || !U().d(c.end)) continue;
+      const startP = U().periodOf(U().d(c.start));
+      const before = pays.filter(p => U().cmp(p.period, startP) < 0);
+      if (before.length) {
+        if (c.inferred) { const ns = U().iso(U().monthFirst(before[0].period)); flags.push({ sev: 'info', entity: 'contracts', code: c.code, text: `الفترة السابقة ${c.code}: بدايتها التقديرية رُجِّعت إلى ${U().fmtDate(ns)} لوجود مبالغ أقدم في الورقة` }); c.start = ns; }
+        else flags.push({ sev: 'warn', entity: 'contracts', code: c.code, text: `${before.length} شهر مسجَّل قبل بداية العقد ${c.code} (${U().fmtDate(c.start)}) في أوراق السنوات — أضف صفًا للعقد السابق في ورقة السنة أو عدّل بداية العقد من البرنامج` });
+      }
+      // سنوات العقد: لو ورقة سنة سابقة تحمل شهورًا كاملة بمبلغ واحد يختلف عن الإيجار المفترض لتلك السنة ولا يوجد إيجار يدوي لها ⇒ نثبّته بدل اعتبار كل شهر «جزئيًا»
+      const s0 = U().d(c.start), e0 = U().d(c.end); c.rentOverrides = c.rentOverrides || {};
+      for (let k = 1; k <= 40; k++) {
+        const f = new Date(Date.UTC(s0.getUTCFullYear() + k - 1, s0.getUTCMonth(), s0.getUTCDate())); if (f > e0) break;
+        if (c.rentOverrides[k] != null) continue;
+        const t = U().addDays(new Date(Date.UTC(s0.getUTCFullYear() + k, s0.getUTCMonth(), s0.getUTCDate())), -1);
+        const full = pays.filter(p => U().monthFirst(p.period) >= f && U().monthLast(p.period) <= (t < e0 ? t : e0) && U().toNum(p.amount) > 0);
+        if (full.length < 2) continue;
+        const amounts = new Set(full.map(p => U().toNum(p.amount))); if (amounts.size !== 1) continue;
+        const amt = [...amounts][0]; const due = En.dueForMonth(c, full[0].period); const sched = due ? U().toNum(due.amount) : null;
+        if (sched == null || Math.abs(sched - amt) <= Math.max((state.settings.toleranceMin || 0), sched * ((state.settings.tolerancePct || 0) / 100))) continue;
+        c.rentOverrides[k] = amt;
+        flags.push({ sev: 'info', entity: 'contracts', code: c.code, text: `العقد ${c.code}: ${full.length} شهر كامل في السنة ${k} من العقد بمبلغ ${U().fmtMoney(amt)} بدل ${U().fmtMoney(sched)} المفترض — ثُبِّت إيجار تلك السنة على ${U().fmtMoney(amt)} (راجعه من شاشة العقد)` });
+      }
+    }
+  }
   /* دفعات قبل بداية العقد = فترة سابقة لنفس المستأجر ⇒ عقد سابق مستنتج مربوط بالعقد الحالي */
   function queuePrior(state, contract, client, unit, before, start) {
     if (before.length) {
@@ -425,16 +481,19 @@ window.Egary = window.Egary || {};
       try {
         await wb.xlsx.load(opts.base);
         const managed = new Set(Object.values(SH));
-        for (const ws of wb.worksheets.slice()) { if (/^\d{4}$/.test(ws.name.trim()) || managed.has(ws.name)) wb.removeWorksheet(ws.id); else foreign.push(ws.name); }
+        for (const ws of wb.worksheets.slice()) { if (/^\d{4}$/.test(U().foldCode(ws.name)) || managed.has(ws.name)) wb.removeWorksheet(ws.id); else foreign.push(ws.name); }
       } catch (e) { foreign = []; for (const ws of wb.worksheets.slice()) wb.removeWorksheet(ws.id); }
     }
     wb.creator = 'Egary'; wb.created = new Date();
     const asOf = U().today();
-    const years = Array.from(new Set((state.settings.ledgerYears || []).concat(state.payments.map(p => parseInt(p.period.slice(0, 4), 10))).concat([asOf.getUTCFullYear()]))).filter(y => y > 1900).sort();
+    const known = Array.from(new Set((state.settings.ledgerYears || []).concat(state.payments.map(p => parseInt(p.period.slice(0, 4), 10))).concat([asOf.getUTCFullYear()]))).filter(y => y > 1900).sort((a, b) => a - b);
+    // كل السنوات من الأقدم إلى الأحدث بلا فجوات: سنة بلا ورقة لا يمكن تسجيل مبالغها
+    const years = []; for (let y = known[0]; y <= known[known.length - 1]; y++) years.push(y);
     state.settings.ledgerYears = years;
     const sheetsMeta = {};
     for (const y of years) sheetsMeta[y] = writeLedger(wb, state, String(y), asOf);
-    writeSummary(wb, state, String(years[years.length - 1]), sheetsMeta[years[years.length - 1]]);
+    const reportYear = years.filter(y => y <= asOf.getUTCFullYear()).pop() || years[years.length - 1]; // ملخص المشاريع لسنة التقرير لا لسنة قادمة فارغة
+    writeSummary(wb, state, String(reportYear), sheetsMeta[reportYear]);
     writeProjects(wb, state, asOf); writeUnits(wb, state, asOf); writeAssets(wb, state); writeClients(wb, state, asOf); writeContracts(wb, state, asOf); writePayments(wb, state); writeMaintenance(wb, state, asOf); writeSettings(wb, state); writeAudit(wb, state); writeUsers(wb, state);
     // ترتيب الأوراق: أوراق السنوات ثم الملخص ثم أوراقنا ثم أوراق المكتب
     let order = 1; for (const ws of wb.worksheets) if (!foreign.includes(ws.name)) ws.orderNo = order++;
@@ -579,7 +638,7 @@ window.Egary = window.Egary || {};
   function writeSettings(wb, state) {
     const ws = wb.addWorksheet(SH.settings, { views: [{ state: 'frozen', ySplit: 1, rightToLeft: true }] });
     ws.getRow(1).values = ['الإعداد', 'القيمة', 'الشرح']; styleHeader(ws.getRow(1)); ws.getColumn(1).width = 30; ws.getColumn(2).width = 20; ws.getColumn(3).width = 60;
-    const help = { enteredThrough: 'الشهور بعده تُعرض «بانتظار التسجيل» لا «متأخرة»', tolerancePct: 'يُقبل المبلغ كسداد كامل لو الفرق أقل من هذه النسبة', toleranceMin: 'حد أدنى للفرق المقبول بالجنيه', prorationBasis: '30 = الشهر 30 يومًا (النصف 15/30) كما يحسب المكتب', officeName: 'يظهر أعلى الورقة والموقع', graceDays: 'بعدها يُعتبر الشهر متأخرًا', dueDay: 'يوم الشهر الذي يستحق فيه الإيجار ما لم يحدد العقد غيره', vacancyMonths: 'الوحدة الشاغرة أطول من ذلك تظهر كتنبيه', trackingFrom: 'الشهور قبله لا تُحاسَب (بداية الورقة)', defaultIncreasePct: 'تُقترح عند إنشاء عقد جديد', ledgerYears: 'أوراق السنوات الموجودة (تُضاف تلقائيًا)', codeSeq: 'لا تُعدَّل: تضمن ألا يُعاد استخدام كود محذوف', invoicePrefix: 'مثل INV-2026-0001', currency: 'رمز العملة في العرض' };
+    const help = { enteredThrough: 'الشهور بعده تُعرض «بانتظار التسجيل» لا «متأخرة»', tolerancePct: 'يُقبل المبلغ كسداد كامل لو الفرق أقل من هذه النسبة', toleranceMin: 'حد أدنى للفرق المقبول بالجنيه', prorationBasis: '30 = الشهر 30 يومًا (النصف 15/30) كما يحسب المكتب', officeName: 'يظهر أعلى الورقة والموقع', graceDays: 'بعدها يُعتبر الشهر متأخرًا', dueDay: 'يوم الشهر الذي يستحق فيه الإيجار ما لم يحدد العقد غيره', vacancyMonths: 'الوحدة الشاغرة أطول من ذلك تظهر كتنبيه', trackingFrom: 'الشهور قبله لا تُحاسَب (بداية الورقة)', defaultIncreasePct: 'تُقترح عند إنشاء عقد جديد', ledgerYears: 'أوراق السنوات الموجودة (تُضاف تلقائيًا)', codeSeq: 'لا تُعدَّل: تضمن ألا يُعاد استخدام كود محذوف', trackingMode: 'auto = تبدأ من أقدم ورقة سنة · manual = كما ضبطها المدير', invoicePrefix: 'مثل INV-2026-0001', currency: 'رمز العملة في العرض' };
     let r = 2;
     for (const s of SETTINGS_KEYS) { ws.getCell(r, 1).value = s.ar; const v = s.key === 'officeName' ? state.meta.officeName : state.settings[s.key]; ws.getCell(r, 2).value = Array.isArray(v) ? v.join(', ') : (v && typeof v === 'object' ? JSON.stringify(v) : (v == null ? '' : v)); ws.getCell(r, 3).value = help[s.key] || ''; r++; }
     ws.getCell(r + 1, 1).value = 'آخر كتابة من الموقع'; ws.getCell(r + 1, 2).value = new Date().toISOString().slice(0, 19).replace('T', ' ');

@@ -59,7 +59,7 @@ window.Egary = window.Egary || {};
     const i = list.findIndex(r => U().foldCode(r.code) === k);
     if (op.type === 'upsert') {
       const rec = Object.assign(M().blank[op.entity](), op.record, { code: op.code });
-      if (i >= 0) list[i] = rec; else list.push(rec);
+      if (i >= 0) list[i] = rec; else { list.push(rec); try { if (E.Codes) E.Codes.noteIssued(STATE, op.entity, op.code); } catch (e) { } }
     } else if (op.type === 'delete') {
       if (i >= 0) list.splice(i, 1);
     } else return false;

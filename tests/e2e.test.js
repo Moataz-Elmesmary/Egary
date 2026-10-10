@@ -156,7 +156,7 @@ e2e('2. linked mode: nav counts, arrears KPI equals the engine and its drawer fo
   assert.equal(await page.textContent('#banner'), '', 'no banner in linked mode');
 
   const expected = await page.evaluate(() => { const k = Egary.Engine.kpis({}); return { total: k.arrears.total, fmt: Egary.U.fmtMoney(k.arrears.total), rows: k.arrears.rows.length, clients: k.arrears.byClient.length }; });
-  assert.ok(expected.total > 0 && /^[\d,]+ ج$/.test(expected.fmt), 'arrears formatted: ' + expected.fmt);
+  assert.ok(expected.total > 0 && /^[\d,]+[ \u00A0]ج$/.test(expected.fmt), 'arrears formatted: ' + expected.fmt);
   const tile = page.locator('#content .kpi[data-kpi="المتأخرات القائمة"]');
   assert.equal((await tile.locator('.v').textContent()).trim(), expected.fmt);
   assert.ok((await tile.locator('.d').textContent()).includes(`${expected.rows} شهر على ${expected.clients} عميل`));
@@ -1072,10 +1072,12 @@ e2e('17. first run: a workbook without users shows the setup screen, creates own
   await loginAs(page, ['owner', 'own@2026'], true);
   await page.waitForSelector('#content .kpis .kpi');
   assert.ok(await page.evaluate(() => !!localStorage.getItem('egary-remember')));
+  await page.evaluate(() => sessionStorage.removeItem('egary-session')); // كأن النافذة أُغلقت: يبقى «تذكرني» وحده
   await page.reload(); await page.waitForSelector('#btn-demo');
   await page.evaluate(t => Egary.U.setToday(t), TODAY);
   await linkReal(page, null, bytes);
   await page.waitForSelector('#content .kpis .kpi', { timeout: 20000 });
   assert.equal(await page.$('#login'), null, 'remembered session: no login screen');
   assert.equal(await page.evaluate(() => Egary.Auth.user().username), 'owner');
+  assert.equal(await page.evaluate(() => Egary.Auth.user().source), 'restored');
 });

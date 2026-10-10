@@ -140,7 +140,7 @@ window.Egary = window.Egary || {};
     const vacantDays = since ? Math.max(0, U().daysBetween(U().d(since), asOf)) : null;
     return { status: 'vacant', contract: null, last: past[past.length - 1] || null, next: future || null, vacantSince: since, vacantDays };
   }
-  const USTATUS_AR = { occupied: 'مؤجَّرة', ending: 'تنتهي قريبًا', vacant: 'شاغرة' };
+  const USTATUS_AR = { occupied: 'مؤجَّرة', ending: 'تنتهي خلال 90 يومًا', vacant: 'شاغرة' }; // نفس العبارة في الفلتر والبطاقات والجداول
 
   /* ---------- نطاق الفلاتر ---------- */
   /* filter: { projectCode, unitType, floor, status, q } → مجموعة وحدات + عقود */

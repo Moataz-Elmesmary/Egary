@@ -68,8 +68,11 @@ window.Egary = window.Egary || {};
   function fmtMoney(n, opts) {
     if (n == null || isNaN(n)) return '—';
     const s = (opts && opts.decimals ? nf2 : nf0).format(Math.round(n * 100) / 100);
-    return opts && opts.plain ? s : s + ' ج';
+    return opts && opts.plain ? s : s + '\u00A0ج'; // مسافة غير قابلة للكسر: الرقم والعملة لا ينفصلان
   }
+  /* تاريخ ووقت بصيغة واحدة في كل الشاشات: dd/mm/yyyy hh:mm بأرقام لاتينية (توقيت الجهاز) */
+  function fmtDateTime(ts) { const dt = ts instanceof Date ? ts : new Date(ts); if (!ts || isNaN(dt)) return '—'; return pad(dt.getDate(), 2) + '/' + pad(dt.getMonth() + 1, 2) + '/' + dt.getFullYear() + ' ' + pad(dt.getHours(), 2) + ':' + pad(dt.getMinutes(), 2); }
+  function fmtTime(ts) { const dt = ts instanceof Date ? ts : new Date(ts); if (!ts || isNaN(dt)) return '—'; return pad(dt.getHours(), 2) + ':' + pad(dt.getMinutes(), 2); }
   function fmtNum(n) { return n == null || isNaN(n) ? '—' : nf0.format(n); }
   function fmtPct(x, digits) { return x == null || isNaN(x) ? '—' : (x * 100).toFixed(digits == null ? 0 : digits) + '%'; }
   function toNum(v) {
@@ -116,5 +119,5 @@ window.Egary = window.Egary || {};
   function groupBy(arr, f) { const m = new Map(); for (const x of arr) { const k = f(x); if (!m.has(k)) m.set(k, []); m.get(k).push(x); } return m; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
-  E.U = { DAY, d, iso, today, setToday, periodOf, monthFirst, monthLast, daysInMonth, addMonths, addDays, daysBetween, cmp, monthsBetween, periods, toIso, MONTHS_AR, periodLabel, fmtDate, fmtMoney, fmtNum, fmtPct, toNum, round2, normalize, matches, cellText, foldCode, pad, uid, clone, sum, groupBy, esc };
+  E.U = { DAY, d, iso, today, setToday, periodOf, monthFirst, monthLast, daysInMonth, addMonths, addDays, daysBetween, cmp, monthsBetween, periods, toIso, MONTHS_AR, periodLabel, fmtDate, fmtDateTime, fmtTime, fmtMoney, fmtNum, fmtPct, toNum, round2, normalize, matches, cellText, foldCode, pad, uid, clone, sum, groupBy, esc };
 })(window.Egary);

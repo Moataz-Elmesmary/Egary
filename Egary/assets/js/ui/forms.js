@@ -11,7 +11,13 @@ window.Egary = window.Egary || {};
   /* ---------- عناصر النموذج ---------- */
   function field(label, input, opts) {
     opts = opts || {};
-    return h('div', { class: 'field ' + (opts.full ? 'full' : ''), dataset: { field: input.name || '' } }, h('label', { for: input.id || null }, label, opts.req ? h('span', { class: 'req' }, ' *') : null), input, opts.help ? h('div', { class: 'help' }, opts.help) : null);
+    let echo = null;
+    if (input.type === 'date') { // حقل التاريخ يعرض بصيغة المتصفح (قد تكون شهر/يوم): نعيد كتابته بصيغة البرنامج يوم/شهر/سنة
+      echo = h('div', { class: 'help date-echo' });
+      const upd = () => { echo.textContent = input.value ? '= ' + U().fmtDate(input.value) + ' (' + ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][U().d(input.value).getUTCDay()] + ')' : ''; };
+      input.addEventListener('input', upd); input.addEventListener('change', upd); setTimeout(upd, 0);
+    }
+    return h('div', { class: 'field ' + (opts.full ? 'full' : ''), dataset: { field: input.name || '' } }, h('label', { for: input.id || null }, label, opts.req ? h('span', { class: 'req' }, ' *') : null), input, echo, opts.help ? h('div', { class: 'help' }, opts.help) : null);
   }
   function input(name, value, attrs) { return h('input', Object.assign({ name, id: 'f_' + name, value: value == null ? '' : value, type: 'text', autocomplete: 'off' }, attrs || {})); }
   function number(name, value, attrs) { return input(name, value, Object.assign({ type: 'number', step: 'any', inputmode: 'decimal' }, attrs || {})); }
@@ -32,7 +38,7 @@ window.Egary = window.Egary || {};
       if (!el.name || el.name.startsWith('_')) return;
       if (el.type === 'checkbox') out[el.name] = el.checked;
       else if (el.type === 'number') out[el.name] = el.value === '' ? '' : U().toNum(el.value);
-      else out[el.name] = el.value.trim();
+      else out[el.name] = el.type === 'password' ? el.value : el.value.trim(); // كلمات المرور كما كُتبت
     });
     return out;
   }
@@ -346,9 +352,10 @@ window.Egary = window.Egary || {};
         if (errors.length) return { errors };
         st.meta.officeName = v.officeName || st.meta.officeName; delete v.officeName;
         for (const k of ['graceDays', 'dueDay', 'vacancyMonths', 'defaultIncreasePct', 'tolerancePct', 'toleranceMin']) if (v[k] === '') delete v[k];
+        if (v.trackingFrom && v.trackingFrom !== sg.trackingFrom) v.trackingMode = 'manual'; // المدير ثبّت البداية: لا تتحرك تلقائيًا مع ورقة سنة أقدم
         Object.assign(sg, v);
         S().notify('change');
-        if (E.Sync) E.Sync.record({ type: 'settings', at: new Date().toISOString(), record: Object.assign({}, sg, { officeName: st.meta.officeName }) });
+        if (E.Sync && E.App && E.App.mode === 'linked') E.Sync.record({ type: 'settings', at: new Date().toISOString(), record: Object.assign({}, sg, { officeName: st.meta.officeName }) });
         UI().toast('حُفظت الإعدادات', 'ok');
         return { record: sg };
       },
@@ -370,7 +377,7 @@ window.Egary = window.Egary || {};
       )),
       h('div', { class: 'total' }, 'المبلغ المسدَّد: ' + U().fmtMoney(p.amount)),
       p.notes ? h('p', { class: 'small mt-s' }, p.notes) : null,
-      h('p', { class: 'small muted', style: { marginTop: '18px' } }, 'أُصدرت من نظام إيجاري — ' + new Date().toLocaleString('ar-EG')),
+      h('p', { class: 'small muted', style: { marginTop: '18px' } }, 'أُصدرت من نظام إيجاري — ' + U().fmtDateTime(new Date())),
     );
     const printBtn = h('button', { class: 'btn primary', onclick: () => { document.body.classList.add('printing'); window.print(); setTimeout(() => document.body.classList.remove('printing'), 500); } }, UI().icon('print'), 'طباعة / حفظ PDF');
     const editBtn = h('button', { class: 'btn', onclick: async () => { m.close(); const r = await payment(p); if (r) invoice(r); } }, UI().icon('edit'), 'تعديل');
@@ -405,7 +412,7 @@ window.Egary = window.Egary || {};
       h('h3', { class: 'mt' }, `الدفعات المسجَّلة (${pays.length})`),
       h('table', { id: 'statement-payments' }, h('thead', null, h('tr', null, h('th', null, 'الفاتورة'), h('th', null, 'تاريخ السداد'), h('th', null, 'عن شهر'), h('th', { class: 'num' }, 'المبلغ'), h('th', null, 'الطريقة'))), h('tbody', null, pays.map(p => h('tr', null, td(h('span', { class: 'code' }, p.code)), td(p.paidOn ? U().fmtDate(p.paidOn) : '—'), td(U().periodLabel(p.period, true)), td(U().fmtMoney(p.amount), 'num'), td(M().label([{ key: '', ar: 'غير محدد' }].concat(M().PAY_METHODS), p.method || '')))))),
       h('div', { class: 'total', id: 'statement-total' }, tRem ? 'إجمالي المتأخرات المستحقة: ' + U().fmtMoney(tRem) : 'لا توجد متأخرات مستحقة'),
-      h('p', { class: 'small muted', style: { marginTop: '18px' } }, 'أُصدر من نظام إيجاري — ' + new Date().toLocaleString('ar-EG')));
+      h('p', { class: 'small muted', style: { marginTop: '18px' } }, 'أُصدر من نظام إيجاري — ' + U().fmtDateTime(new Date())));
     const printBtn = h('button', { class: 'btn primary', onclick: () => { document.body.classList.add('printing'); window.print(); setTimeout(() => document.body.classList.remove('printing'), 500); } }, UI().icon('print'), 'طباعة / حفظ PDF');
     return UI().modal({ title: 'كشف حساب — ' + c.name, size: 'lg', body: box, footer: [printBtn] });
   }

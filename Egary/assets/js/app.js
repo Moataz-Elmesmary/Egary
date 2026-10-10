@@ -49,10 +49,10 @@ window.Egary = window.Egary || {};
   function initSync() {
     E.Sync.init({
       serialize: async () => { const buf = await W().write(S().state(), { base: lastBytes }); lastBytes = buf; saveSnapshot(); E.FileLink.saveBackup(buf); return buf; },
-      deserialize: async (buf) => { if (App.mode === 'linked' && E.Sync.adapter) await E.FileLink.saveOriginal(buf, E.Sync.adapter.name); const r = await W().read(buf, { snapshot: loadSnapshot() }); lastBytes = buf; S().load(r.state); App.flags = r.flags; saveSnapshot(); E.FileLink.saveBackup(buf); if (E.Auth.user() && !E.Auth.revalidate()) { UI().toast('أُلغي حسابك أو عُطِّل — سيُعاد فتح شاشة الدخول', 'warn', 4000); setTimeout(() => location.reload(), 1500); } },
+      deserialize: async (buf) => { if (App.mode === 'linked' && E.Sync.adapter) await E.FileLink.saveOriginal(buf, E.Sync.adapter.name); const r = await W().read(buf, { snapshot: loadSnapshot() }); lastBytes = buf; S().load(r.state); App.flags = r.flags; saveSnapshot(); E.FileLink.saveBackup(buf); },
       applyOps: ops => S().applyOps(ops),
       onStatus: renderSync,
-      onExternalChange: () => { UI().toast('تم تحديث البيانات من ملف الإكسيل', 'ok'); render(); },
+      onExternalChange: () => { if (E.Auth.user() && !E.Auth.revalidate()) { UI().toast('أُلغي حسابك أو عُطِّل من المدير — سيُعاد فتح شاشة الدخول', 'warn', 4000); setTimeout(() => location.reload(), 1500); return; } UI().toast('تم تحديث البيانات من ملف الإكسيل', 'ok'); render(); },
       onWritten: (buf) => { E.Backup.write(buf, '', false); },
       pollMs: 2000,
     });
@@ -90,7 +90,7 @@ window.Egary = window.Egary || {};
   }
   function renderSync(st) {
     const el = App.els.sync; if (!el) return;
-    const map = { unlinked: ['غير مرتبط بملف', 'اضغط لربط ملف الإكسيل'], linked: ['متزامن مع ' + (st.name || 'الإكسيل'), st.lastSync ? 'آخر مزامنة ' + new Date(st.lastSync).toLocaleTimeString('ar-EG') : ''], saving: ['جارٍ الحفظ في الإكسيل…', ''], reading: ['جارٍ القراءة من الإكسيل…', ''], locked: ['الملف مفتوح في Excel — ' + st.pending + ' تعديل بانتظار الحفظ', 'أغلق الملف في Excel وسيُحفظ تلقائيًا'], error: ['خطأ في المزامنة', st.error || ''] };
+    const map = { unlinked: ['غير مرتبط بملف', 'اضغط لربط ملف الإكسيل'], linked: ['متزامن مع ' + (st.name || 'الإكسيل'), st.lastSync ? 'آخر مزامنة ' + U().fmtTime(st.lastSync) : ''], saving: ['جارٍ الحفظ في الإكسيل…', ''], reading: ['جارٍ القراءة من الإكسيل…', ''], locked: ['الملف مفتوح في Excel — ' + st.pending + ' تعديل بانتظار الحفظ', 'أغلق الملف في Excel وسيُحفظ تلقائيًا'], error: ['خطأ في المزامنة', st.error || ''] };
     const [t, sub] = map[st.state] || ['', ''];
     el.className = 'sync ' + st.state; UI().clear(el); el.append(h('span', { class: 'dot' }), h('span', null, t)); el.title = sub;
     const banner = App.els.banner; if (!banner) return; UI().clear(banner);
@@ -100,7 +100,7 @@ window.Egary = window.Egary || {};
   }
   async function downloadCopy() { const buf = await W().write(S().state(), { base: lastBytes }); E.FileLink.downloadBytes(buf, 'Egary.xlsx'); UI().toast('تم تنزيل نسخة الإكسيل', 'ok'); }
   async function downloadOriginal() { const b = await E.FileLink.loadOriginal(); if (!b || !b.bytes) { UI().toast('لا يوجد ملف أصلي محفوظ (يُحفظ عند أول ربط)', 'warn'); return; } E.FileLink.downloadBytes(b.bytes, 'Egary-original-' + new Date(b.at).toISOString().slice(0, 10) + '.xlsx'); UI().toast('تم تنزيل الملف الأصلي كما كان قبل أول تحويل (' + new Date(b.at).toLocaleDateString('ar-EG') + ')', 'ok'); }
-  async function downloadBackup() { const b = await E.FileLink.loadBackup(); if (!b || !b.bytes) { UI().toast('لا توجد نسخة احتياطية بعد', 'warn'); return; } E.FileLink.downloadBytes(b.bytes, 'Egary-backup-' + new Date(b.at).toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.xlsx'); UI().toast('تم تنزيل النسخة الاحتياطية (' + new Date(b.at).toLocaleString('ar-EG') + ')', 'ok'); }
+  async function downloadBackup() { const b = await E.FileLink.loadBackup(); if (!b || !b.bytes) { UI().toast('لا توجد نسخة احتياطية بعد', 'warn'); return; } E.FileLink.downloadBytes(b.bytes, 'Egary-backup-' + new Date(b.at).toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.xlsx'); UI().toast('تم تنزيل النسخة الاحتياطية (' + U().fmtDateTime(b.at) + ')', 'ok'); }
 
   async function linkFile() {
     try {
@@ -174,15 +174,18 @@ window.Egary = window.Egary || {};
     return new Promise(resolve => {
       const st = S().state();
       const err = h('div', { class: 'err', id: 'login-err', role: 'alert' });
-      const user = h('input', { type: 'text', id: 'login-user', name: 'username', autocomplete: 'username', placeholder: 'اسم المستخدم', autocapitalize: 'off', spellcheck: false, dir: 'ltr' });
+      const user = h('input', { type: 'text', id: 'login-user', name: 'username', autocomplete: 'username', placeholder: 'اسم المستخدم', autocapitalize: 'off', spellcheck: false, dir: 'auto' });
       const pass = h('input', { type: 'password', id: 'login-pass', name: 'password', autocomplete: 'current-password', placeholder: '••••••••', dir: 'ltr' });
       const eye = h('button', { type: 'button', class: 'eye', title: 'إظهار/إخفاء كلمة المرور', onclick: () => { pass.type = pass.type === 'password' ? 'text' : 'password'; } }, UI().icon('eye'));
       const remember = h('input', { type: 'checkbox', id: 'login-remember' });
       const go = h('button', { type: 'submit', class: 'btn-go', id: 'login-go' }, UI().icon('key'), 'دخول');
+      const kb = h('div', { class: 'kb-hint', id: 'kb-hint', role: 'status' });
+      const kbCheck = (e) => { const ar = /[\u0600-\u06FF]/.test(user.value + pass.value); const caps = e && e.getModifierState && e.getModifierState('CapsLock'); kb.textContent = ar ? 'لوحة المفاتيح على العربية — بدّلها إلى English (Alt+Shift) ثم أعد الكتابة' : caps ? 'زر Caps Lock مفعَّل' : ''; kb.classList.toggle('on', !!kb.textContent); };
+      user.addEventListener('input', kbCheck); pass.addEventListener('input', kbCheck); pass.addEventListener('keyup', kbCheck);
       const form = h('form', { class: 'lf', id: 'login-form', onsubmit: async (e) => { e.preventDefault(); err.classList.remove('on'); if (!user.value.trim() || !pass.value) { err.textContent = 'أدخل اسم المستخدم وكلمة المرور'; err.classList.add('on'); return; } go.disabled = true; let r; try { r = await E.Auth.login(user.value, pass.value, remember.checked); } catch (ex) { r = { ok: false, error: 'تعذّر التحقق من كلمة المرور (سجل المستخدم تالف؟) — اطلب من المدير إعادة تعيينها' }; } go.disabled = false; if (!r.ok) { err.textContent = r.error; err.classList.add('on'); pass.value = ''; pass.focus(); return; } resolve(r.user); } },
         h('div', null, h('label', { for: 'login-user' }, 'اسم المستخدم'), user),
-        h('div', null, h('label', { for: 'login-pass' }, 'كلمة المرور'), h('div', { class: 'in' }, pass, eye)),
-        h('div', { class: 'row' }, h('label', null, remember, 'تذكرني على هذا الجهاز (14 يومًا)'), h('span', null, E.Sync.status.name || '')),
+        h('div', null, h('label', { for: 'login-pass' }, 'كلمة المرور'), h('div', { class: 'in' }, pass, eye), kb),
+        h('div', { class: 'row' }, h('label', null, remember, 'تذكرني على هذا الجهاز (14 يومًا)'), h('span', { class: 'file-tag' }, UI().icon('excel'), E.Sync.status.name || '')),
         err, go);
       const hint = App.mode === 'preview' ? h('div', { class: 'hint' }, 'نسخة العرض — للتجربة: ', h('b', null, 'admin / admin@2026'), ' (مدير) أو ', h('b', null, 'office / office@2026'), ' (موظف)') : h('div', { class: 'hint' }, 'نسيت كلمة المرور؟ يعيد المدير تعيينها من الإعدادات ← المستخدمون.');
       const card = h('div', { class: 'login-card' }, h('div', { class: 'login-logo' }, UI().icon('building', 32)), h('h1', null, st.meta.officeName || 'إيجاري'), h('div', { class: 'sub' }, 'تسجيل الدخول إلى نظام إدارة الإيجارات'), form, hint,
@@ -195,15 +198,15 @@ window.Egary = window.Egary || {};
     return new Promise(resolve => {
       let adminDone = false;
       const err = h('div', { class: 'err', id: 'setup-err', role: 'alert' });
-      const f = (id, label, type, ph, auto) => { const i = h('input', { type: type || 'text', id, placeholder: ph || '', autocomplete: auto || 'off', dir: type === 'password' || /user/.test(id) ? 'ltr' : null }); return [i, h('div', null, h('label', { for: id }, label), i)]; };
+      const f = (id, label, type, ph, auto) => { const i = h('input', { type: type || 'text', id, placeholder: ph || '', autocomplete: auto || 'off', dir: type === 'password' ? 'ltr' : /user/.test(id) ? 'auto' : null }); const eyeBtn = type === 'password' ? h('button', { type: 'button', class: 'eye', title: 'إظهار/إخفاء', onclick: () => { i.type = i.type === 'password' ? 'text' : 'password'; } }, UI().icon('eye')) : null; return [i, h('div', null, h('label', { for: id }, label), type === 'password' ? h('div', { class: 'in' }, i, eyeBtn) : i)]; };
       const [au, auEl] = f('su-admin-user', 'اسم مستخدم المدير', 'text', 'مثال: admin', 'username'), [an, anEl] = f('su-admin-name', 'اسم المدير (يظهر في سجل التعديلات)', 'text', 'مثال: أ. محمد'), [ap, apEl] = f('su-admin-pass', 'كلمة مرور المدير', 'password', '6 أحرف على الأقل', 'new-password'), [ap2, ap2El] = f('su-admin-pass2', 'تأكيد كلمة مرور المدير', 'password', '', 'new-password');
-      const [su, suEl] = f('su-staff-user', 'اسم مستخدم الموظف', 'text', 'مثال: office'), [sn, snEl] = f('su-staff-name', 'اسم الموظف', 'text', 'مثال: موظف المكتب'), [sp, spEl] = f('su-staff-pass', 'كلمة مرور الموظف', 'password', '6 أحرف على الأقل', 'new-password');
+      const [su, suEl] = f('su-staff-user', 'اسم مستخدم الموظف', 'text', 'مثال: office'), [sn, snEl] = f('su-staff-name', 'اسم الموظف', 'text', 'مثال: موظف المكتب'), [sp, spEl] = f('su-staff-pass', 'كلمة مرور الموظف', 'password', '6 أحرف على الأقل', 'new-password'), [sp2, sp2El] = f('su-staff-pass2', 'تأكيد كلمة مرور الموظف', 'password', '', 'new-password');
       const go = h('button', { type: 'submit', class: 'btn-go', id: 'setup-go' }, UI().icon('check'), 'إنشاء الحسابات والدخول');
       const form = h('form', { class: 'lf two', id: 'setup-form', onsubmit: async (e) => {
         e.preventDefault(); err.classList.remove('on'); const errs = [];
         // التحقق من الكتلتين معًا قبل إنشاء أي حساب حتى لا نقف في منتصف الطريق
         if (!adminDone) { const e1 = E.Auth.validateUsername(au.value); if (e1) errs.push('المدير: ' + e1); const e2 = E.Auth.validatePassword(ap.value); if (e2) errs.push('المدير: ' + e2); if (ap.value !== ap2.value) errs.push('تأكيد كلمة مرور المدير غير مطابق'); }
-        if (!recover) { const e3 = E.Auth.validateUsername(su.value); if (e3) errs.push('الموظف: ' + e3); const e4 = E.Auth.validatePassword(sp.value); if (e4) errs.push('الموظف: ' + e4); if (E.Auth.normUser(au.value) && E.Auth.normUser(au.value) === E.Auth.normUser(su.value)) errs.push('اسما المستخدمين متطابقان'); }
+        if (!recover) { const e3 = E.Auth.validateUsername(su.value); if (e3) errs.push('الموظف: ' + e3); const e4 = E.Auth.validatePassword(sp.value); if (e4) errs.push('الموظف: ' + e4); if (sp.value !== sp2.value) errs.push('تأكيد كلمة مرور الموظف غير مطابق'); if (E.Auth.normUser(au.value) && E.Auth.normUser(au.value) === E.Auth.normUser(su.value)) errs.push('اسما المستخدمين متطابقان'); }
         if (errs.length) { err.textContent = errs.join(' · '); err.classList.add('on'); return; }
         go.disabled = true;
         if (!adminDone) {
@@ -223,7 +226,7 @@ window.Egary = window.Egary || {};
           : h('div', { class: 'full role-note' }, h('b', null, 'أول تشغيل:'), ' أنشئ حسابين على الأقل — ', h('b', null, 'مدير'), ' (كل الصلاحيات: الإعدادات والمستخدمون والحذف) و', h('b', null, 'موظف'), ' (الإدخال والتعديل، بلا إعدادات ولا حذف للمشاريع والوحدات والعملاء والعقود). تُحفظ الحسابات داخل Egary.xlsx وكلمات المرور مشفّرة.'),
         auEl, anEl, apEl, ap2El,
         recover ? null : h('div', { class: 'full', style: { height: '1px', background: 'rgba(255,255,255,.08)', margin: '2px 0' } }),
-        recover ? null : suEl, recover ? null : snEl, recover ? null : spEl, recover ? null : h('div'),
+        recover ? null : suEl, recover ? null : snEl, recover ? null : spEl, recover ? null : sp2El,
         h('div', { class: 'full' }, err), h('div', { class: 'full' }, go));
       const card = h('div', { class: 'login-card wide' }, h('div', { class: 'login-logo' }, UI().icon('shield', 32)), h('h1', null, recover ? 'استعادة حساب المدير' : 'إنشاء حسابات الدخول'), h('div', { class: 'sub' }, (S().state().meta.officeName || 'إيجاري') + ' — ' + (E.Sync.status.name || 'Egary.xlsx')), form);
       loginShell(card); setTimeout(() => au.focus(), 60);
@@ -364,9 +367,10 @@ window.Egary = window.Egary || {};
       const next = Array.from(new Set(years.concat([y]))).sort();
       const rec = { ledgerYears: next };
       const canSettings = !E.Auth || E.Auth.can('settings');
-      if (canSettings && U().cmp(String(next[0]) + '-01', st.settings.trackingFrom || '9999-99') < 0) rec.trackingFrom = String(next[0]) + '-01';
+      if (canSettings && y < (parseInt(String(st.settings.trackingFrom || '9999').slice(0, 4), 10) || 9999)) { rec.trackingFrom = String(y) + '-01'; rec.trackingMode = 'auto'; } // لا تتحرك البداية إلا لو السنة المضافة أقدم منها
+      if (y < years[0] - 1) { for (let yy = y + 1; yy < years[0]; yy++) if (!next.includes(yy)) next.push(yy); next.sort(); rec.ledgerYears = next; } // لا فجوات: السنوات الوسيطة تُضاف أيضًا
       S().applyOp({ type: 'settings', record: rec }); S().notify('change');
-      if (E.Sync) E.Sync.record({ type: 'settings', at: new Date().toISOString(), record: rec });
+      if (E.Sync && App.mode === 'linked') E.Sync.record({ type: 'settings', at: new Date().toISOString(), record: rec }); // في وضع العرض لا نكتب في دفتر المزامنة
       try { S().log({ action: 'إضافة', entity: 'سنة', code: String(y), summary: 'ورقة سنة جديدة ' + y }); } catch (e) { }
       App.year = String(y); m.close(); render(); UI().toast(`أُضيفت سنة ${y} — ستظهر ورقتها في الإكسيل مع أول حفظ` + (!canSettings && U().cmp(String(y) + '-01', st.settings.trackingFrom || '9999-99') < 0 ? ' (بداية المحاسبة لا تتغيّر إلا من المدير في الإعدادات)' : ''), 'ok', 5000);
     } }, 'إضافة')] });
@@ -385,18 +389,16 @@ window.Egary = window.Egary || {};
       const cur = U().periodOf(U().today()); const from = st.settings.trackingFrom && U().cmp(st.settings.trackingFrom, cur) <= 0 ? st.settings.trackingFrom : cur.slice(0, 4) + '-01';
       const sel = f.period || opts.defaultPeriod || cur; const months = [...U().periods(from, cur)].reverse();
       const setP = (p) => setFilter({ period: p && p !== (opts.defaultPeriod || cur) ? p : '' });
-      bar.appendChild(h('span', { class: 'period-nav', id: 'period-nav' },
+      bar.appendChild(h('span', { class: 'period-nav fgroup', id: 'period-nav' }, h('span', { class: 'lbl' }, 'شهر التقرير'),
         h('button', { class: 'chip icon', id: 'period-prev', title: 'الشهر السابق', disabled: U().cmp(sel, from) <= 0 ? true : null, onclick: () => setP(U().addMonths(sel, -1)) }, UI().icon('chevR')),
-        h('select', { class: 'chip', id: 'period-pick', title: 'شهر التقرير', onchange: (e) => setP(e.target.value) }, months.map(p => h('option', { value: p, selected: p === sel ? true : null }, U().periodLabel(p, true)))),
+        h('select', { class: 'chip', id: 'period-pick', title: 'شهر التقرير', onchange: (e) => setP(e.target.value) }, months.map(p => h('option', { value: p, selected: p === sel ? true : null }, U().periodLabel(p, true) + (p === cur ? ' — الشهر الحالي' : p === opts.defaultPeriod && opts.defaultPeriod !== cur ? ' — آخر شهر مسجَّل' : '')))),
         h('button', { class: 'chip icon', id: 'period-next', title: 'الشهر التالي', disabled: U().cmp(sel, cur) >= 0 ? true : null, onclick: () => setP(U().addMonths(sel, 1)) }, UI().icon('chevL')),
-        f.period ? h('button', { class: 'btn sm ghost', id: 'period-reset', onclick: () => setFilter({ period: '' }) }, 'الشهر الحالي') : null));
-      bar.appendChild(h('span', { class: 'muted' }, '|'));
+        f.period ? h('button', { class: 'chip', id: 'period-reset', title: 'العودة إلى الشهر الافتراضي', onclick: () => setFilter({ period: '' }) }, '↩ ' + (opts.defaultPeriod && opts.defaultPeriod !== cur ? 'آخر شهر مسجَّل' : 'الشهر الحالي')) : null));
     }
-    for (const p of st.projects) bar.appendChild(chip(p.name, f.projectCode === p.code, () => setFilter({ projectCode: f.projectCode === p.code ? '' : p.code }), 'f-project'));
-    bar.appendChild(h('span', { class: 'muted' }, '|'));
-    for (const t of M().UNIT_TYPES) bar.appendChild(chip(t.ar, f.unitType === t.key, () => setFilter({ unitType: f.unitType === t.key ? '' : t.key }), 'f-type'));
-    if (opts.status !== false) { bar.appendChild(h('span', { class: 'muted' }, '|')); for (const [k, ar] of [['occupied', 'مؤجَّرة'], ['vacant', 'شاغرة'], ['ending', 'تنتهي قريبًا']]) bar.appendChild(chip(ar, f.status === k, () => setFilter({ status: f.status === k ? '' : k }), 'f-status')); }
-    if (opts.year) { const years = st.settings.ledgerYears.length ? st.settings.ledgerYears : [new Date().getFullYear()]; const sel = h('select', { class: 'chip', id: 'year-select', onchange: (e) => { if (e.target.value === '__add') { e.target.value = String(App.year); addYear(); return; } App.year = e.target.value; render(); } }, years.map(y => h('option', { value: y, selected: String(y) === String(App.year) ? true : null }, 'سنة ' + y)), (!E.Auth || E.Auth.can('edit')) && App.mode !== 'demo' ? h('option', { value: '__add' }, '＋ إضافة سنة…') : null); bar.appendChild(sel); }
+    const gP = h('span', { class: 'fgroup' }, h('span', { class: 'lbl' }, 'المشروع')); for (const p of st.projects) gP.appendChild(chip(p.name, f.projectCode === p.code, () => setFilter({ projectCode: f.projectCode === p.code ? '' : p.code }), 'f-project')); bar.appendChild(gP);
+    const gT = h('span', { class: 'fgroup' }, h('span', { class: 'lbl' }, 'النوع')); for (const t of M().UNIT_TYPES) gT.appendChild(chip(t.ar, f.unitType === t.key, () => setFilter({ unitType: f.unitType === t.key ? '' : t.key }), 'f-type')); bar.appendChild(gT);
+    if (opts.status !== false) { const gS = h('span', { class: 'fgroup' }, h('span', { class: 'lbl' }, 'الحالة')); for (const k of ['occupied', 'vacant', 'ending']) gS.appendChild(chip(En().USTATUS_AR[k], f.status === k, () => setFilter({ status: f.status === k ? '' : k }), 'f-status')); bar.appendChild(gS); }
+    if (opts.year) { const years = st.settings.ledgerYears.length ? st.settings.ledgerYears : [new Date().getFullYear()]; const sel = h('select', { class: 'chip', id: 'year-select', onchange: (e) => { if (e.target.value === '__add') { e.target.value = String(App.year); addYear(); return; } App.year = e.target.value; render(); } }, years.map(y => h('option', { value: y, selected: String(y) === String(App.year) ? true : null }, 'سنة ' + y)), (!E.Auth || E.Auth.can('edit')) && App.mode === 'linked' ? h('option', { value: '__add' }, '＋ إضافة سنة…') : null); bar.appendChild(sel); }
     if (f.q) bar.appendChild(chip('بحث: ' + f.q, true, () => setFilter({ q: '' }), 'f-q'));
     if (f.projectCode || f.unitType || f.status || f.q || f.floor) bar.appendChild(h('button', { class: 'btn sm ghost', id: 'clear-filters', onclick: () => setFilter({ projectCode: '', unitType: '', status: '', floor: '', q: '', period: '' }) }, 'مسح الكل'));
     return bar;

@@ -18,11 +18,20 @@ window.Egary = window.Egary || {};
   }
   /* الرقم التالي = أعلى من (الموجود فعلًا، وما ورد في سجل التعديلات، وأعلى رقم صدر من قبل) — فالكود المحذوف لا يُعاد لسجل آخر */
   function seqs(state) { if (!state.settings) state.settings = {}; if (!state.settings.codeSeq || typeof state.settings.codeSeq !== 'object') state.settings.codeSeq = {}; return state.settings.codeSeq; }
-  function nextSeq(state, kind, list, re) {
+  function nextSeq(state, kind, list, re) { // بلا أثر جانبي: العدّاد يتقدم عند إنشاء السجل فعلًا (noteIssued) لا عند معاينة الكود
     const sq = seqs(state);
-    const n = Math.max(maxSeq(list, re), maxSeq(state.audit || [], re), parseInt(sq[kind], 10) || 0) + 1;
-    sq[kind] = n; return n;
+    return Math.max(maxSeq(list, re), maxSeq(state.audit || [], re), parseInt(sq[kind], 10) || 0) + 1;
   }
+  const SEQ_RE = { projects: [/^P(\d+)$/, () => 'P'], clients: [/^C(\d+)$/, () => 'C'], contracts: [/^T(\d+)$/, () => 'T'], maintenance: [/^M(\d+)$/, () => 'M'], payments: [/^([A-Z0-9]+-\d{4})-(\d+)$/, (m) => m[1]] };
+  /* يُستدعى عند إنشاء سجل جديد (من البرنامج أو من الإكسيل): يرفع أعلى رقم صادر لهذا النوع حتى لا يُعاد استخدامه بعد الحذف */
+  function noteIssued(state, entity, code) {
+    const def = SEQ_RE[entity]; if (!def || !code) return;
+    const m = def[0].exec(U().foldCode(code)); if (!m) return;
+    const kind = def[1](m), n = parseInt(m[m.length - 1], 10); const sq = seqs(state);
+    if (!(parseInt(sq[kind], 10) >= n)) sq[kind] = n;
+  }
+  /* بعد قراءة ملف: العدّادات لا تقل عن أعلى كود موجود */
+  function syncSeq(state) { for (const ent of Object.keys(SEQ_RE)) for (const r of state[ent] || []) noteIssued(state, ent, r.code); }
   function nextProject(state) { return 'P' + U().pad(nextSeq(state, 'P', state.projects, /^P(\d+)$/), 2); }
   function nextClient(state) { return 'C' + U().pad(nextSeq(state, 'C', state.clients, /^C(\d+)$/), 3); }
   function nextContract(state) { return 'T' + U().pad(nextSeq(state, 'T', state.contracts, /^T(\d+)$/), 4); }
@@ -118,5 +127,5 @@ window.Egary = window.Egary || {};
     if (/^[A-Z0-9]+-\d{4}-\d+$/.test(c)) return 'payments';
     return '';
   }
-  E.Codes = { nextProject, nextClient, nextContract, nextMaintenance, nextInvoice, invoicePrefix, unitCode, parseLabel, inferFloor, inferType, kindOf };
+  E.Codes = { nextProject, nextClient, nextContract, nextMaintenance, nextInvoice, invoicePrefix, noteIssued, syncSeq, unitCode, parseLabel, inferFloor, inferType, kindOf };
 })(window.Egary);

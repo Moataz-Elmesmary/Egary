@@ -41,7 +41,7 @@ window.Egary = window.Egary || {};
   function users() { return (S().state().users || []); }
   function find(username) { const k = normUser(username); return users().find(u => normUser(u.code) === k) || null; }
   function hasUsers() { return users().some(u => u.enabled !== false && u.passwordHash); }
-  function roleOf(u) { return ROLES.some(r => r.key === u.role) ? u.role : 'staff'; }
+  function roleOf(u) { return ROLES.some(r => r.key === u.role) ? u.role : 'viewer'; } // دور غير معروف (سجل تالف) ⇒ أقل صلاحية
   /* الرمز المحفوظ مرتبط بكلمة المرور (آخر 16 خانة من التجزئة) وباسم الملف: تغيير كلمة المرور أو ملف آخر ينهي الجلسة المحفوظة */
   const fileName = () => { try { return (E.Sync && E.Sync.status && E.Sync.status.name) || ''; } catch (e) { return ''; } };
   const tokenFor = (u) => JSON.stringify({ u: u.code, at: Date.now(), h: String(u.passwordHash || '').slice(-16), f: fileName() });
