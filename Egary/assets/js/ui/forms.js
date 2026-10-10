@@ -146,7 +146,8 @@ window.Egary = window.Egary || {};
         const r = Object.assign({}, rec, v, { assets: assetRows.filter(a => a.present || a.details), createdAt: rec.createdAt || now() });
         if (!isNew) r.projectCode = rec.projectCode;
         r.code = isNew ? C().unitCode(S().state(), r.projectCode, r.label) : rec.code;
-        const errors = M().validate('units', r, S().state()); if (errors.length) return { errors };
+        // تعديل وحدة بلا تغيير اسمها: لا نمنع الحفظ لو الورقة فيها أصلًا وحدتان بنفس الاسم (allowDupLabel يقرؤه model.validate)
+        const errors = M().validate('units', r, S().state(), { allowDupLabel: !isNew && U().normalize(r.label) === U().normalize(rec.label) }); if (errors.length) return { errors };
         S().upsert('units', r, `${r.label} (${(S().project(r.projectCode) || {}).name || ''})`); UI().toast((isNew ? 'أُضيفت الوحدة ' : 'عُدِّلت الوحدة ') + r.code, 'ok');
         return { record: r };
       },
@@ -157,6 +158,7 @@ window.Egary = window.Egary || {};
   function client(rec, defaults) {
     if (!guard('edit')) return Promise.resolve(null);
     const isNew = !rec; rec = rec || Object.assign(M().blank.clients(), defaults || {});
+    let dupConfirmed = false, dupFor = ''; // تأكيد الرقم القومي المكرر: لمحاولة الحفظ التالية في هذا النموذج فقط (لا يُكتب على سجل المخزن)
     return openForm({
       title: isNew ? 'عميل جديد' : 'تعديل عميل ' + rec.code,
       body: () => [
@@ -175,9 +177,9 @@ window.Egary = window.Egary || {};
         for (const k of ['nationalId', 'taxId', 'phone', 'phone2']) if (v[k]) v[k] = U().foldCode(v[k]).replace(/[^0-9A-Z+\-]/g, '');
         const r = Object.assign({}, rec, v, { code: isNew ? C().nextClient(S().state()) : rec.code, createdAt: rec.createdAt || now() });
         const errors = M().validate('clients', r, S().state()); if (errors.length) return { errors };
-        const dup = r.nationalId ? S().state().clients.find(c => c.code !== r.code && U().foldCode(c.nationalId) === U().foldCode(r.nationalId)) : null;
-        if (dup && !rec._dupConfirmed) { rec._dupConfirmed = true; return { errors: [`هذا الرقم القومي/الباسبور مسجَّل للعميل «${dup.name}» (${dup.code}) — اضغط حفظ مرة أخرى للتأكيد لو كان عميلًا مختلفًا فعلًا`] }; }
-        delete r._dupConfirmed;
+        const nid = U().foldCode(r.nationalId);
+        const dup = r.nationalId ? S().state().clients.find(c => c.code !== r.code && U().foldCode(c.nationalId) === nid) : null;
+        if (dup && !(dupConfirmed && dupFor === nid)) { dupConfirmed = true; dupFor = nid; return { errors: [`هذا الرقم القومي/الباسبور مسجَّل للعميل «${dup.name}» (${dup.code}) — اضغط حفظ مرة أخرى للتأكيد لو كان عميلًا مختلفًا فعلًا`] }; }
         S().upsert('clients', r, r.name); UI().toast((isNew ? 'أُضيف العميل ' : 'عُدِّل العميل ') + r.code, 'ok');
         return { record: r };
       },
@@ -327,6 +329,7 @@ window.Egary = window.Egary || {};
   }
 
   /* ---------- الإعدادات ---------- */
+  const SETTING_AR = { officeName: 'اسم المكتب', graceDays: 'أيام السماح', dueDay: 'يوم الاستحقاق الافتراضي', vacancyMonths: 'عتبة الشغور الطويل', trackingFrom: 'بداية المحاسبة', defaultIncreasePct: 'الزيادة السنوية الافتراضية', invoicePrefix: 'بادئة رقم الفاتورة', currency: 'رمز العملة', enteredThrough: 'آخر شهر مسجَّل في الورقة', tolerancePct: 'فرق مقبول في السداد %', toleranceMin: 'الحد الأدنى للفرق المقبول' };
   function settings() {
     if (!guard('settings')) return Promise.resolve(null);
     const st = S().state(), sg = st.settings;
@@ -350,12 +353,20 @@ window.Egary = window.Egary || {};
         if (!/^\d{4}-\d{2}$/.test(v.trackingFrom)) errors.push('بداية المحاسبة بصيغة سنة-شهر مثل 2026-01');
         if (v.enteredThrough && !/^\d{4}-\d{2}$/.test(v.enteredThrough)) errors.push('آخر شهر مسجَّل بصيغة سنة-شهر مثل 2026-08 أو اتركه فارغًا');
         if (errors.length) return { errors };
+        const before = Object.assign({}, sg, { officeName: st.meta.officeName }); // لمعرفة ما تغيّر فعلًا (سطر في سجل التعديلات)
         st.meta.officeName = v.officeName || st.meta.officeName; delete v.officeName;
         for (const k of ['graceDays', 'dueDay', 'vacancyMonths', 'defaultIncreasePct', 'tolerancePct', 'toleranceMin']) if (v[k] === '') delete v[k];
         if (v.trackingFrom && v.trackingFrom !== sg.trackingFrom) v.trackingMode = 'manual'; // المدير ثبّت البداية: لا تتحرك تلقائيًا مع ورقة سنة أقدم
         Object.assign(sg, v);
         S().notify('change');
         if (E.Sync && E.App && E.App.mode === 'linked') E.Sync.record({ type: 'settings', at: new Date().toISOString(), record: Object.assign({}, sg, { officeName: st.meta.officeName }) });
+        // مَن غيّر الإعدادات وماذا غيّر: سطر في «سجل التعديلات» (وسجل العمليات) مثل بقية الكتابات
+        try {
+          const after = Object.assign({}, sg, { officeName: st.meta.officeName });
+          const str = x => x == null ? '' : String(x);
+          const changed = Object.keys(SETTING_AR).filter(k => str(before[k]) !== str(after[k]));
+          if (changed.length) S().log({ action: 'تعديل', entity: 'الإعدادات', code: 'settings', summary: changed.map(k => `${SETTING_AR[k]}: ${str(before[k]) || '—'} ← ${str(after[k]) || '—'}`).join(' · ') });
+        } catch (e) { /* السجل لا يمنع الحفظ */ }
         UI().toast('حُفظت الإعدادات', 'ok');
         return { record: sg };
       },
@@ -380,7 +391,7 @@ window.Egary = window.Egary || {};
       h('p', { class: 'small muted', style: { marginTop: '18px' } }, 'أُصدرت من نظام إيجاري — ' + U().fmtDateTime(new Date())),
     );
     const printBtn = h('button', { class: 'btn primary', onclick: () => { document.body.classList.add('printing'); window.print(); setTimeout(() => document.body.classList.remove('printing'), 500); } }, UI().icon('print'), 'طباعة / حفظ PDF');
-    const editBtn = h('button', { class: 'btn', onclick: async () => { m.close(); const r = await payment(p); if (r) invoice(r); } }, UI().icon('edit'), 'تعديل');
+    const editBtn = h('button', { class: 'btn', onclick: async () => { m.close(); const r = await payment(p); if (r) { if (E.App && E.App.render) E.App.render(); invoice(r); } } }, UI().icon('edit'), 'تعديل'); // الصفحة تحت الفاتورة تُعاد رسمها بالقيم الجديدة
     const m = UI().modal({ title: 'الفاتورة ' + p.code, size: 'lg', body: box, footer: [editBtn, printBtn] });
     return m;
   }
@@ -388,12 +399,12 @@ window.Egary = window.Egary || {};
   /* ---------- كشف حساب عميل (قابل للطباعة): كل شهر مستحق منذ بداية المحاسبة مع المسدَّد والمتبقي، ثم الدفعات ---------- */
   function statement(c) {
     if (!c) return null;
-    const st = S().state(), asOf = U().today(), cur = U().periodOf(asOf);
+    const st = S().state(), asOf = U().today(), cur = U().periodOf(asOf), tf = En().trackingFrom(); // بداية المحاسبة الفعلية (الإعداد أو سلايسر «المحاسبة من») لتطابق المتأخرات على الشاشة
     const cs = S().contractsOfClient(c.code).slice().sort((a, b) => U().cmp(a.start, b.start));
     const rows = [];
     for (const x of cs) {
       const u = S().unit(x.unitCode) || {}; const sD = U().d(x.start), eD = U().d(x.end); if (!sD || !eD) continue;
-      const from = U().cmp(U().periodOf(sD), st.settings.trackingFrom) > 0 ? U().periodOf(sD) : st.settings.trackingFrom;
+      const from = U().cmp(U().periodOf(sD), tf) > 0 ? U().periodOf(sD) : tf;
       const to = U().cmp(U().periodOf(eD), cur) < 0 ? U().periodOf(eD) : cur;
       if (U().cmp(from, to) > 0) continue;
       for (const pr of U().periods(from, to)) { const ci = En().cell(x, pr, asOf); if (ci.status === 'none' || ci.status === 'history' || ci.status === 'upcoming') continue; rows.push({ period: pr, unit: u.label || x.unitCode, contract: x.code, due: ci.due ? ci.due.amount : 0, paid: ci.paid || 0, remaining: (ci.status === 'late' || ci.status === 'partial' || ci.status === 'due') ? ci.remaining : 0, status: ci.status }); }

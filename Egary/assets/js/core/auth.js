@@ -65,6 +65,7 @@ window.Egary = window.Egary || {};
     let ok = false; try { ok = await verifyPassword(password, u && u.enabled !== false ? u.passwordHash : DUMMY); } catch (e) { ok = false; }
     if (!u || u.enabled === false || !ok) { try { if (E.Log) E.Log.append({ action: 'دخول مرفوض', entity: 'مستخدم', code: normUser(username), summary: !u ? 'اسم مستخدم غير موجود' : u.enabled === false ? 'حساب معطَّل' : 'كلمة مرور غير صحيحة' }); } catch (e) { } return { ok: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة' }; }
     setCurrent(u, remember, 'login', 'login');
+    u.lastLogin = E.U.stamp(); // على سجل الحالة مباشرة (بلا upsert ⇒ بلا سطر تعديل إضافي)؛ عملية «دخول» التالية تكتب الملف
     try { if (S().log) S().log({ action: 'دخول', entity: 'مستخدم', code: u.code, summary: current.name + (remember ? ' (تذكرني)' : '') }); } catch (e) { }
     return { ok: true, user: current };
   }
@@ -101,6 +102,7 @@ window.Egary = window.Egary || {};
     const r = role(); if (!r) return false;
     if (r === 'admin') return true;
     if (r === 'viewer') return action === 'view';
+    if (entity === 'users' && action !== 'view') return false; // إدارة الحسابات للمدير فقط
     if (action === 'view' || action === 'edit') return true;
     if (action === 'delete') return !CORE.has(entity);
     return false;

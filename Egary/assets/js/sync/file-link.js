@@ -87,6 +87,12 @@ window.Egary = window.Egary || {};
         const w = await handle.createWritable({ keepExistingData: false });
         try { await w.write(buf); } finally { await w.close(); }
       },
+      /* جسّ القفل بلا كتابة: createWritable يأخذ قفل الكتابة (ويفشل لو Excel فاتح الملف) ثم abort يهمل الملف المؤقت
+         دون أن يمسّ الملف الأصلي أو وقت تعديله — أرخص بكثير من تسلسل المصنّف كاملًا في كل محاولة */
+      async probe() {
+        const w = await handle.createWritable({ keepExistingData: false });
+        try { await w.abort(); } catch (e) { /* الإهمال لا يُعدّ فشلًا */ }
+      },
       async permission(ask) {
         const opts = { mode: 'readwrite' };
         let p = await handle.queryPermission(opts);
@@ -108,6 +114,8 @@ window.Egary = window.Egary || {};
         if (a.locked) { const e = new Error('locked'); e.name = 'NoModificationAllowedError'; throw e; }
         bytes = buf.slice(0); mtime += 1; a.writes += 1;
       },
+      /* جسّ القفل (كالمحوِّل الحقيقي): يفشل لو الملف «مفتوح في Excel» ولا يُحسب كتابة */
+      async probe() { a.probes = (a.probes || 0) + 1; if (a.locked) { const e = new Error('locked'); e.name = 'NoModificationAllowedError'; throw e; } },
       /* محاكاة تعديل خارجي (كأن Excel حفظ الملف) */
       externalWrite(buf) { bytes = buf.slice(0); mtime += 1; },
       bytes() { return bytes; },

@@ -53,6 +53,52 @@ window.Egary = window.Egary || {};
     for (let r = fromRow; r <= Math.max(toRow, fromRow); r++) ws.getCell(r, col).dataValidation = { type: 'list', allowBlank: true, formulae: ['"' + values.join(',') + '"'], showErrorMessage: true, errorTitle: 'قيمة غير مسموحة', error: 'اختر من القائمة: ' + values.join(' / ') };
   }
   function toDate(isoStr) { const d = U().d(isoStr); return d || null; }
+  const PERIOD_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+  const isFormula = (v) => !!(v && typeof v === 'object' && (v.formula || v.sharedFormula));
+  /* شهر مكتوب بأي صيغة يكتبها المكتب → 'YYYY-MM' أو '' لو غير مقروء:
+     2026-9 · 9/2026 · 04-2026 · 15/09/2026 · سبتمبر 2026 · Sep 2026 · تاريخ إكسيل أو رقمه التسلسلي · أرقام عربية */
+  const MONTHS_EN = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  function parsePeriod(v) {
+    if (v == null || v === '') return '';
+    if (v instanceof Date) { const iso = U().toIso(v); return iso ? iso.slice(0, 7) : ''; }
+    if (typeof v === 'object' && v.result != null) return parsePeriod(v.result);
+    if (typeof v === 'number') { if (v >= 20000 && v <= 80000) { const iso = U().toIso(v); return iso ? iso.slice(0, 7) : ''; } return ''; } // رقم إكسيل تسلسلي لتاريخ (1954–2119)
+    const s = U().foldDigits(U().cellText(v)).trim().replace(/\s+/g, ' ');
+    const ok = (y, m) => { const p = `${y}-${U().pad(+m, 2)}`; return PERIOD_RE.test(p) ? p : ''; };
+    let m = /^(\d{4})[-/.](\d{1,2})(?:[-/.]\d{1,2})?$/.exec(s); if (m) return ok(m[1], m[2]);
+    m = /^(\d{1,2})[-/.](\d{4})$/.exec(s); if (m) return ok(m[2], m[1]);
+    m = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/.exec(s); if (m) return ok(m[3], m[2]);
+    m = /^(\p{L}+)\s+(\d{4})$/u.exec(s) || /^(\d{4})\s+(\p{L}+)$/u.exec(s); // سبتمبر 2026 · 2026 سبتمبر · Sep 2026
+    if (m) { const name = U().normalize(/\d/.test(m[1]) ? m[2] : m[1]), y = /\d/.test(m[1]) ? m[1] : m[2]; let i = U().MONTHS_AR.findIndex(x => U().normalize(x) === name); if (i < 0) i = MONTHS_EN.findIndex(x => name.startsWith(x)); if (i >= 0) return ok(y, i + 1); }
+    return '';
+  }
+  /* نسبة مئوية من خلية: 0.1 بتنسيق % ⇒ 10 · نص «10%» ⇒ 10 · 10 ⇒ 10 */
+  function pctOf(cell) {
+    const v = cell.value; if (v == null || v === '') return null;
+    let n;
+    if (typeof v === 'string' || (v && v.richText)) n = U().toNum(U().cellText(v).replace(/\s*[%٪]\s*$/, ''));
+    else { n = U().toNum(v); if (n != null && /%/.test(String(cell.numFmt || ''))) n = n * 100; }
+    return n == null ? null : Math.round(n * 1e6) / 1e6;
+  }
+  /* نص تعليق خلية (ExcelJS: نص أو {texts:[…]}) */
+  function noteText(note) { if (!note) return ''; if (typeof note === 'string') return note.trim(); if (Array.isArray(note.texts)) return note.texts.map(t => t.text || '').join('').trim(); return ''; }
+  /* الأعمدة التي أضافها المكتب في ورقة منظَّمة (ليست من أعمدتنا): تُقرأ كما هي وتُعاد كتابتها بعد الأعمدة المعروفة */
+  function extraHeaders(ws, headerRow, knownSet) {
+    const out = []; const row = ws.getRow(headerRow || 1);
+    row.eachCell((cell, col) => { const t = U().cellText(cell.value).trim(); if (!t) return; if (knownSet.has(U().normalize(t))) return; out.push({ name: t, col }); });
+    return out;
+  }
+  function knownSetOf(names) { return new Set(names.map(n => U().normalize(n))); }
+  const KNOWN_LEDGER = () => knownSetOf(LEDGER_HEAD.concat(['العقد إلى', 'الرقم القومي'], U().MONTHS_AR));
+  /* قيمة خلية إضافية كما قُرئت (تاريخ/رقم/نص/معادلة) مع تنسيقها حتى تُكتب كما كانت */
+  function captureExtra(row, extras, into, fmts) {
+    for (const x of extras) {
+      const cell = row.getCell(x.col); const v = cell.value;
+      if (v == null || v === '' || (typeof v === 'object' && !(v instanceof Date) && !isFormula(v) && !v.richText && !v.text && v.result == null)) continue;
+      into[x.name] = v;
+      if (fmts && !fmts[x.name] && cell.numFmt && cell.numFmt !== 'General') fmts[x.name] = cell.numFmt;
+    }
+  }
 
   /* =====================================================================
      القراءة
@@ -69,17 +115,29 @@ window.Egary = window.Egary || {};
     const normalized = !!wb.getWorksheet(SH.contracts);
     // ورقة تشبه ورقة سنة لكن اسمها ليس سنة («2026 (2)» من «نقل أو نسخ» في Excel) ⇒ لا تُقرأ، وننبّه
     for (const w of wb.worksheets) { if (isYearName(w.name) || Object.values(SH).includes(w.name)) continue; let looks = /^\d{4}\b/.test(U().foldCode(w.name).replace(/\(.*/, '')); if (!looks) { try { const m = headerMap(w, 2); looks = !!(findCol(m, 'المشروع') && findCol(m, 'الاسم') && findCol(m, 'يناير')); } catch (e) { looks = false; } } if (looks) flags.push({ sev: 'warn', entity: 'sheet', code: w.name, text: `الورقة «${w.name}» تشبه ورقة سنة لكن اسمها ليس سنة — سمِّها بالسنة فقط (مثل 2025) لتُقرأ` }); }
-    state._newestYear = ledgerSheets.length ? Math.max(...ledgerSheets.map(w => parseInt(U().foldCode(w.name), 10))) : 0;
+    // رسم بياني أو جدول محوري رسمه المكتب: ExcelJS لا يستطيع إعادة كتابته فيضيع مع أول حفظ من الموقع — ننبّه قبل ذلك
+    if (hasChartsOrPivots(buf)) flags.push({ sev: 'warn', entity: 'sheet', code: 'الملف', text: 'الملف يحتوي على رسم بياني/جدول محوري لن يُحفظ عند الكتابة من الموقع — احتفظ به في ملف منفصل' });
+    const sheetYears = Array.from(new Set(ledgerSheets.map(w => parseInt(U().foldCode(w.name), 10)))).sort((a, b) => a - b); // أرقام عربية في اسم الورقة («٢٠٢٦») تُقرأ كسنة
+    state._newestYear = sheetYears.length ? sheetYears[sheetYears.length - 1] : 0;
     if (normalized) readNormalized(wb, state, flags);
     else state.meta.source = 'migrated';
+    const listedYears = normalized ? (state.settings.ledgerYears || []).slice() : []; // ما ورد في «سنوات الورقة» بالإعدادات (قبل التصحيح)
     for (const ws of ledgerSheets) readLedger(ws, state, flags, opts.snapshot || null, !normalized);
     createPriors(state, flags);
     if (normalized && ledgerSheets.length > 1) reconcilePriorYears(state, flags);
     if (!ledgerSheets.length && !normalized) throw new Error('الملف لا يحتوي على ورقة سنة (مثل 2026) ولا أوراق إيجاري');
-    state.settings.ledgerYears = Array.from(new Set(ledgerSheets.map(w => parseInt(U().foldCode(w.name), 10)).concat(state.settings.ledgerYears || []))).sort();
-    if (!state.settings.trackingFrom || !normalized) state.settings.trackingFrom = String(state.settings.ledgerYears[0] || new Date().getUTCFullYear()) + '-01';
-    // ورقة سنة أقدم أُضيفت (مثل 2025 بجوار 2026): تبدأ المحاسبة من أول سنة موجودة فعلًا
-    { const y0 = state.settings.ledgerYears[0], ty = parseInt(String(state.settings.trackingFrom || '').slice(0, 4), 10);
+    // سنوات الورقة = الأوراق الموجودة فعلًا ∪ سنوات المدفوعات الصحيحة داخل النطاق ∪ السنة الحالية/القادمة لو أُضيفت من الإعدادات («＋ إضافة سنة» قبل أي دفعة)
+    // سنة في «سنوات الورقة» حُذفت ورقتها من الإكسيل لا تعود من تلقاء نفسها (حذف الورقة = التراجع عن إضافتها)
+    const curY = U().today().getUTCFullYear(), y0 = sheetYears[0] || 0, loY = y0 || curY, hiY = curY + 1;
+    const payYears = state.payments.map(p => parseInt(String(p.period || '').slice(0, 4), 10)).filter(y => y >= loY && y <= hiY);
+    const futureYears = (state.settings.ledgerYears || []).map(Number).filter(y => y >= curY && y <= hiY);
+    state.settings.ledgerYears = Array.from(new Set(sheetYears.concat(payYears, futureYears))).sort((a, b) => a - b);
+    { const dropped = listedYears.map(Number).filter(y => y > 1900 && !state.settings.ledgerYears.includes(y)); if (dropped.length) flags.push({ sev: 'info', entity: 'sheet', code: 'سنوات الورقة', text: `سنوات مذكورة في «سنوات الورقة» بلا ورقة في الملف (${dropped.join('، ')}) — أُهملت؛ لإضافة سنة استخدم «＋ إضافة سنة» من كشف التحصيل` }); }
+    // دفعة شهرها خارج نطاق السنوات (خطأ كتابة مثل 2062-03 أو سنة أقدم من أقدم ورقة): تبقى في المدفوعات بلا ورقة سنة
+    for (const p of state.payments) { const y = parseInt(String(p.period || '').slice(0, 4), 10); if (y < loY || y > hiY) { const c = state.contracts.find(x => x.code === p.contractCode); const cl = c ? state.clients.find(x => x.code === c.clientCode) : null; flags.push({ sev: 'warn', entity: 'payments', code: p.code, text: `الدفعة ${p.code}${cl ? ' (' + cl.name + ')' : ''} لشهر ${p.period} خارج سنوات الورقة (${loY}–${hiY}) — لن تُنشأ لها ورقة سنة؛ صحّح الشهر من ورقة المدفوعات، أو أضف السنة من البرنامج لو كانت مقصودة` }); } }
+    if (!state.settings.trackingFrom || !normalized) state.settings.trackingFrom = String(y0 || curY) + '-01';
+    // ورقة سنة أقدم أُضيفت (مثل 2025 بجوار 2026): تبدأ المحاسبة من أول سنة موجودة فعلًا (الأوراق الموجودة لا قائمة الإعدادات)
+    { const ty = parseInt(String(state.settings.trackingFrom || '').slice(0, 4), 10);
       if (y0 && !(ty >= 1900)) state.settings.trackingFrom = String(y0) + '-01';
       else if (y0 && y0 < ty && state.settings.trackingMode !== 'manual') { // ورقة سنة أقدم ظهرت: المحاسبة تبدأ منها (ما لم يثبّت المدير البداية يدويًا)
         const n = state.contracts.filter(c => c.start && c.end && c.start.slice(0, 4) <= String(y0) && c.end.slice(0, 4) >= String(y0)).length;
@@ -94,8 +152,21 @@ window.Egary = window.Egary || {};
     return { state, flags, migrated: !normalized, sheets: names };
   }
 
-  function readTable(ws, entity, headerRow) {
+  /* هل في الملف رسم بياني أو جدول محوري؟ نفحص أسماء الأجزاء في فهرس الـzip (ExcelJS يُسقطها بصمت عند الكتابة) */
+  function hasChartsOrPivots(buf) {
+    try {
+      if (!buf || typeof TextDecoder === 'undefined') return false;
+      const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+      return /xl\/charts\/chart\d+\.xml|xl\/pivotTables\//.test(new TextDecoder('latin1').decode(u8));
+    } catch (e) { return false; }
+  }
+
+  const PCT_FIELDS = new Set(['increasePct']); // حقول النسبة المئوية: 0.1 بتنسيق % في الإكسيل = 10
+  /* readTable: الصفوف بأسماء الأعمدة. extra (اختياري) يُملأ بالأعمدة التي أضافها المكتب: { headers: [...], fmts: {...} } وكل صف يحمل _extra بقيمها كما قُرئت */
+  function readTable(ws, entity, headerRow, extra) {
     const map = headerMap(ws, headerRow || 1), cols = COLS[entity], out = [];
+    const xh = extraHeaders(ws, headerRow || 1, knownSetOf(cols.map(c => c[1])));
+    if (extra) { extra.headers = xh.map(x => x.name); extra.fmts = {}; }
     for (let r = (headerRow || 1) + 1; r <= ws.rowCount; r++) {
       const row = ws.getRow(r); if (!row || !row.hasValues) continue;
       const rec = M().blank[entity] ? M().blank[entity]() : {};
@@ -103,22 +174,23 @@ window.Egary = window.Egary || {};
       for (const [field, ar] of cols) {
         if (field.startsWith('_') && field !== '_project' && field !== '_unit' && field !== '_client') continue;
         const col = findCol(map, ar); if (!col) continue;
-        const v = row.getCell(col).value; const txt = U().cellText(v);
+        const cell = row.getCell(col); const v = cell.value; const txt = U().cellText(v);
         if (txt !== '') any = true;
         if (field.startsWith('_')) { if (txt !== '') rec[field] = txt; continue; }
         if (DATE_FIELDS.has(field)) rec[field] = U().toIso(v instanceof Date ? v : (v && v.result instanceof Date ? v.result : txt));
+        else if (PCT_FIELDS.has(field)) { const n = pctOf(cell); rec[field] = n == null ? 0 : n; if (n != null && (n < 0 || n > 100)) rec._pctBad = (rec._pctBad || []).concat([{ ar, n }]); }
         else if (NUM_FIELDS.has(field) && !(entity === 'projects' && field === 'area')) {
           const n = U().toNum(v);
           rec[field] = n == null ? (field === 'dueDay' ? 1 : (field === 'area' ? '' : (field === 'ledgerOrder' ? null : 0))) : n;
         }
         else if (LISTS[entity + '.' + field]) rec[field] = M().keyOf(LISTS[entity + '.' + field](), txt) || (entity === 'users' ? (LISTS['users.role']().find(r => r.key === txt.trim().toLowerCase() || U().normalize(txt).startsWith(U().normalize(r.ar)) || (U().normalize(txt).length >= 3 && U().normalize(r.ar).startsWith(U().normalize(txt)))) || {}).key || (txt.trim() ? 'viewer' : rec[field]) : (field === 'method' || field === 'source' ? '' : rec[field]));
         else if (field === 'rentOverrides') rec[field] = parseOverrides(txt);
-        else if (field === 'period') { const iso = v instanceof Date ? U().toIso(v) : (/^\d{4}-\d{2}-\d{2}/.test(txt) ? txt : ''); rec[field] = iso ? iso.slice(0, 7) : txt.replace(/[٠-٩]/g, ch => '٠١٢٣٤٥٦٧٨٩'.indexOf(ch)).replace(/\//g, '-').slice(0, 7); }
+        else if (field === 'period') { rec[field] = parsePeriod(v); if (!rec[field]) rec._periodRaw = txt; } // '' = غير مقروء ⇒ يُعلَّم الصف ويُتجاهل في readNormalized
         else if (field === 'present' || field === 'inferred') rec[field] = /^(نعم|✓|yes|true|1|موجود)$/i.test(txt);
         else if (field === 'enabled') rec[field] = !/^(لا|no|false|0|معطل|معطَّل|معطّل|x|✗)$/i.test(txt.trim()); // لا يُعطَّل إلا بنفي صريح
         else rec[field] = txt;
       }
-      if (any) { rec._row = r; out.push(rec); }
+      if (any) { rec._row = r; if (xh.length) { const ex = {}; captureExtra(row, xh, ex, extra && extra.fmts); if (Object.keys(ex).length) rec._extra = ex; } out.push(rec); }
     }
     return out;
   }
@@ -128,12 +200,23 @@ window.Egary = window.Egary || {};
   function fmtOverrides(o) { return Object.keys(o || {}).sort((a, b) => a - b).map(k => k + ':' + o[k]).join('; '); }
 
   function readNormalized(wb, state, flags) {
+    state._extra = state._extra || {};
     for (const ent of ['projects', 'units', 'clients', 'contracts', 'payments', 'maintenance']) {
       const ws = wb.getWorksheet(SH[ent]); if (!ws) continue;
-      const rows = readTable(ws, ent);
+      const extra = {};
+      const rows = readTable(ws, ent, 1, extra);
+      if (extra.headers && extra.headers.length) { state._extra[ent] = { headers: extra.headers, fmts: extra.fmts, rows: {} }; flags.push({ sev: 'info', entity: 'sheet', code: SH[ent], text: `ورقة ${SH[ent]}: أعمدة إضافية من المكتب (${extra.headers.join('، ')}) — تُحفظ كما هي بعد الأعمدة المعروفة عند الكتابة من الموقع` }); }
       const seen = new Set();
       for (const r of rows) {
         const rowNo = r._row; delete r._row;
+        if (ent === 'payments' && !r.period) { // شهر غير مقروء أو فارغ: الصف لا يُحمَّل كدفعة (لا يظهر في ورقة سنة ولا يُحاسَب) لكنه يبقى في ورقة المدفوعات كما كُتب حتى يُصحَّح
+          const raw = r._periodRaw || '';
+          flags.push({ sev: raw ? 'danger' : 'warn', entity: 'payments', code: r.code || ('صف ' + rowNo), text: raw ? `ورقة المدفوعات صف ${rowNo}: الشهر «${raw}» غير مقروء — اكتبه بصيغة 2026-09 (الصف باقٍ في الورقة بلا احتساب حتى يُصحَّح)` : `ورقة المدفوعات صف ${rowNo}: الشهر فارغ — الصف باقٍ في الورقة بلا احتساب حتى يُكتب شهره` });
+          const keep = Object.assign({}, r, { period: raw }); for (const k of Object.keys(keep)) if (k.startsWith('_')) delete keep[k];
+          (state._unreadPayments = state._unreadPayments || []).push(keep); // الكتابة من الموقع تعيد بناء ورقة المدفوعات كلها ⇒ يُعاد الصف كما هو في آخرها بدل أن يضيع
+          continue;
+        }
+        if (r._pctBad) { for (const b of r._pctBad) flags.push({ sev: 'warn', entity: ent, code: r.code || ('صف ' + rowNo), text: `ورقة ${SH[ent]} صف ${rowNo}: «${b.ar}» = ${b.n} خارج النطاق 0–100 — راجع القيمة (10% تُكتب 10)` }); delete r._pctBad; }
         if (r.code && seen.has(U().foldCode(r.code))) { flags.push({ sev: 'danger', entity: ent, code: r.code, text: `ورقة ${SH[ent]} صف ${rowNo}: الكود ${r.code} مكرر — أُعطي الصف كودًا جديدًا (راجع الصفين)` }); r.code = ''; }
         if (!r.code) { r._needsCode = true; } else seen.add(U().foldCode(r.code));
         state[ent].push(r); r._rowNo = rowNo;
@@ -177,26 +260,34 @@ window.Egary = window.Egary || {};
     for (const c of state.contracts) { fix(c, 'unitCode', cU, 'contracts', 'كود الوحدة'); fix(c, 'clientCode', cC, 'contracts', 'كود العميل'); fix(c, 'prevCode', cT, 'contracts', 'العقد السابق', true); }
     for (const p of state.payments) fix(p, 'contractCode', cT, 'payments', 'كود العقد');
     for (const m of state.maintenance) { fix(m, 'unitCode', cU, 'maintenance', 'كود الوحدة'); fix(m, 'custodianContract', cT, 'maintenance', 'عقد العهدة', true); }
-    for (const ent of ['projects', 'units', 'clients', 'contracts', 'payments', 'maintenance']) for (const r of state[ent]) { delete r._needsCode; delete r._rowNo; delete r._project; delete r._unit; delete r._client; delete r._drop; }
+    // الأعمدة الإضافية تُخزَّن بالكود النهائي للصف (بعد إعطاء الأكواد الجديدة) حتى تُكتب في صفها عند الحفظ
+    for (const ent of ['projects', 'units', 'clients', 'contracts', 'payments', 'maintenance']) for (const r of state[ent]) { if (r._extra) { if (state._extra[ent] && r.code) state._extra[ent].rows[r.code] = r._extra; delete r._extra; } delete r._periodRaw; delete r._needsCode; delete r._rowNo; delete r._project; delete r._unit; delete r._client; delete r._drop; }
     // المستخدمون (حسابات الدخول)
     const wu = wb.getWorksheet(SH.users);
-    if (wu) for (const r of readTable(wu, 'users')) { delete r._row; r.code = String(r.code || '').trim().toLowerCase(); if (r.code) state.users.push(r); }
+    if (wu) { const ex = {}; for (const r of readTable(wu, 'users', 1, ex)) { delete r._row; delete r._extra; r.code = String(r.code || '').trim().toLowerCase(); if (r.code) state.users.push(r); } if (ex.headers && ex.headers.length) flags.push({ sev: 'danger', entity: 'sheet', code: SH.users, text: `ورقة ${SH.users}: أعمدة غير معروفة (${ex.headers.join('، ')}) ستُفقد عند الكتابة من الموقع — انقلها إلى ورقة خاصة بكم` }); }
     // الأصول
     const wa = wb.getWorksheet(SH.assets);
     if (wa) {
-      const byUnit = new Map();
+      const byUnit = new Map(); const ex = {};
       const cUnits = new Map(state.units.map(u => [U().foldCode(u.code), u.code]));
-      for (const a of readTable(wa, 'assets')) { if (!a.unitCode) continue; const uc = cUnits.get(U().foldCode(a.unitCode)) || a.unitCode; if (!byUnit.has(uc)) byUnit.set(uc, []); byUnit.get(uc).push({ name: a.name, present: !!a.present, details: a.details || '' }); }
+      for (const a of readTable(wa, 'assets', 1, ex)) { if (!a.unitCode) continue; const uc = cUnits.get(U().foldCode(a.unitCode)) || a.unitCode; if (!byUnit.has(uc)) byUnit.set(uc, []); byUnit.get(uc).push({ name: a.name, present: !!a.present, details: a.details || '' }); }
       for (const u of state.units) u.assets = byUnit.get(u.code) || [];
+      if (ex.headers && ex.headers.length) flags.push({ sev: 'danger', entity: 'sheet', code: SH.assets, text: `ورقة ${SH.assets}: أعمدة غير معروفة (${ex.headers.join('، ')}) ستُفقد عند الكتابة من الموقع — انقلها إلى ورقة خاصة بكم` });
     }
     // الإعدادات
     const wsS = wb.getWorksheet(SH.settings);
     if (wsS) {
       for (let r = 2; r <= wsS.rowCount; r++) {
-        const k = U().cellText(wsS.getCell(r, 1).value), v = wsS.getCell(r, 2).value, txt = U().cellText(v);
+        const cellV = wsS.getCell(r, 2);
+        const k = U().cellText(wsS.getCell(r, 1).value), v = cellV.value, txt = U().cellText(v);
         if (!k) continue;
         const f = SETTINGS_KEYS.find(s => U().normalize(s.ar) === U().normalize(k)); if (!f) continue;
         if (f.type === 'num') state.settings[f.key] = U().toNum(v) == null ? state.settings[f.key] : U().toNum(v);
+        else if (f.type === 'pct') { const n = pctOf(cellV); if (n != null) { state.settings[f.key] = n; if (n < 0 || n > 100) flags.push({ sev: 'warn', entity: 'sheet', code: SH.settings, text: `الإعدادات: «${f.ar}» = ${n} خارج النطاق 0–100 — راجع القيمة (10% تُكتب 10)` }); } }
+        else if (f.type === 'period') { // سنة-شهر: Excel يحوّل «2026-01» تلقائيًا إلى تاريخ ⇒ نقبل التاريخ والنص ونرفض الباقي
+          if (v == null || txt === '') { if (f.key !== 'trackingFrom') state.settings[f.key] = ''; }
+          else { const p = parsePeriod(v); state.settings[f.key] = p; if (!p) flags.push({ sev: 'warn', entity: 'sheet', code: SH.settings, text: `الإعدادات: «${f.ar}» = «${txt}» غير مقروء — اكتبه بصيغة 2026-01 (تم تجاهله${f.key === 'trackingFrom' ? ' والمحاسبة تبدأ من أقدم ورقة سنة' : ''})` }); }
+        }
         else if (f.type === 'years') state.settings[f.key] = txt.split(/[,،\s]+/).map(x => parseInt(x, 10)).filter(x => x > 1900);
         else if (f.type === 'json') { try { const o = JSON.parse(txt || '{}'); state.settings[f.key] = o && typeof o === 'object' ? o : {}; } catch (e) { state.settings[f.key] = state.settings[f.key] || {}; } }
         else if (f.key === 'officeName') state.meta.officeName = txt || state.meta.officeName;
@@ -208,14 +299,15 @@ window.Egary = window.Egary || {};
   }
   const SETTINGS_KEYS = [
     { key: 'officeName', ar: 'اسم المكتب', type: 'text' }, { key: 'graceDays', ar: 'أيام السماح بعد الاستحقاق', type: 'num' }, { key: 'dueDay', ar: 'يوم الاستحقاق الافتراضي', type: 'num' },
-    { key: 'vacancyMonths', ar: 'عتبة الشغور الطويل (شهور)', type: 'num' }, { key: 'trackingFrom', ar: 'بداية المحاسبة (سنة-شهر)', type: 'text' }, { key: 'defaultIncreasePct', ar: 'الزيادة السنوية الافتراضية %', type: 'num' },
+    { key: 'vacancyMonths', ar: 'عتبة الشغور الطويل (شهور)', type: 'num' }, { key: 'trackingFrom', ar: 'بداية المحاسبة (سنة-شهر)', type: 'period' }, { key: 'defaultIncreasePct', ar: 'الزيادة السنوية الافتراضية %', type: 'pct' },
     { key: 'ledgerYears', ar: 'سنوات الورقة', type: 'years' }, { key: 'codeSeq', ar: 'أعلى أرقام الأكواد الصادرة', type: 'json' }, { key: 'trackingMode', ar: 'بداية المحاسبة (تلقائي/يدوي)', type: 'text' }, { key: 'invoicePrefix', ar: 'بادئة رقم الفاتورة', type: 'text' }, { key: 'currency', ar: 'العملة', type: 'text' },
-    { key: 'enteredThrough', ar: 'آخر شهر مسجَّل في الورقة (سنة-شهر أو فارغ = تلقائي)', type: 'text' }, { key: 'tolerancePct', ar: 'فرق مقبول في السداد %', type: 'num' }, { key: 'toleranceMin', ar: 'الحد الأدنى للفرق المقبول (ج)', type: 'num' }, { key: 'prorationBasis', ar: 'أساس الشهر المقطوع (30 أو actual)', type: 'text' },
-  ];
+    { key: 'enteredThrough', ar: 'آخر شهر مسجَّل في الورقة (سنة-شهر أو فارغ = تلقائي)', type: 'period' }, { key: 'tolerancePct', ar: 'فرق مقبول في السداد %', type: 'pct' }, { key: 'toleranceMin', ar: 'الحد الأدنى للفرق المقبول (ج)', type: 'num' }, { key: 'prorationBasis', ar: 'أساس الشهر المقطوع (30 أو actual)', type: 'text' },
+  ]; // period: سنة-شهر (تاريخ إكسيل أو نص) · pct: نسبة مئوية (0.1 بتنسيق % = 10)
 
   /* ---------- قراءة ورقة سنة (الشكل المعتاد) ---------- */
+  const TOTAL_RE = /(^|\s)(ال)?(اجمالي|مجموع|total)(\s|$)/; // على النص المطبَّع: الاجمالي · الإجمالى العام · اجمالي بابل · مجموع · Total
   function readLedger(ws, state, flags, snapshot, migrating) {
-    const year = ws.name.trim();
+    const year = String(parseInt(U().foldCode(ws.name), 10)); // «٢٠٢٦» ⇒ 2026: الشهور وأرقام الفواتير تُبنى من السنة لا من اسم الورقة الخام
     let headerRow = 0;
     for (let r = 1; r <= Math.min(ws.rowCount, 10) && !headerRow; r++) { const m = headerMap(ws, r); if (findCol(m, 'المشروع') && findCol(m, 'الاسم') && findCol(m, 'يناير')) headerRow = r; }
     if (!headerRow) { flags.push({ sev: 'danger', entity: 'sheet', code: year, text: `ورقة ${year}: لم يُعثر على صف العناوين (المشروع / الاسم / يناير)` }); return; }
@@ -224,20 +316,46 @@ window.Egary = window.Egary || {};
     const cSerial = col('م'), cProj = col('المشروع'), cName = col('الاسم'), cRep = col('الممثل القانوني'), cUnit = col('الوحدة'), cAddr = col('العنوان'), cFrom = col('العقد من'), cTo = col('العقد الى') || col('العقد إلى'), cTax = col('تسجيل ضريبي'), cNid = col('الرقم القومي / الباسبور') || col('الرقم القومي'), cNote = col('ملاحظات');
     const cCodeT = col('كود العقد'), cCodeU = col('كود الوحدة'), cCodeC = col('كود العميل'), cCodeP = col('كود المشروع');
     const monthCols = ['يناير', 'فبراير', 'مارس', 'ابريل', 'مايو', 'يونيو', 'يوليو', 'اغسطس', 'سبتمبر', 'اكتوبر', 'نوفمبر', 'ديسمبر'].map((n, i) => col(n) || col(U().MONTHS_AR[i]));
+    // أعمدة ناقصة (ورقة أرشيف قديمة بلا وحدة أو تواريخ): تُقرأ الورقة بما فيها وننبّه بدل أن يتوقف الملف كله
+    { const missing = [['الوحدة', cUnit], ['العقد من', cFrom], ['العقد الى', cTo]].filter(x => !x[1]).map(x => x[0]); if (missing.length) flags.push({ sev: 'warn', entity: 'sheet', code: year, text: `ورقة ${year}: الأعمدة الناقصة: ${missing.join('، ')} — ${missing.includes('الوحدة') ? 'الوحدة ستُقرأ فارغة؛ ' : ''}${missing.some(m => m !== 'الوحدة') ? 'تواريخ العقود ستُقرأ فارغة؛ ' : ''}أضف الأعمدة بنفس العناوين` }); }
+    let row = null; // الصف الجاري (تستخدمه الدوال المساعدة أدناه)
+    const txtOf = (c) => c ? U().cellText(row.getCell(c).value) : '';
+    const dateOf = (c) => { if (!c) return ''; const v = row.getCell(c).value; return U().toIso(v instanceof Date ? v : (v && v.result instanceof Date ? v.result : U().cellText(v))); };
+    // أعمدة أضافها المكتب في ورقة السنة: تُحفظ بقيمها (بكود العقد) وتُعاد كتابتها بعد أعمدة الأكواد
+    const xh = extraHeaders(ws, headerRow, KNOWN_LEDGER());
+    if (xh.length) { state._extra = state._extra || {}; state._extra[year] = { headers: xh.map(x => x.name), fmts: {}, rows: {} }; flags.push({ sev: 'info', entity: 'sheet', code: year, text: `ورقة ${year}: أعمدة إضافية من المكتب (${xh.map(x => x.name).join('، ')}) — تُحفظ كما هي بعد أعمدة الأكواد عند الكتابة من الموقع` }); }
     const seen = new Set();
     for (let r = headerRow + 1; r <= ws.rowCount; r++) {
-      const row = ws.getRow(r); if (!row.hasValues) continue;
+      row = ws.getRow(r); if (!row.hasValues) continue;
       const name = U().cellText(row.getCell(cName).value), proj = U().cellText(row.getCell(cProj).value);
       if (!name && !proj) continue;
-      if (/الاجمالي|الإجمالي/.test(name) || /الاجمالي|الإجمالي/.test(proj)) continue;
+      const unit = txtOf(cUnit), from = dateOf(cFrom), to = dateOf(cTo);
+      if (TOTAL_RE.test(U().normalize(name)) || TOTAL_RE.test(U().normalize(proj))) { // صف إجمالي عام أو إجمالي مشروع
+        if (!unit || !from) continue;
+        flags.push({ sev: 'warn', entity: 'sheet', code: year + ':' + r, text: `ورقة ${year} صف ${r}: «${name || proj}» يشبه اسم صف إجمالي لكن للصف وحدة (${unit}) وتاريخ عقد — قُرئ كمستأجر؛ لو كان إجماليًا امسح الوحدة والتواريخ منه` }); // مستأجر في اسمه كلمة إجمالي/Total لا يُسقَط بصمت
+      }
+      const monthVals = monthCols.filter(Boolean).map(cc => row.getCell(cc).value).filter(v => v != null && v !== '');
+      if (!unit && !from && !to && monthVals.length && monthVals.every(isFormula)) { flags.push({ sev: 'info', entity: 'sheet', code: year + ':' + r, text: `ورقة ${year} صف ${r} («${name || proj}»): صف معادلات بلا وحدة ولا تواريخ (إجمالي فرعي على الأرجح) — تم تجاهله` }); continue; }
       if (!name || !proj) { flags.push({ sev: 'warn', entity: 'sheet', code: year + ':' + r, text: `ورقة ${year} صف ${r}: الاسم أو المشروع فارغ — تم تجاهل الصف` }); continue; }
+      const comments = {};
+      const noteAt = (c, key) => { if (!c) return; const t = noteText(row.getCell(c).note); if (t) comments[key] = t; };
+      noteAt(cName, year + '-name'); noteAt(cNote, year + '-notes');
       const L = {
-        row: r, serial: r, proj, name, rep: cRep ? U().cellText(row.getCell(cRep).value) : '', unit: U().cellText(row.getCell(cUnit).value), addr: cAddr ? U().cellText(row.getCell(cAddr).value) : '',
-        from: U().toIso(row.getCell(cFrom).value instanceof Date ? row.getCell(cFrom).value : U().cellText(row.getCell(cFrom).value)), to: U().toIso(row.getCell(cTo).value instanceof Date ? row.getCell(cTo).value : U().cellText(row.getCell(cTo).value)),
-        tax: cTax ? U().cellText(row.getCell(cTax).value) : '', nid: cNid ? U().cellText(row.getCell(cNid).value) : '', note: cNote ? U().cellText(row.getCell(cNote).value) : '',
-        codeT: cCodeT ? U().cellText(row.getCell(cCodeT).value) : '', codeU: cCodeU ? U().cellText(row.getCell(cCodeU).value) : '', codeC: cCodeC ? U().cellText(row.getCell(cCodeC).value) : '', codeP: cCodeP ? U().cellText(row.getCell(cCodeP).value) : '',
-        months: monthCols.map((cc, i) => { if (!cc) return { period: year + '-' + U().pad(i + 1, 2), num: null, text: '' }; const v = row.getCell(cc).value; const num = U().toNum(v); const text = U().cellText(v); return { period: year + '-' + U().pad(i + 1, 2), num, text: num == null ? text : '', raw: v }; }),
+        row: r, serial: r, proj, name, rep: txtOf(cRep), unit, addr: txtOf(cAddr), from, to,
+        tax: txtOf(cTax), nid: txtOf(cNid), note: txtOf(cNote),
+        codeT: txtOf(cCodeT), codeU: txtOf(cCodeU), codeC: txtOf(cCodeC), codeP: txtOf(cCodeP),
+        months: monthCols.map((cc, i) => {
+          const period = year + '-' + U().pad(i + 1, 2);
+          if (!cc) return { period, num: null, text: '' };
+          const cell = row.getCell(cc); const v = cell.value; const num = U().toNum(v); let text = U().cellText(v);
+          // معادلة بلا قيمة محفوظة أو نتيجتها خطأ (#REF!…): ليست رقمًا ولا خانة فارغة ⇒ تُعامل كنص حتى يظهر التنبيه
+          if (num == null && !text && isFormula(v)) text = v.result && v.result.error ? String(v.result.error) : ('معادلة بلا قيمة' + (v.formula ? ' (=' + String(v.formula).slice(0, 40) + ')' : ''));
+          noteAt(cc, period);
+          return { period, num, text: num == null ? text : '', raw: v };
+        }),
+        comments,
       };
+      if (xh.length) { const ex = {}; captureExtra(row, xh, ex, state._extra[year].fmts); if (Object.keys(ex).length) L.extra = ex; }
       const L2 = stripStaleCodes(L, year, state, flags);
       if (L2.codeT && seen.has(U().foldCode(L2.codeT))) { flags.push({ sev: 'warn', entity: 'sheet', code: year + ':' + r, text: `ورقة ${year} صف ${r}: كود العقد ${L2.codeT} مكرر — تم تجاهل الصف` }); continue; }
       if (L2.codeT) seen.add(U().foldCode(L2.codeT));
@@ -285,7 +403,22 @@ window.Egary = window.Egary || {};
     const from = L.from, to = L.to;
     if (!unit) {
       const cands = state.units.filter(u => u.projectCode === project.code && U().normalize(u.label) === U().normalize(L.unit));
-      unit = cands.find(u => !state.contracts.some(c => c.unitCode === u.code && c.clientCode !== client.code && from && to && U().d(c.start) <= U().d(to) && U().d(c.end) >= U().d(from))) || null;
+      // إعادة تأجير نفس الوحدة المرقَّمة بتداخل قصير (≤ 31 يومًا: تأخر إخلاء أو خطأ يوم) = نفس الوحدة مع تنبيه؛
+      // تداخل أطول، أو اسم عام غير مرقَّم (محل، مخزن) = وحدة أخرى بنفس الاسم
+      const generic = !(C().parseLabel(L.unit) || {}).num;
+      let shortOverlap = null;
+      for (const u of cands) {
+        let clash = null, brief = null;
+        for (const c of state.contracts) {
+          if (c.unitCode !== u.code || c.clientCode === client.code || !from || !to || !U().d(c.start) || !U().d(c.end)) continue;
+          const a = U().d(c.start) > U().d(from) ? U().d(c.start) : U().d(from), b = U().d(c.end) < U().d(to) ? U().d(c.end) : U().d(to);
+          const days = U().daysBetween(a, b) + 1; if (days <= 0) continue;
+          if (days <= 31 && !generic) { if (!brief || days > brief.days) brief = { c, days }; continue; }
+          clash = c; break;
+        }
+        if (!clash) { unit = u; shortOverlap = brief; break; }
+      }
+      if (unit && shortOverlap) flags.push({ sev: 'warn', entity: 'units', code: unit.code, text: `«${L.unit}» في ${project.name}: صف ${L.row} بورقة ${year} (${U().fmtDate(from)} → ${U().fmtDate(to)}) يتداخل ${shortOverlap.days} يومًا مع العقد ${shortOverlap.c.code} على نفس الوحدة (${U().fmtDate(shortOverlap.c.start)} → ${U().fmtDate(shortOverlap.c.end)}) — عُدَّ إعادة تأجير لنفس الوحدة؛ راجع تاريخ نهاية العقد السابق وبداية الجديد` });
       if (!unit && cands.length) flags.push({ sev: 'warn', entity: 'units', code: cands[0].code, text: `«${L.unit}» في ${project.name}: صف ${L.row} بورقة ${year} لعميل آخر بفترة متداخلة مع ${cands[0].code} — أُنشئت وحدة منفصلة بنفس الاسم` });
     }
     if (!unit) { unit = Object.assign(M().blank.units(), { code: C().unitCode(state, project.code, L.unit), projectCode: project.code, label: L.unit, type: C().inferType(L.unit), floor: C().inferFloor(L.unit) }); state.units.push(unit); if (!migrating) flags.push({ sev: 'info', entity: 'units', code: unit.code, text: `وحدة جديدة «${L.unit}» في ${project.name} من ورقة ${year} صف ${L.row} — الكود ${unit.code}` }); }
@@ -346,6 +479,10 @@ window.Egary = window.Egary || {};
       reconcileCell(state, contract, m.period, m.num, snapshot, isNew || migrating, flags);
     }
     if (Object.keys(cellNotes).length) contract.cellNotes = cellNotes; else delete contract.cellNotes;
+    // تعليقات الخلايا (ملاحظات Excel) على الشهور والاسم والملاحظات: تُحفظ بالعقد وتُعاد كتابتها مع الورقة
+    if (L.comments && Object.keys(L.comments).length) contract.cellComments = Object.assign(contract.cellComments || {}, L.comments);
+    // الأعمدة الإضافية في هذا الصف تُحفظ بكود العقد النهائي
+    if (L.extra && state._extra && state._extra[year]) state._extra[year].rows[contract.code] = L.extra;
     // استنتاج الإيجار والزيادة (للعقود الجديدة فقط — العقود الموجودة إيجارها مسجَّل في ورقة العقود)
     if (isNew) inferRent(state, contract, flags, client, unit, migrating);
   }
@@ -356,13 +493,27 @@ window.Egary = window.Egary || {};
     const sum = U().sum(pays, p => U().toNum(p.amount));
     const lv = ledgerVal == null ? 0 : ledgerVal;
     if (Math.abs(lv - sum) < 0.5) return;
-    if (!forceLedger && snapshot && snapshot.cells) {
+    const hasSnap = !forceLedger && !!(snapshot && snapshot.cells);
+    // ورقة المدفوعات تقدّمت والخانة بقيت كما هي في الملف: نسجّل قيمة الخانة كما رآها الموقع حتى تحملها اللقطة التالية (snapshotOf) بدل مجموع الدفعات —
+    // وإلا عُدَّت الخانة «فُرِّغت» في القراءة التالية (الموقع يحفظ لقطة بعد كل قراءة) وحُذفت الدفعة التي أبقيناها الآن
+    const seenAs = () => { (state._ledgerSeen = state._ledgerSeen || {})[contract.code + '|' + period] = lv; };
+    if (hasSnap) {
       const key = contract.code + '|' + period;
-      const snapLedger = snapshot.cells[key];
-      if (snapLedger != null && Math.abs((snapLedger || 0) - lv) < 0.5) return; // الورقة لم تتغير ⇒ ورقة المدفوعات هي التي تغيّرت وتتقدم
+      const snapLedger = snapshot.cells[key] == null ? 0 : snapshot.cells[key]; // خلية لم تكن في اللقطة = كانت فارغة (صفر)
+      if (Math.abs((snapLedger || 0) - lv) < 0.5) { seenAs(); return; } // الورقة لم تتغير ⇒ ورقة المدفوعات هي التي تغيّرت وتتقدم (صف كتبه المكتب لشهر كانت خانته فارغة)
     }
     // الورقة تغيّرت (أو لا يوجد مرجع): اضبط المدفوعات لتطابق الخلية
-    if (lv === 0) { for (const p of pays) state.payments.splice(state.payments.indexOf(p), 1); if (pays.length) flags.push({ sev: 'info', entity: 'contracts', code: contract.code, text: `حُذفت ${pays.length} دفعة لشهر ${U().periodLabel(period, true)} لأن الخلية فُرِّغت في الإكسيل` }); return; }
+    if (lv === 0) {
+      if (!pays.length) return;
+      if (!hasSnap && !forceLedger) { // بلا لقطة (أول قراءة على جهاز جديد) لا نعرف أي الجهتين أحدث ⇒ لا حذف صامت: تبقى الدفعات وننبّه
+        flags.push({ sev: 'warn', entity: 'contracts', code: contract.code, text: `${pays.length} دفعة لشهر ${U().periodLabel(period, true)} في ورقة المدفوعات (مجموعها ${U().fmtMoney(sum)}) بينما خانة الشهر في ورقة ${period.slice(0, 4)} فارغة — أُبقيت الدفعات؛ لو الخانة الفارغة هي الصحيحة احذف الدفعة من البرنامج أو من ورقة المدفوعات` });
+        seenAs();
+        return;
+      }
+      for (const p of pays) state.payments.splice(state.payments.indexOf(p), 1);
+      flags.push({ sev: 'info', entity: 'contracts', code: contract.code, text: `حُذفت ${pays.length} دفعة لشهر ${U().periodLabel(period, true)} لأن الخلية فُرِّغت في الإكسيل` });
+      return;
+    }
     if (pays.length === 1) { pays[0].amount = lv; return; }
     if (pays.length > 1) {
       const others = U().sum(pays.slice(0, -1), p => U().toNum(p.amount));
@@ -485,8 +636,13 @@ window.Egary = window.Egary || {};
       } catch (e) { foreign = []; for (const ws of wb.worksheets.slice()) wb.removeWorksheet(ws.id); }
     }
     wb.creator = 'Egary'; wb.created = new Date();
-    const asOf = U().today();
-    const known = Array.from(new Set((state.settings.ledgerYears || []).concat(state.payments.map(p => parseInt(p.period.slice(0, 4), 10))).concat([asOf.getUTCFullYear()]))).filter(y => y > 1900).sort((a, b) => a - b);
+    const asOf = U().today(), curY = asOf.getUTCFullYear();
+    // سنوات الأوراق: قائمة الإعدادات (الأوراق الموجودة وما أضافه المدير) + السنة الحالية + سنوات المدفوعات الصحيحة داخل [أقدم ورقة، السنة القادمة]
+    // شهر بسنة خاطئة (2062-03) أو أقدم من أقدم ورقة لا ينشئ أوراقًا: يبقى في «المدفوعات» ويُنبَّه عليه عند القراءة
+    const listed = (state.settings.ledgerYears || []).map(Number).filter(y => y > 1900);
+    const minY = listed.length ? Math.min(...listed) : curY;
+    const payYears = state.payments.map(p => String(p.period || '')).filter(per => PERIOD_RE.test(per)).map(per => parseInt(per.slice(0, 4), 10)).filter(y => y >= minY && y <= curY + 1);
+    const known = Array.from(new Set(listed.concat(payYears, [curY]))).sort((a, b) => a - b);
     // كل السنوات من الأقدم إلى الأحدث بلا فجوات: سنة بلا ورقة لا يمكن تسجيل مبالغها
     const years = []; for (let y = known[0]; y <= known[known.length - 1]; y++) years.push(y);
     state.settings.ledgerYears = years;
@@ -501,6 +657,7 @@ window.Egary = window.Egary || {};
     wb.calcProperties = { fullCalcOnLoad: true };
     wb.views = [{ x: 0, y: 0, width: 20000, height: 12000, firstSheet: 0, activeTab: 0, visibility: 'visible', rightToLeft: true }];
     const buf = await wb.xlsx.writeBuffer();
+    delete state._ledgerSeen; // بعد الكتابة خانات الورقة تطابق مجموع الدفعات ⇒ اللقطة التالية من الدفعات نفسها
     return buf instanceof ArrayBuffer ? buf : new Uint8Array(buf).buffer.slice(buf.byteOffset || 0, (buf.byteOffset || 0) + buf.byteLength);
   }
 
@@ -523,15 +680,20 @@ window.Egary = window.Egary || {};
     const ws = wb.addWorksheet(year, { views: [{ state: 'frozen', xSplit: 5, ySplit: 2, rightToLeft: true }] });
     ws.getCell('K1').value = year; ws.mergeCells('K1:V1'); ws.getCell('K1').font = { bold: true, size: 14 }; ws.getCell('K1').alignment = { horizontal: 'center' };
     ws.getCell('A1').value = state.meta.officeName || 'إيجاري'; ws.getCell('A1').font = { bold: true, size: 12, color: { argb: STYLE.head } };
-    ws.getRow(2).values = LEDGER_HEAD; styleHeader(ws.getRow(2));
+    // الأعمدة التي أضافها المكتب في هذه الورقة تُعاد بعد أعمدة الأكواد بقيمها المحفوظة لكل عقد
+    const extra = (state._extra && state._extra[year]) || null; const xHead = extra ? extra.headers : [];
+    ws.getRow(2).values = LEDGER_HEAD.concat(xHead); styleHeader(ws.getRow(2));
     const widths = [5, 12, 34, 30, 12, 26, 12, 12, 13, 18, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 14, 40, 11, 12, 11, 12];
     widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+    xHead.forEach((hname, i) => { ws.getColumn(29 + i).width = Math.max(12, Math.min(30, hname.length + 4)); });
+    const lastCol = 28 + xHead.length;
     const rows = ledgerRows(state, year);
     const projIdx = new Map(state.projects.map((p, i) => [p.code, i]));
     let r = 3, serial = 1; const colSums = {};
     const monthFirstCol = 11;
     for (const c of rows) {
       const cl = S.client(c.clientCode) || {}, u = S.unit(c.unitCode) || {}, p = S.project(u.projectCode) || {};
+      const cc = c.cellComments || {}; // تعليقات خلايا هذه السنة (الشهر ⇒ 'YYYY-MM'، الاسم ⇒ 'YYYY-name'، الملاحظات ⇒ 'YYYY-notes')
       const row = ws.getRow(r);
       row.getCell(1).value = serial++;
       row.getCell(2).value = p.name || ''; row.getCell(3).value = cl.name || ''; row.getCell(4).value = cl.rep || (cl.kind === 'person' ? cl.name : '') || '';
@@ -546,13 +708,16 @@ window.Egary = window.Egary || {};
         const cell = row.getCell(monthFirstCol + m - 1);
         if (pays.length) { cell.value = Math.round(sum * 100) / 100; rowSum += cell.value; colSums[m] = (colSums[m] || 0) + cell.value; } else if (c.cellNotes && c.cellNotes[period]) cell.value = c.cellNotes[period]; else cell.value = null;
         cell.numFmt = '#,##0.00';
+        if (cc[period]) cell.note = cc[period]; // تعليق الخلية كما كتبه المكتب
       }
       colSums[13] = (colSums[13] || 0) + rowSum;
       row.getCell(23).value = { formula: `SUM(K${r}:V${r})`, result: rowSum }; row.getCell(23).numFmt = '#,##0.00'; row.getCell(23).font = { bold: true };
       row.getCell(24).value = c.notes || '';
+      if (cc[year + '-name']) row.getCell(3).note = cc[year + '-name']; if (cc[year + '-notes']) row.getCell(24).note = cc[year + '-notes'];
       row.getCell(25).value = c.code; row.getCell(26).value = c.unitCode; row.getCell(27).value = c.clientCode; row.getCell(28).value = p.code || '';
+      if (extra) { const ex = extra.rows[c.code] || {}; xHead.forEach((hname, i) => { const cell = row.getCell(29 + i); cell.value = ex[hname] == null ? null : ex[hname]; if (extra.fmts && extra.fmts[hname]) cell.numFmt = extra.fmts[hname]; }); }
       const fill = STYLE.rowFills[(projIdx.get(p.code) || 0) % STYLE.rowFills.length];
-      row.eachCell({ includeEmpty: true }, (cell, col) => { if (col <= 28) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } }; cell.border = { top: { style: 'hair' }, bottom: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' } }; } });
+      row.eachCell({ includeEmpty: true }, (cell, col) => { if (col <= lastCol) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } }; cell.border = { top: { style: 'hair' }, bottom: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' } }; } });
       for (let col = 25; col <= 28; col++) row.getCell(col).font = { color: { argb: 'FF7F7F7F' }, size: 9 };
       r++;
     }
@@ -560,8 +725,8 @@ window.Egary = window.Egary || {};
     const tr = ws.getRow(r);
     tr.getCell(3).value = 'الاجمالي العام'; tr.getCell(3).font = { bold: true };
     for (let col = 11; col <= 23; col++) { const L = ws.getColumn(col).letter; tr.getCell(col).value = last >= 3 ? { formula: `SUM(${L}3:${L}${last})`, result: Math.round((colSums[col - 10] || 0) * 100) / 100 } : 0; tr.getCell(col).numFmt = '#,##0.00'; tr.getCell(col).font = { bold: true }; }
-    tr.eachCell({ includeEmpty: true }, (cell, col) => { if (col <= 28) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.total } }; });
-    ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: Math.max(2, last), column: 28 } };
+    tr.eachCell({ includeEmpty: true }, (cell, col) => { if (col <= lastCol) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.total } }; });
+    ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: Math.max(2, last), column: lastCol } };
     return { firstRow: 3, lastRow: Math.max(3, last), totalRow: r, count: rows.length, byProject: rows.reduce((m, c) => { const u = S.unit(c.unitCode) || {}; const pc = u.projectCode || ''; m[pc] = m[pc] || { n: 0, sum: 0 }; m[pc].n++; m[pc].sum += U().sum(S.paymentsOf(c.code).filter(x => x.period.startsWith(year)), x => U().toNum(x.amount)); return m; }, {}) };
   }
   function writeSummary(wb, state, year, meta) {
@@ -590,11 +755,15 @@ window.Egary = window.Egary || {};
     opts = opts || {};
     const cols = COLS[entity];
     const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', xSplit: opts.xSplit || 1, ySplit: 1, rightToLeft: true }] });
-    ws.getRow(1).values = cols.map(c => c[1]); styleHeader(ws.getRow(1));
+    // الأعمدة التي أضافها المكتب في هذه الورقة (state._extra[entity]) تُعاد بعد أعمدة البرنامج بقيمها لكل كود
+    const office = (opts.extra && opts.extra.headers && opts.extra.headers.length) ? opts.extra : null; const xHead = office ? office.headers : [];
+    ws.getRow(1).values = cols.map(c => c[1]).concat(xHead); styleHeader(ws.getRow(1));
     cols.forEach((c, i) => { ws.getColumn(i + 1).width = opts.widths && opts.widths[i] ? opts.widths[i] : (c[0] === 'notes' || c[0] === 'description' || c[0] === '_schedule' || c[0] === '_assets' ? 36 : c[1].length > 14 ? 20 : 14); });
+    xHead.forEach((hname, i) => { ws.getColumn(cols.length + 1 + i).width = Math.max(12, Math.min(30, hname.length + 4)); });
     let r = 2;
     for (const rec of records) {
       const ex = extra ? extra(rec) : {};
+      if (office) { const ox = office.rows[rec.code] || {}; xHead.forEach((hname, i) => { const cell = ws.getCell(r, cols.length + 1 + i); cell.value = ox[hname] == null ? null : ox[hname]; if (office.fmts && office.fmts[hname]) cell.numFmt = office.fmts[hname]; }); }
       cols.forEach((c, i) => {
         const field = c[0]; let v = field.startsWith('_') ? ex[field] : rec[field];
         const cell = ws.getCell(r, i + 1);
@@ -616,32 +785,34 @@ window.Egary = window.Egary || {};
     const lastRow = Math.max(r - 1, 2);
     cols.forEach((c, i) => { const lk = LISTS[entity + '.' + c[0]]; if (lk) listValidation(ws, i + 1, 2, Math.max(lastRow, 200), lk().map(x => x.ar).filter(Boolean)); });
     if (entity === 'assets') listValidation(ws, 3, 2, Math.max(lastRow, 400), ['نعم', 'لا']);
-    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: lastRow, column: cols.length } };
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: lastRow, column: cols.length + xHead.length } };
     return ws;
   }
-  function writeProjects(wb, state, asOf) { const En = E.Engine; table(wb, SH.projects, 'projects', state.projects, p => { const k = En.kpis({ projectCode: p.code }, asOf); return { _units: k.occupancy.total, _occupied: k.occupancy.occupiedCount, _vacant: k.occupancy.vacant.length, _arrears: k.arrears.total, _ytd: k.ytd.collected }; }, { widths: [12, 22, 30, 14, 30, 14, 12, 12, 12, 14, 16] }); }
+  /* خيارات الجدول مع الأعمدة الإضافية المحفوظة لهذه الورقة */
+  function withExtra(state, entity, opts) { return Object.assign({}, opts || {}, { extra: state._extra && state._extra[entity] }); }
+  function writeProjects(wb, state, asOf) { const En = E.Engine; table(wb, SH.projects, 'projects', state.projects, p => { const k = En.kpis({ projectCode: p.code }, asOf); return { _units: k.occupancy.total, _occupied: k.occupancy.occupiedCount, _vacant: k.occupancy.vacant.length, _arrears: k.arrears.total, _ytd: k.ytd.collected }; }, withExtra(state, 'projects', { widths: [12, 22, 30, 14, 30, 14, 12, 12, 12, 14, 16] })); }
   function writeUnits(wb, state, asOf) {
     const En = E.Engine, S = E.Store;
-    table(wb, SH.units, 'units', state.units, u => { const s = En.unitStatus(u, asOf); const cl = s.contract ? S.client(s.contract.clientCode) : null; return { _project: (S.project(u.projectCode) || {}).name || '', _assets: (u.assets || []).filter(a => a.present).map(a => a.name + (a.details ? ' (' + a.details + ')' : '')).join(' · '), _status: En.USTATUS_AR[s.status], _tenant: cl ? cl.name : '', _contract: s.contract ? s.contract.code : '', _rent: s.contract ? En.currentRent(s.contract, asOf) : null, _vacantSince: s.vacantSince ? U().fmtDate(s.vacantSince) : '', _vacantDays: s.vacantDays == null ? null : s.vacantDays, _statusKey: s.status }; }, { widths: [12, 12, 16, 16, 10, 8, 10, 30, 14, 36, 14, 26, 12, 14, 14, 12], xSplit: 1 });
+    table(wb, SH.units, 'units', state.units, u => { const s = En.unitStatus(u, asOf); const cl = s.contract ? S.client(s.contract.clientCode) : null; return { _project: (S.project(u.projectCode) || {}).name || '', _assets: (u.assets || []).filter(a => a.present).map(a => a.name + (a.details ? ' (' + a.details + ')' : '')).join(' · '), _status: En.USTATUS_AR[s.status], _tenant: cl ? cl.name : '', _contract: s.contract ? s.contract.code : '', _rent: s.contract ? En.currentRent(s.contract, asOf) : null, _vacantSince: s.vacantSince ? U().fmtDate(s.vacantSince) : '', _vacantDays: s.vacantDays == null ? null : s.vacantDays, _statusKey: s.status }; }, withExtra(state, 'units', { widths: [12, 12, 16, 16, 10, 8, 10, 30, 14, 36, 14, 26, 12, 14, 14, 12], xSplit: 1 }));
   }
   function writeAssets(wb, state) { const rows = []; for (const u of state.units) for (const a of (u.assets || [])) rows.push({ unitCode: u.code, name: a.name, present: !!a.present, details: a.details || '' }); table(wb, SH.assets, 'assets', rows, null, { widths: [12, 20, 10, 40] }); }
   function writeClients(wb, state, asOf) {
     const En = E.Engine, S = E.Store;
-    table(wb, SH.clients, 'clients', state.clients, c => { const cs = S.contractsOfClient(c.code); const sc = { contracts: cs, contractSet: new Set(cs.map(x => x.code)) }; const ar = En.arrears(sc, asOf); return { _contracts: cs.length, _active: cs.filter(x => En.contractStatus(x, asOf) === 'active').length, _arrears: ar.total, _paid: U().sum(cs, x => U().sum(S.paymentsOf(x.code), p => U().toNum(p.amount))) }; }, { widths: [10, 34, 8, 28, 18, 14, 14, 14, 20, 26, 30, 12, 10, 10, 14, 16] });
+    table(wb, SH.clients, 'clients', state.clients, c => { const cs = S.contractsOfClient(c.code); const sc = { contracts: cs, contractSet: new Set(cs.map(x => x.code)) }; const ar = En.arrears(sc, asOf); return { _contracts: cs.length, _active: cs.filter(x => En.contractStatus(x, asOf) === 'active').length, _arrears: ar.total, _paid: U().sum(cs, x => U().sum(S.paymentsOf(x.code), p => U().toNum(p.amount))) }; }, withExtra(state, 'clients', { widths: [10, 34, 8, 28, 18, 14, 14, 14, 20, 26, 30, 12, 10, 10, 14, 16] }));
   }
   function writeContracts(wb, state, asOf) {
     const En = E.Engine, S = E.Store;
-    table(wb, SH.contracts, 'contracts', state.contracts, c => { const u = S.unit(c.unitCode) || {}, cl = S.client(c.clientCode) || {}, p = S.project(u.projectCode) || {}; const sc = { contracts: [c], contractSet: new Set([c.code]) }; return { _project: p.name || '', _unit: u.label || '', _client: cl.name || '', _status: En.CSTATUS_AR[En.contractStatus(c, asOf)], _currentRent: En.currentRent(c, asOf), _paid: U().sum(S.paymentsOf(c.code), x => U().toNum(x.amount)), _arrears: En.arrears(sc, asOf).total, _schedule: En.schedule(c).map(y => `س${y.k} ${U().fmtDate(y.from)}–${U().fmtDate(y.to)}: ${U().fmtNum(y.rent)}`).join(' | '), _statusKey: En.contractStatus(c, asOf), _daysLeft: U().d(c.end) ? U().daysBetween(asOf, U().d(c.end)) : null }; }, { widths: [10, 12, 10, 14, 12, 30, 12, 12, 16, 10, 22, 12, 14, 10, 12, 36, 10, 12, 16, 14, 14, 14, 60] });
+    table(wb, SH.contracts, 'contracts', state.contracts, c => { const u = S.unit(c.unitCode) || {}, cl = S.client(c.clientCode) || {}, p = S.project(u.projectCode) || {}; const sc = { contracts: [c], contractSet: new Set([c.code]) }; return { _project: p.name || '', _unit: u.label || '', _client: cl.name || '', _status: En.CSTATUS_AR[En.contractStatus(c, asOf)], _currentRent: En.currentRent(c, asOf), _paid: U().sum(S.paymentsOf(c.code), x => U().toNum(x.amount)), _arrears: En.arrears(sc, asOf).total, _schedule: En.schedule(c).map(y => `س${y.k} ${U().fmtDate(y.from)}–${U().fmtDate(y.to)}: ${U().fmtNum(y.rent)}`).join(' | '), _statusKey: En.contractStatus(c, asOf), _daysLeft: U().d(c.end) ? U().daysBetween(asOf, U().d(c.end)) : null }; }, withExtra(state, 'contracts', { widths: [10, 12, 10, 14, 12, 30, 12, 12, 16, 10, 22, 12, 14, 10, 12, 36, 10, 12, 16, 14, 14, 14, 60] }));
   }
-  function writePayments(wb, state) { const S = E.Store; const rows = state.payments.slice().sort((a, b) => U().cmp(a.period, b.period) || U().cmp(a.code, b.code)); table(wb, SH.payments, 'payments', rows, p => { const c = S.contract(p.contractCode); const cl = c ? S.client(c.clientCode) : null, u = c ? S.unit(c.unitCode) : null; return { _client: cl ? cl.name : '', _unit: u ? u.label : '' }; }, { widths: [16, 10, 30, 12, 10, 14, 12, 14, 16, 30, 10, 12] }); }
-  function writeMaintenance(wb, state, asOf) { const En = E.Engine, S = E.Store; table(wb, SH.maintenance, 'maintenance', state.maintenance, m => { const u = S.unit(m.unitCode); const c = m.custodianContract ? S.contract(m.custodianContract) : (u ? En.activeContractOf(u.code, U().d(m.date) || asOf) : null); const cl = c ? S.client(c.clientCode) : null; return { _project: u ? (S.project(u.projectCode) || {}).name || '' : '', _unit: u ? u.label : '', _custodian: m.custodianName || (cl ? cl.name : ''), _custodianContract: c ? c.code : '' }; }, { widths: [10, 12, 14, 12, 12, 12, 40, 12, 12, 10, 12, 30, 12, 12, 26, 26, 12] }); }
+  function writePayments(wb, state) { const S = E.Store; const rows = state.payments.slice().sort((a, b) => U().cmp(a.period, b.period) || U().cmp(a.code, b.code)).concat(state._unreadPayments || []); /* صفوف بشهر غير مقروء تبقى في آخر الورقة كما كُتبت حتى تُصحَّح */ table(wb, SH.payments, 'payments', rows, p => { const c = S.contract(p.contractCode); const cl = c ? S.client(c.clientCode) : null, u = c ? S.unit(c.unitCode) : null; return { _client: cl ? cl.name : '', _unit: u ? u.label : '' }; }, withExtra(state, 'payments', { widths: [16, 10, 30, 12, 10, 14, 12, 14, 16, 30, 10, 12] })); }
+  function writeMaintenance(wb, state, asOf) { const En = E.Engine, S = E.Store; table(wb, SH.maintenance, 'maintenance', state.maintenance, m => { const u = S.unit(m.unitCode); const c = m.custodianContract ? S.contract(m.custodianContract) : (u ? En.activeContractOf(u.code, U().d(m.date) || asOf) : null); const cl = c ? S.client(c.clientCode) : null; return { _project: u ? (S.project(u.projectCode) || {}).name || '' : '', _unit: u ? u.label : '', _custodian: m.custodianName || (cl ? cl.name : ''), _custodianContract: c ? c.code : '' }; }, withExtra(state, 'maintenance', { widths: [10, 12, 14, 12, 12, 12, 40, 12, 12, 10, 12, 30, 12, 12, 26, 26, 12] })); }
   function writeSettings(wb, state) {
     const ws = wb.addWorksheet(SH.settings, { views: [{ state: 'frozen', ySplit: 1, rightToLeft: true }] });
     ws.getRow(1).values = ['الإعداد', 'القيمة', 'الشرح']; styleHeader(ws.getRow(1)); ws.getColumn(1).width = 30; ws.getColumn(2).width = 20; ws.getColumn(3).width = 60;
     const help = { enteredThrough: 'الشهور بعده تُعرض «بانتظار التسجيل» لا «متأخرة»', tolerancePct: 'يُقبل المبلغ كسداد كامل لو الفرق أقل من هذه النسبة', toleranceMin: 'حد أدنى للفرق المقبول بالجنيه', prorationBasis: '30 = الشهر 30 يومًا (النصف 15/30) كما يحسب المكتب', officeName: 'يظهر أعلى الورقة والموقع', graceDays: 'بعدها يُعتبر الشهر متأخرًا', dueDay: 'يوم الشهر الذي يستحق فيه الإيجار ما لم يحدد العقد غيره', vacancyMonths: 'الوحدة الشاغرة أطول من ذلك تظهر كتنبيه', trackingFrom: 'الشهور قبله لا تُحاسَب (بداية الورقة)', defaultIncreasePct: 'تُقترح عند إنشاء عقد جديد', ledgerYears: 'أوراق السنوات الموجودة (تُضاف تلقائيًا)', codeSeq: 'لا تُعدَّل: تضمن ألا يُعاد استخدام كود محذوف', trackingMode: 'auto = تبدأ من أقدم ورقة سنة · manual = كما ضبطها المدير', invoicePrefix: 'مثل INV-2026-0001', currency: 'رمز العملة في العرض' };
     let r = 2;
-    for (const s of SETTINGS_KEYS) { ws.getCell(r, 1).value = s.ar; const v = s.key === 'officeName' ? state.meta.officeName : state.settings[s.key]; ws.getCell(r, 2).value = Array.isArray(v) ? v.join(', ') : (v && typeof v === 'object' ? JSON.stringify(v) : (v == null ? '' : v)); ws.getCell(r, 3).value = help[s.key] || ''; r++; }
-    ws.getCell(r + 1, 1).value = 'آخر كتابة من الموقع'; ws.getCell(r + 1, 2).value = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    for (const s of SETTINGS_KEYS) { ws.getCell(r, 1).value = s.ar; const v = s.key === 'officeName' ? state.meta.officeName : state.settings[s.key]; ws.getCell(r, 2).value = Array.isArray(v) ? v.join(', ') : (v && typeof v === 'object' ? JSON.stringify(v) : (v == null ? '' : v)); if (s.type === 'period' || s.type === 'years') ws.getCell(r, 2).numFmt = '@'; ws.getCell(r, 3).value = help[s.key] || ''; r++; } // سنة-شهر كنص حتى لا يحوّلها Excel إلى تاريخ
+    ws.getCell(r + 1, 1).value = 'آخر كتابة من الموقع'; ws.getCell(r + 1, 2).value = U().stamp(); // ساعة المكتب المحلية
     ws.getCell(r + 2, 1).value = 'إصدار البنية'; ws.getCell(r + 2, 2).value = 2;
   }
   /* ورقة المستخدمين: مخفية في الإكسيل (المدير يستطيع إظهارها)، كلمة المرور مشفّرة لا تُقرأ */
@@ -660,6 +831,7 @@ window.Egary = window.Egary || {};
   function snapshotOf(state) {
     const cells = {}, rows = {};
     for (const p of state.payments) { const k = p.contractCode + '|' + p.period; cells[k] = (cells[k] || 0) + (U().toNum(p.amount) || 0); }
+    for (const k of Object.keys(state._ledgerSeen || {})) cells[k] = state._ledgerSeen[k]; // خانات بقيت في الملف بقيمتها بينما تقدّمت ورقة المدفوعات: اللقطة تحمل قيمة الخانة كما قُرئت (تُمسح مع أول كتابة من الموقع)
     for (const c of state.contracts) { const cl = (state.clients.find(x => x.code === c.clientCode) || {}), u = (state.units.find(x => x.code === c.unitCode) || {}), p = (state.projects.find(x => x.code === u.projectCode) || {}); rows[c.code] = { start: c.start, end: c.end, note: c.notes || '', name: cl.name || '', rep: cl.rep || '', nid: cl.nationalId || '', tax: cl.taxId || '', label: u.label || '', addr: p.address || '' }; }
     return { cells, rows, at: new Date().toISOString() };
   }

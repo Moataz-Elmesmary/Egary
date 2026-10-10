@@ -102,16 +102,19 @@ window.Egary = window.Egary || {};
     city = makeSkyline(sky);
     root.addEventListener('mousemove', (e) => { const x = (e.clientX / window.innerWidth - .5) * 2, y = (e.clientY / window.innerHeight - .5) * 2; city.setTilt(x, y); const card = root.querySelector('.hero-card'); if (card && !reduced()) card.style.transform = `rotateY(${x * 4}deg) rotateX(${-y * 3}deg)`; root.style.setProperty('--px', x.toFixed(3)); root.style.setProperty('--py', y.toFixed(3)); });
     unsub = S().subscribe(() => { if (root && board.classList.contains('in')) renderBoard(); });
-    document.addEventListener('keydown', onKey);
+    // مرحلة الالتقاط: حتى نرى الدرج/النافذة قبل أن يغلقها مستمع ui.js (مرحلة الفقاعة) — وإلا أغلق Escape الاثنين معًا
+    document.addEventListener('keydown', onKey, true);
   }
   function onKey(e) { if (e.key === 'Escape' && root && !document.querySelector('.overlay, .drawer')) close(); }
   function close(keepHash) {
     if (!root) return;
+    UI().hideTip(); // الإغلاق يزيل العنصر الذي تحت المؤشر دون mouseleave — نخفي التلميح حتى لا يبقى عالقًا فوق البرنامج
     city && city.destroy(); city = null; root.remove(); root = null;
-    document.removeEventListener('keydown', onKey);
+    document.removeEventListener('keydown', onKey, true);
     if (unsub) unsub(); unsub = null;
     document.documentElement.dataset.theme = prevTheme || 'light';
-    if (!keepHash && location.hash === '#/bi') location.hash = '#/dashboard';
+    // الخروج يعيد المسار إلى لوحة المؤشرات مهما كان شكل الرابط (#/bi أو #/bi/ أو #/bi?project=…) حتى لا تبقى الصفحة على مسار BI
+    if (!keepHash && E.App && E.App.route && E.App.route.view === 'bi') E.App.go('dashboard');
   }
   function buildHero() {
     const k = En().kpis({});
@@ -135,14 +138,16 @@ window.Egary = window.Egary || {};
   function ctx() { return E.App.ctx(); }
   function renderBoard() {
     const board = root.querySelector('#bi-board'); UI().clear(board);
+    UI().hideTip(); // إعادة الرسم تزيل العنصر الذي تحت المؤشر فلا يصله mouseleave — نخفي التلميح يدويًا حتى لا يبقى عالقًا
     root.querySelectorAll('.dock button').forEach(b => b.classList.toggle('on', b.dataset.section === section));
     const c = ctx(), f = E.App.filter, st = S().state();
     En().setOverride({ trackingFrom: f.from || '' });
     const k = En().kpis(f);
-    const curP = k.currentPeriod, fromP = st.settings.trackingFrom && U().cmp(st.settings.trackingFrom, curP) <= 0 ? st.settings.trackingFrom : curP.slice(0, 4) + '-01';
+    // الحد الأدنى لمتصفح الشهر: بداية المحاسبة الفعلية (قيمة المُرشِّح «المحاسبة من» إن وُجدت، وإلا الإعداد)
+    const curP = k.currentPeriod, tf = En().trackingFrom(), fromP = tf && U().cmp(tf, curP) <= 0 ? tf : curP.slice(0, 4) + '-01';
     const pnav = h('span', { class: 'pnav', id: 'bi-period-nav' },
       h('button', { title: 'الشهر السابق', id: 'bi-period-prev', disabled: U().cmp(k.period, fromP) <= 0 ? true : null, onclick: () => { E.App.filter.period = U().addMonths(k.period, -1); renderBoard(); } }, UI().icon('chevR')),
-      h('button', { class: 'on', id: 'bi-period-label', title: k.selectedPeriod ? 'العودة إلى الشهر الحالي' : 'شهر التقرير', onclick: () => { if (k.selectedPeriod) { E.App.filter.period = ''; renderBoard(); } } }, U().periodLabel(k.period, true)),
+      h('button', { class: 'on', id: 'bi-period-label', title: k.selectedPeriod ? (U().cmp(k.enteredThrough, k.currentPeriod) < 0 ? 'العودة إلى آخر شهر مسجَّل' : 'العودة إلى الشهر الحالي') : 'شهر التقرير', onclick: () => { if (k.selectedPeriod) { E.App.filter.period = ''; renderBoard(); } } }, U().periodLabel(k.period, true)),
       h('button', { title: 'الشهر التالي', id: 'bi-period-next', disabled: U().cmp(k.period, curP) >= 0 ? true : null, onclick: () => { const n = U().addMonths(k.period, 1); E.App.filter.period = U().cmp(n, curP) > 0 ? k.period : n; renderBoard(); } }, UI().icon('chevL')));
     const curY = U().today().getUTCFullYear(), tfy = parseInt(String(st.settings.trackingFrom || '').slice(0, 4), 10) || curY, y0 = Math.min(st.settings.ledgerYears && st.settings.ledgerYears.length ? st.settings.ledgerYears[0] : tfy, tfy);
     const fromSel = curY > y0 ? h('select', { class: 'bi-select' + (f.from ? ' on' : ''), id: 'bi-from-pick', title: 'المحاسبة من', onchange: (e) => { E.App.filter.period = E.App.filter.period; E.App.filter.from = e.target.value; renderBoard(); } }, h('option', { value: '' }, `المحاسبة من ${tfy} (الإعداد)`), Array.from({ length: curY - y0 + 1 }, (_, i) => y0 + i).map(y => h('option', { value: y + '-01', selected: f.from === y + '-01' ? true : null }, 'المحاسبة من ' + y))) : null;
@@ -161,7 +166,7 @@ window.Egary = window.Egary || {};
     body.appendChild(h('div', { class: 'tiles' },
       tile(mo.rate >= .9 ? 'ok' : mo.rate >= .6 ? 'warn' : 'danger', `تحصيل ${U().periodLabel(k.period)}`, fm(mo.collected), `${fp(mo.rate)} من ${fm(mo.due)}`, () => V().monthEvidence(c, k.period)),
       k.pending.periods.length ? tile('warn', 'بانتظار التسجيل', fn(k.pending.contracts), `${k.pending.periods.map(p => U().periodLabel(p)).join('، ')} — ${fm(k.pending.due)}`, () => V().pendingEvidence(c, k.pending)) : null,
-      tile('accent', 'محصَّل السنة', fm(k.ytd.collected), `${k.counts.payments} دفعة`, () => V().paymentsEvidence(c, k.ytd.rows, 'مدفوعات السنة')),
+      tile('accent', 'محصَّل السنة', fm(k.ytd.collected), `${k.ytd.rows.length} دفعة`, () => V().paymentsEvidence(c, k.ytd.rows, 'مدفوعات السنة')),
       tile(k.arrears.total ? 'danger' : 'ok', 'المتأخرات', fm(k.arrears.total), `${k.arrears.byClient.length} عميل · ${k.arrears.rows.length} شهر`, () => V().arrearsEvidence(c, k.arrears)),
       tile(k.occupancy.rate >= .9 ? 'ok' : 'warn', 'الإشغال', fp(k.occupancy.rate), `${k.occupancy.occupiedCount} من ${k.occupancy.total}`, () => V().unitsEvidence(c, [...k.occupancy.occupied, ...k.occupancy.ending], 'المؤجَّرة')),
       tile(k.occupancy.longVacant.length ? 'danger' : 'ok', `شاغرة > ${S().state().settings.vacancyMonths} شهور`, fn(k.occupancy.longVacant.length), `${k.occupancy.vacant.length} شاغرة إجمالًا`, () => V().unitsEvidence(c, k.occupancy.longVacant, `شاغرة أكثر من ${S().state().settings.vacancyMonths} شهور`)),

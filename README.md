@@ -31,8 +31,9 @@
 ## Development
 No build step. Tests (Node 22 + Playwright + Python openpyxl as an independent oracle):
 ```
-node --test tests/sync.test.js tests/workbook.test.js tests/workbook2.test.js tests/auth.test.js tests/years.test.js tests/backup.test.js   # sync engine, Excel round trips (both directions), login, other years, backups
-NODE_PATH=/opt/node22/lib/node_modules node --test tests/e2e.test.js tests/bi.test.js tests/link-flow.test.js tests/backup-flow.test.js   # browser end-to-end
+node --test tests/sync.test.js tests/workbook.test.js tests/workbook2.test.js tests/auth.test.js tests/years.test.js tests/backup.test.js tests/codes.test.js tests/log.test.js   # sync engine, Excel round trips (both directions), login, other years, backups, codes, operations log
+node --test tests/fix-core.test.js tests/fix-workbook.test.js tests/fix-sync.test.js tests/fix-ui.test.js   # regression tests from the full scan (one file per subsystem)
+NODE_PATH=/opt/node22/lib/node_modules node --test tests/e2e.test.js tests/e2e-extra.test.js tests/bi.test.js tests/fix-bi.test.js tests/link-flow.test.js tests/backup-flow.test.js   # browser end-to-end (run files one at a time if the machine is small)
 node tests/build_workbook.js                                   # regenerate Egary/Egary.xlsx from a source workbook
 ```
 Architecture (`Egary/assets/js`): `core/` (util, model, codes, store, engine) · `xlsx/workbook.js` (ExcelJS read/write + migration of the original sheet format + conflict rules) · `sync/` (file link + sync engine with a pending-ops journal) · `ui/` (toolkit, forms, views) · `bi/` · `app.js`.

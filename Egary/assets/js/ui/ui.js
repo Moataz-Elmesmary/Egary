@@ -168,9 +168,12 @@ window.Egary = window.Egary || {};
   /* ---------- رسوم SVG ---------- */
   const PALETTE = ['#2457C5', '#0E8F84', '#B7791F', '#C9403C', '#6D5BD0', '#3E6FB1', '#1E8E5A', '#D97706', '#8B5CF6', '#0891B2'];
   function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888'; }
+  /* قيمة رسم آمنة: أي شيء غير رقمي (NaN/undefined/null/نص) = 0 حتى لا تخرج سمات SVG غير صالحة */
+  const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+  const maxOf = (vals) => Math.max(1, ...vals.map(num));
   function bars(opts) { // data: [{label, value, color?, sub?}] ; horizontal
-    const data = opts.data, W = opts.width || 520, rowH = opts.rowH || 30, padL = opts.padL || 150, H = data.length * rowH + 10;
-    const max = Math.max(1, ...data.map(d => d.value));
+    const data = (opts.data || []).map(d => ({ ...d, label: String(d.label ?? ''), value: num(d.value) })), W = opts.width || 520, rowH = opts.rowH || 30, padL = opts.padL || 150, H = data.length * rowH + 10;
+    const max = maxOf(data.map(d => d.value));
     const svg = s('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', style: 'direction:ltr' });
     data.forEach((d, i) => {
       const y = i * rowH + 5, w = Math.max(2, (W - padL - 70) * (d.value / max));
@@ -186,10 +189,11 @@ window.Egary = window.Egary || {};
   }
   function columns(opts) { // series: [{name, color, values:[]}], labels:[] ; line اختياري ; highlight فهرس الشهر المميَّز ; fmt للتلميحات ; unit لاحقة المحور
     const W = opts.width || 720, H = opts.height || 240, padL = 56, padB = 28, padT = opts.valueLabels === false ? 14 : 24, padR = 10;
-    const labels = opts.labels, series = opts.series, fmtV = opts.fmt || (v => U().fmtMoney(v)), unit = opts.unit || '';
-    const max = Math.max(1, ...series.flatMap(sr => sr.values), ...(opts.line ? opts.line.values : []));
+    const labels = (opts.labels || []).map(l => String(l ?? '')), series = (opts.series || []).map(sr => ({ ...sr, values: (sr.values || []).map(num) })), fmtV = opts.fmt || (v => U().fmtMoney(v)), unit = opts.unit || '';
+    if (opts.line) opts = { ...opts, line: { ...opts.line, values: (opts.line.values || []).map(num) } };
+    const max = maxOf([...series.flatMap(sr => sr.values), ...(opts.line ? opts.line.values : [])]);
     const svg = s('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, style: 'direction:ltr' });
-    const iw = (W - padL - padR) / labels.length, ih = H - padT - padB;
+    const iw = (W - padL - padR) / Math.max(1, labels.length), ih = H - padT - padB;
     for (let t = 0; t <= 4; t++) { const y = padT + ih - ih * t / 4; svg.appendChild(s('line', { class: 'grid-line', x1: padL, x2: W - padR, y1: y, y2: y })); svg.appendChild(s('text', { x: padL - 6, y: y + 4, 'text-anchor': 'end' }, short(max * t / 4) + unit)); }
     const showVals = opts.valueLabels !== false && labels.length <= 13 && series.length === 1;
     labels.forEach((lb, i) => {
@@ -218,6 +222,7 @@ window.Egary = window.Egary || {};
     return h('div', { class: 'chart-wrap' }, svg, legend);
   }
   function donut(opts) { // data: [{label, value, color}]
+    opts = { ...opts, data: (opts.data || []).map(d => ({ ...d, label: String(d.label ?? ''), value: num(d.value) })) };
     const R = 54, r = 36, C = 2 * Math.PI * R, total = Math.max(1, U().sum(opts.data, d => d.value));
     const svg = s('svg', { viewBox: '0 0 140 140', width: opts.size || 140, height: opts.size || 140 });
     let off = 0;
@@ -233,14 +238,16 @@ window.Egary = window.Egary || {};
     return h('div', { class: 'flex', style: { gap: '18px', alignItems: 'center' } }, svg, legend);
   }
   function spark(values, color) {
-    const W = 120, H = 34, max = Math.max(1, ...values), min = Math.min(0, ...values);
+    values = (values || []).map(num);
+    const W = 120, H = 34, max = maxOf(values), min = Math.min(0, ...values);
     const pts = values.map((v, i) => [i * (W / Math.max(1, values.length - 1)), H - 3 - (H - 6) * ((v - min) / (max - min || 1))]);
     const svg = s('svg', { class: 'spark', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none' });
+    if (!pts.length) return svg; // بلا نقاط: svg فارغ بدل مسار غير صالح
     svg.appendChild(s('path', { d: pts.map((p, i) => (i ? 'L' : 'M') + p[0] + ' ' + p[1]).join(' ') + ` L${W} ${H} L0 ${H} Z`, fill: color || cssVar('--primary') || '#2457C5', 'fill-opacity': '0.15', class: 'area' }));
     svg.appendChild(s('path', { d: pts.map((p, i) => (i ? 'L' : 'M') + p[0] + ' ' + p[1]).join(' '), class: 'line', stroke: color || cssVar('--primary') || '#2457C5', fill: 'none', 'stroke-width': '2' }));
     return svg;
   }
-  function short(n) { if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'; if (n >= 1e3) return Math.round(n / 1e3) + 'K'; return String(Math.round(n)); }
+  function short(n) { n = num(n); if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'; if (n >= 1e3) return Math.round(n / 1e3) + 'K'; return String(Math.round(n)); }
 
   function badge(cls, text) { return h('span', { class: 'badge ' + cls }, text); }
   function codeLink(code, onClick) { return h('a', { class: 'code link', onclick: (e) => { e.stopPropagation(); onClick(code); } }, code); }

@@ -116,6 +116,19 @@ window.Egary = window.Egary || {};
     if (/شقه|شقة|سكن/.test(U().normalize(label))) return 'residential';
     return 'admin';
   }
+  /* الكود الحر التالي لأي كيان من سجله (المدفوعات حسب سنة الشهر، الوحدات حسب المشروع والاسم) — لإعادة ترقيم سجل عند تعارض الأكواد في المزامنة */
+  function nextCode(state, entity, rec) {
+    rec = rec || {};
+    switch (entity) {
+      case 'projects': return nextProject(state);
+      case 'units': return unitCode(state, rec.projectCode || 'P00', rec.label || '');
+      case 'clients': return nextClient(state);
+      case 'contracts': return nextContract(state);
+      case 'payments': return nextInvoice(state, (rec.period || U().iso(U().today())).slice(0, 4));
+      case 'maintenance': return nextMaintenance(state);
+      default: return '';
+    }
+  }
   /* تمييز نوع الكود من شكله (للبحث السريع) */
   function kindOf(code) {
     const c = U().foldCode(code);
@@ -127,5 +140,5 @@ window.Egary = window.Egary || {};
     if (/^[A-Z0-9]+-\d{4}-\d+$/.test(c)) return 'payments';
     return '';
   }
-  E.Codes = { nextProject, nextClient, nextContract, nextMaintenance, nextInvoice, invoicePrefix, noteIssued, syncSeq, unitCode, parseLabel, inferFloor, inferType, kindOf };
+  E.Codes = { nextProject, nextClient, nextContract, nextMaintenance, nextInvoice, nextCode, invoicePrefix, noteIssued, syncSeq, unitCode, parseLabel, inferFloor, inferType, kindOf };
 })(window.Egary);

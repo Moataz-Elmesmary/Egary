@@ -28,7 +28,34 @@ window.Egary = window.Egary || {};
   const ASSET_CATALOG = ['تكييف', 'فرش', 'مطبخ', 'سخان', 'عداد كهرباء', 'عداد مياه', 'عداد غاز', 'إنترنت / تليفون', 'ستائر', 'أجهزة كهربائية', 'إنتركم / باب أمان', 'موقف سيارة'];
 
   const label = (list, key) => { const f = list.find(x => x.key === key); return f ? f.ar : (key || ''); };
-  const keyOf = (list, ar) => { const n = String(ar || '').trim(); const f = list.find(x => x.ar === n || x.key === n); return f ? f.key : ''; };
+  /* مرادفات يكتبها المكتب في الإكسيل (مذكّر/مؤنث، عامية، إنجليزية) → المفتاح؛ تُقبل فقط لو المفتاح موجود في القائمة المطلوبة */
+  const ALIASES = {
+    // حالة الصيانة
+    'مغلق': 'closed', 'مقفول': 'closed', 'مقفوله': 'closed', 'منتهي': 'closed', 'منتهيه': 'closed', 'تم': 'closed', 'تمت': 'closed', 'closed': 'closed', 'done': 'closed',
+    'مفتوح': 'open', 'جاري': 'open', 'جاريه': 'open', 'قائم': 'open', 'قائمه': 'open', 'open': 'open',
+    // نوع الصيانة
+    'سباك': 'plumbing', 'صرف': 'plumbing', 'مواسير': 'plumbing', 'كهربا': 'electric', 'كهربائي': 'electric', 'كهربائيه': 'electric', 'نور': 'electric',
+    'تكييفات': 'ac', 'مكيف': 'ac', 'مكيفات': 'ac', 'دهان': 'paint', 'نقاشه': 'paint', 'نقاش': 'paint', 'بويه': 'paint', 'نجار': 'carpentry', 'الوميتال': 'carpentry',
+    'اسانسير': 'elevator', 'مصاعد': 'elevator', 'تنظيف': 'cleaning', 'نظافه عامه': 'cleaning', 'اخر': 'other', 'غير ذلك': 'other', 'متنوع': 'other',
+    // طريقة السداد
+    'كاش': 'cash', 'نقدا': 'cash', 'نقد': 'cash', 'cash': 'cash', 'تحويل': 'transfer', 'تحويل بنك': 'transfer', 'بنك': 'transfer', 'bank': 'transfer', 'transfer': 'transfer',
+    'شيكات': 'cheque', 'شك': 'cheque', 'cheque': 'cheque', 'check': 'cheque', 'انستا باي': 'instapay', 'انستا': 'instapay', 'instapay': 'instapay',
+    // نوع العميل / من يتحمّل الصيانة
+    'افراد': 'person', 'شخص': 'person', 'شخصي': 'person', 'شركات': 'company', 'مؤسسه': 'company', 'شركه': 'company',
+    'مالك': 'owner', 'المالكه': 'owner', 'مستاجر': 'tenant', 'المستاجره': 'tenant', 'مشترك': 'shared', 'مناصفه': 'shared', 'نصف': 'shared',
+    // نوع الوحدة / حالة التأمين
+    'تجاري': 'commercial', 'محل': 'commercial', 'سكني': 'residential', 'شقه': 'residential', 'اداري': 'admin', 'مكتب': 'admin', 'جراجات': 'garage', 'موقف': 'garage',
+    'محتفظ': 'held', 'محتفظ بها': 'held', 'مردوده': 'returned', 'مرتجع': 'returned', 'مخصومه': 'deducted', 'بدون': 'none', 'لا يوجد': 'none',
+  };
+  /* نص من الإكسيل → المفتاح: مطابقة بعد التطبيع (همزات، تاء مربوطة، أرقام، حالة الأحرف) ثم المرادفات؛ '' لو غير معروف */
+  const keyOf = (list, ar) => {
+    const raw = String(ar || '').trim(); if (!raw) return '';
+    const n = E.U.normalize(raw);
+    const f = list.find(x => x.key === raw || x.key === n || (x.ar && E.U.normalize(x.ar) === n));
+    if (f) return f.key;
+    const alias = ALIASES[n];
+    return alias && list.some(x => x.key === alias) ? alias : '';
+  };
 
   function emptyState() {
     return {
@@ -68,11 +95,12 @@ window.Egary = window.Egary || {};
   const ENTITIES = Object.keys(blank);
   const ENTITY_AR = { projects: 'مشروع', units: 'وحدة', clients: 'عميل', contracts: 'عقد', payments: 'دفعة', maintenance: 'صيانة', users: 'مستخدم' };
 
-  /* تحقق بسيط يعيد قائمة أخطاء بالعربية (فارغة = سليم) */
-  function validate(entity, r, state) {
+  /* تحقق بسيط يعيد قائمة أخطاء بالعربية (فارغة = سليم)
+     opts.allowDupLabel: لا يمنع تكرار اسم الوحدة (تعديل وحدة اسمها مكرر أصلًا في الملف دون تغيير الاسم) */
+  function validate(entity, r, state, opts) {
     const errs = [];
     const need = (cond, msg) => { if (!cond) errs.push(msg); };
-    const U = E.U;
+    const U = E.U; opts = opts || {};
     switch (entity) {
       case 'projects':
         need(r.name && r.name.trim(), 'اسم المشروع مطلوب');
@@ -82,11 +110,11 @@ window.Egary = window.Egary || {};
         need(r.projectCode, 'المشروع مطلوب');
         need(r.label && String(r.label).trim(), 'رقم/اسم الوحدة مطلوب');
         need(UNIT_TYPES.some(t => t.key === r.type), 'نوع الوحدة غير صحيح');
-        need(!state || !state.units.some(u => u.code !== r.code && u.projectCode === r.projectCode && U.normalize(u.label) === U.normalize(r.label)), 'توجد وحدة بنفس الرقم في هذا المشروع');
+        need(opts.allowDupLabel || !state || !state.units.some(u => u.code !== r.code && u.projectCode === r.projectCode && U.normalize(u.label) === U.normalize(r.label)), 'توجد وحدة بنفس الرقم في هذا المشروع');
         break;
       case 'clients':
         need(r.name && r.name.trim(), 'اسم العميل مطلوب');
-        need(!r.phone || /^[+\d\s-]{6,20}$/.test(String(r.phone).replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c))), 'رقم التليفون غير صحيح');
+        need(!r.phone || /^[+\d\s-]{6,20}$/.test(U.foldDigits(r.phone)), 'رقم التليفون غير صحيح'); // أرقام عربية/فارسية مقبولة
         break;
       case 'contracts':
         need(r.unitCode, 'الوحدة مطلوبة');
@@ -103,12 +131,19 @@ window.Egary = window.Egary || {};
           need(!overlap, overlap ? `يتداخل مع العقد ${overlap.code} على نفس الوحدة (${U.fmtDate(overlap.start)} → ${U.fmtDate(overlap.end)}) — ابدأ من ${U.fmtDate(U.iso(U.addDays(U.d(overlap.end), 1)))} أو عدّل العقد السابق` : '');
         }
         break;
-      case 'payments':
+      case 'payments': {
         need(r.contractCode, 'العقد مطلوب');
-        need(/^\d{4}-\d{2}$/.test(r.period || ''), 'الشهر مطلوب');
-        need(U.toNum(r.amount) != null && U.toNum(r.amount) !== 0, 'المبلغ مطلوب');
+        const okPeriod = /^\d{4}-(0[1-9]|1[0-2])$/.test(r.period || '');
+        need(okPeriod, 'الشهر مطلوب');
+        if (okPeriod) { // سنة الشهر: من (أقدم ورقة سنة أو سنة بداية المحاسبة − 1) إلى (السنة الحالية + 1) — تمنع أخطاء الكتابة مثل 2062
+          const y = +r.period.slice(0, 4), cur = U.today().getUTCFullYear(), sg = (state && state.settings) || {};
+          const known = [cur, ...((Array.isArray(sg.ledgerYears) ? sg.ledgerYears : []).map(Number).filter(n => n > 0)), +String(sg.trackingFrom || '').slice(0, 4) || cur];
+          need(y >= Math.min(...known) - 1 && y <= cur + 1, 'سنة الشهر غير منطقية');
+        }
+        need(U.toNum(r.amount) != null && U.toNum(r.amount) > 0, 'المبلغ مطلوب (أكبر من صفر)');
         need(!r.paidOn || U.d(r.paidOn), 'تاريخ السداد غير صحيح');
         break;
+      }
       case 'maintenance':
         need(r.unitCode, 'الوحدة مطلوبة');
         need(U.d(r.date), 'التاريخ مطلوب');

@@ -15,7 +15,7 @@ window.Egary = window.Egary || {};
   const st = () => S().state();
   /* تجاوز مؤقت للإعدادات من سلايسر «المحاسبة من» (لا يُكتب في الإكسيل) */
   let OVERRIDE = {}, _ovCache = null;
-  const settings = () => { const s = st().settings; const tf = OVERRIDE.trackingFrom; if (!tf || tf === s.trackingFrom) return s; if (!_ovCache || _ovCache.base !== s || _ovCache.tf !== tf) _ovCache = { base: s, tf, obj: Object.assign({}, s, { trackingFrom: tf }) }; return _ovCache.obj; };
+  const settings = () => { const s = st().settings; const tf = OVERRIDE.trackingFrom; if (!tf || tf === s.trackingFrom) return s; const rev = S().rev(); if (!_ovCache || _ovCache.base !== s || _ovCache.tf !== tf || _ovCache.rev !== rev) _ovCache = { base: s, tf, rev, obj: Object.assign({}, s, { trackingFrom: tf }) }; return _ovCache.obj; };
   function setOverride(o) { OVERRIDE = o || {}; _ovCache = null; }
   function overrideOf() { return OVERRIDE; }
   /* بداية المحاسبة الفعلية (الإعداد أو سلايسر «المحاسبة من») — تستخدمها الشاشات بدل قراءة الإعداد الخام */
@@ -28,7 +28,7 @@ window.Egary = window.Egary || {};
     if (!start || !end || end < start) return [];
     const out = []; let rent = U().toNum(c.rent) || 0; const inc = (U().toNum(c.increasePct) || 0) / 100;
     const ov = c.rentOverrides || {};
-    for (let k = 1; k <= 60; k++) {
+    for (let k = 1; k <= 400; k++) { // بلا سقف عملي (عقود الإيجار القديم منذ الستينيات) — الحد الأعلى حماية من حلقة لا تنتهي فقط
       const from = addYears(start, k - 1);
       if (from > end) break;
       const to0 = U().addDays(addYears(start, k), -1);
@@ -54,7 +54,10 @@ window.Egary = window.Egary || {};
       const n = U().daysBetween(a, b) + 1; days += n;
       let frac;
       if (n === dim) frac = 1;
-      else if (basis30) { const sDay = a.getUTCDate(), eDay = b.getUTCDate(); frac = (eDay === dim ? Math.max(0, 31 - sDay) : (eDay - sDay + 1)) / 30; frac = Math.min(1, frac); }
+      else if (basis30) { // أول شهر لعقد يبدأ يوم 31 = يوم واحد لا صفر؛ أما يوم 31 عند ذكرى العقد (السنة k>1) فالأيام 1–30 قبله حُسبت شهرًا كاملًا فلا يُضاف فوقها
+        const sDay = a.getUTCDate(), eDay = b.getUTCDate();
+        frac = (eDay === dim ? (sDay === 31 && y.k > 1 ? 0 : Math.max(1, 31 - Math.min(sDay, 30))) : (eDay - sDay + 1)) / 30; frac = Math.min(1, frac);
+      }
       else frac = n / dim;
       amount += y.rent * frac;
     }
@@ -76,7 +79,7 @@ window.Egary = window.Egary || {};
     asOf = asOf || U().today();
     const manual = settings().enteredThrough;
     if (manual && /^\d{4}-\d{2}$/.test(manual)) return manual;
-    const key = U().periodOf(asOf) + '|' + st().payments.length + '|' + st().contracts.length;
+    const key = U().periodOf(asOf) + '|' + S().rev(); // أي تعديل في الحالة (حتى تعديل مبلغ في مكانه) يُبطل الذاكرة المؤقتة
     if (ET_CACHE.key === key) return ET_CACHE.value;
     const cur = U().periodOf(asOf);
     let found = cur;
@@ -202,7 +205,7 @@ window.Egary = window.Egary || {};
     for (const c of sc.contracts) {
       const ci = cell(c, period, asOf);
       if (ci.status === 'none' || ci.status === 'history') continue;
-      if (ci.status === 'orphan') { orphanPaid += ci.paid; rows.push(row(ci)); continue; }
+      if (ci.status === 'orphan') { orphanPaid += ci.paid; collected += ci.paid; rows.push(row(ci)); continue; } // محصَّل فعلًا وإن كان خارج مدة العقد
       if (ci.due && ci.status !== 'upcoming' && ci.status !== 'advance') { due += ci.due.amount; dueCount++; }
       if (ci.paid) { collected += ci.paid; }
       if (ci.status === 'paid') paidCount++;
@@ -302,9 +305,9 @@ window.Egary = window.Egary || {};
     }
     return out.sort((a, b) => b.arrears - a.arrears || (a.score == null ? 1 : 0) - (b.score == null ? 1 : 0));
   }
-  function maintenanceStats(sc, asOf) {
+  function maintenanceStats(sc, asOf, year) { // year: سنة التقرير (افتراضيًا سنة asOf) — تُعاد في النتيجة حتى تُسمّيها الشاشة
     asOf = asOf || U().today();
-    const yr = String(asOf.getUTCFullYear());
+    const yr = String(year || asOf.getUTCFullYear());
     const items = st().maintenance.filter(m => sc.unitSet.has(m.unitCode)).map(m => {
       const u = S().unit(m.unitCode); const cAt = m.custodianContract ? S().contract(m.custodianContract) : (u ? activeContractOf(u.code, U().d(m.date) || asOf) : null); const cl = cAt ? S().client(cAt.clientCode) : null;
       return { ...m, unitLabel: u ? u.label : '', projectName: u ? (S().project(u.projectCode) || {}).name : '', custodianContract: cAt ? cAt.code : '', custodianName: m.custodianName || (cl ? cl.name : '') };
@@ -313,7 +316,7 @@ window.Egary = window.Egary || {};
     const ytd = items.filter(m => (m.date || '').startsWith(yr));
     const byBorne = {}; for (const b of M().BORNE_BY) byBorne[b.key] = U().sum(ytd.filter(m => m.borneBy === b.key), m => U().toNum(m.cost));
     const byUnit = [...U().groupBy(items, m => m.unitCode)].map(([code, ms]) => ({ unitCode: code, unitLabel: ms[0].unitLabel, projectName: ms[0].projectName, count: ms.length, cost: U().sum(ms, m => U().toNum(m.cost)) })).sort((a, b) => b.cost - a.cost);
-    return { items, open, ytd, costYtd: U().sum(ytd, m => U().toNum(m.cost)), byBorne, byUnit };
+    return { items, open, ytd, year: yr, costYtd: U().sum(ytd, m => U().toNum(m.cost)), byBorne, byUnit };
   }
   function byDimension(sc, fromPeriod, toPeriod, keyFn) {
     const m = new Map();
@@ -344,7 +347,7 @@ window.Egary = window.Egary || {};
     const ytdDue = series(sc, yEnd, +yEnd.slice(5), asOf).reduce((s, m) => s + m.due, 0);
     const ar = arrears(sc, asOf), occ = occupancy(sc, asOf), ren = renewals(sc, asOf), dep = deposits(sc, asOf);
     const next12 = contractedRevenue(sc, U().addMonths(cur, 1), 12);
-    const gaps = reletGaps(sc), punct = punctuality(sc), maint = maintenanceStats(sc, asOf);
+    const gaps = reletGaps(sc), punct = punctuality(sc), maint = maintenanceStats(sc, asOf, ryr);
     const trend = series(sc, selected || cur, 12, asOf);
     const byProject = byDimension(sc, ryr + '-01', yEnd, u => u.projectCode).map(o => ({ ...o, name: (S().project(o.key) || {}).name || o.key }));
     const byType = byDimension(sc, ryr + '-01', yEnd, u => u.type).map(o => ({ ...o, name: M().label(M().UNIT_TYPES, o.key) }));
@@ -353,7 +356,7 @@ window.Egary = window.Egary || {};
     const avgRentByType = M().UNIT_TYPES.map(t => { const cs = activeContracts.filter(c => (S().unit(c.unitCode) || {}).type === t.key); return { key: t.key, name: t.ar, count: cs.length, avg: cs.length ? U().sum(cs, c => currentRent(c, asOf)) / cs.length : null }; }).filter(t => t.count);
     const noIncrease = activeContracts.filter(c => !(U().toNum(c.increasePct) > 0));
     const unknownDates = st().payments.filter(p => sc.contractSet.has(p.contractCode) && !p.paidOn).length;
-    return { asOf: U().iso(asOf), period: reportPeriod, selectedPeriod: selected, reportYear: ryr, currentPeriod: cur, enteredThrough: et, pending, scope: sc, month, prevMonth, ytd: { collected: ytd.total, due: ytdDue, rate: ytdDue ? ytd.total / ytdDue : null, rows: ytd.rows }, arrears: ar, occupancy: occ, renewals: ren, deposits: dep, next12, gaps, punctuality: punct, maintenance: maint, trend, byProject, byType, activeContracts, monthlyRentRoll, avgRentByType, noIncrease, unknownDates, counts: { projects: st().projects.filter(p => !filter || !filter.projectCode || p.code === filter.projectCode).length, units: sc.units.length, clients: sc.clients.length, contracts: sc.contracts.length, payments: st().payments.filter(p => sc.contractSet.has(p.contractCode)).length } };
+    return { asOf: U().iso(asOf), period: reportPeriod, selectedPeriod: selected, defaultPeriod: U().cmp(et, cur) < 0 ? et : cur, reportYear: ryr, currentPeriod: cur, enteredThrough: et, pending, scope: sc, month, prevMonth, ytd: { collected: ytd.total, due: ytdDue, rate: ytdDue ? ytd.total / ytdDue : null, rows: ytd.rows }, arrears: ar, occupancy: occ, renewals: ren, deposits: dep, next12, gaps, punctuality: punct, maintenance: maint, trend, byProject, byType, activeContracts, monthlyRentRoll, avgRentByType, noIncrease, unknownDates, counts: { projects: st().projects.filter(p => !filter || !filter.projectCode || p.code === filter.projectCode).length, units: sc.units.length, clients: sc.clients.length, contracts: sc.contracts.length, payments: st().payments.filter(p => sc.contractSet.has(p.contractCode)).length } };
   }
 
   /* ---------- الإنسايتس (نصوص مولَّدة من الأرقام، كل واحدة بدليلها) ---------- */
@@ -421,13 +424,18 @@ window.Egary = window.Egary || {};
     for (const c of st().contracts) {
       if (!S().unit(c.unitCode)) add('danger', 'contracts', c.code, 'العقد يشير إلى وحدة غير موجودة');
       if (!S().client(c.clientCode)) add('danger', 'contracts', c.code, 'العقد يشير إلى عميل غير موجود');
+      if (!U().d(c.start) || !U().d(c.end)) add('danger', 'contracts', c.code, `${(S().client(c.clientCode) || {}).name || ''} / ${(S().unit(c.unitCode) || {}).label || ''}: تاريخ ${!U().d(c.start) ? 'بداية' : 'نهاية'} العقد مفقود أو غير صحيح (${!U().d(c.start) ? (c.start || 'فارغ') : (c.end || 'فارغ')}) — العقد لا يُحاسَب حتى يُصحَّح`);
       if (U().d(c.start) && U().d(c.end) && U().d(c.end) < U().d(c.start)) add('danger', 'contracts', c.code, 'تاريخ نهاية العقد قبل بدايته');
       if (!(U().toNum(c.rent) > 0)) add('warn', 'contracts', c.code, 'الإيجار الشهري صفر أو غير مسجَّل');
       for (const p of S().paymentsOf(c.code)) { const d = dueForMonth(c, p.period); if (!d) add('info', 'payments', p.code, `دفعة ${U().periodLabel(p.period, true)} خارج مدة العقد ${c.code} (فترة سابقة؟)`); }
     }
     for (const u of st().units) if (!S().project(u.projectCode)) add('danger', 'units', u.code, 'الوحدة تشير إلى مشروع غير موجود');
     for (const p of st().payments) if (!S().contract(p.contractCode)) add('danger', 'payments', p.code, `الدفعة ${p.code} تشير إلى عقد غير موجود (${p.contractCode}) — ربما حُذف صفه من ورقة العقود`);
-    for (const c of st().contracts) { const s0 = U().d(c.start), e0 = U().d(c.end); if (!s0 || !e0) continue; for (const p of S().paymentsOf(c.code)) { const ci = cell(c, p.period); if (ci.status === 'paid' && ci.over) add('warn', 'contracts', c.code, `${(S().client(c.clientCode) || {}).name || ''} / ${(S().unit(c.unitCode) || {}).label || ''}: المسدَّد في ${U().periodLabel(p.period, true)} (${U().fmtMoney(ci.paid)}) أعلى من المستحق (${U().fmtMoney(ci.due.amount)})`); } }
+    for (const m of st().maintenance) if (!S().unit(m.unitCode)) add('danger', 'maintenance', m.code, `صيانة ${m.code} تشير إلى وحدة غير موجودة (${m.unitCode || 'فارغ'}) — راجع كود الوحدة في ورقة الصيانة`);
+    for (const c of st().contracts) { // تنبيه واحد لكل شهر مهما تعددت دفعاته
+      const s0 = U().d(c.start), e0 = U().d(c.end); if (!s0 || !e0) continue;
+      for (const period of new Set(S().paymentsOf(c.code).map(p => p.period))) { const ci = cell(c, period); if (ci.status === 'paid' && ci.over) add('warn', 'contracts', c.code, `${(S().client(c.clientCode) || {}).name || ''} / ${(S().unit(c.unitCode) || {}).label || ''}: المسدَّد في ${U().periodLabel(period, true)} (${U().fmtMoney(ci.paid)}) أعلى من المستحق (${U().fmtMoney(ci.due.amount)})`); }
+    }
     const byNid = U().groupBy(st().clients.filter(c => c.nationalId), c => U().foldCode(c.nationalId));
     for (const [nid, cs] of byNid) if (cs.length > 1) add('info', 'clients', cs[0].code, `نفس الرقم القومي/الباسبور (${nid}) مسجَّل لأكثر من عميل: ${cs.map(c => c.name + ' (' + c.code + ')').join('، ')}`);
     for (const c of st().contracts) if (c.inferred) add('info', 'contracts', c.code, `${(S().client(c.clientCode) || {}).name || ''} / ${(S().unit(c.unitCode) || {}).label || ''}: فترة سابقة مستنتجة من مبالغ الورقة قبل بداية العقد الحالي — راجع تواريخها وإيجارها`);

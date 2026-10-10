@@ -21,24 +21,32 @@ window.Egary = window.Egary || {};
   const fileFor = at => 'Egary-log-' + String(at || '').slice(0, 7) + '.csv';
   const deviceName = () => { try { return (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || ''; } catch (e) { return ''; } };
   function save() { try { localStorage.setItem(BUF_KEY, JSON.stringify(buf.slice(-MAX))); } catch (e) { } }
+  /* الوقت المحلي للجهاز (لا UTC) حتى يطابق ما يراه المستخدم في الإكسيل والسجل */
+  const stampNow = () => (E.U && E.U.stamp) ? E.U.stamp() : new Date().toISOString().slice(0, 19).replace('T', ' ');
   function append(entry) {
-    const e = Object.assign({ at: new Date().toISOString().slice(0, 19).replace('T', ' '), user: '', action: '', entity: '', code: '', summary: '', device: deviceName() }, entry || {});
+    const e = Object.assign({ at: stampNow(), user: '', action: '', entity: '', code: '', summary: '', device: deviceName() }, entry || {});
     buf.push(e); if (buf.length > MAX) buf = buf.slice(-MAX); save(); emit();
     if (state.dir) flush();
     return e;
   }
   let flushP = null;
-  /* كتابة ما في الذاكرة إلى ملفات الشهر (إلحاق). استدعاء متزامن ينتظر الكتابة الجارية ثم يكمل ما وصل أثناءها */
+  /* كتابة ما في الذاكرة إلى ملفات الشهر (إلحاق). استدعاء متزامن ينتظر الكتابة الجارية ثم يكمل ما وصل أثناءها.
+     • الجسم يبدأ بـ await حتى لا يكتمل متزامنًا قبل إسناد flushP (وإلا بقي flushP وعدًا منتهيًا ولم يُكتب شيء بعده).
+     • صفوف كل شهر تُحذف من الذاكرة فور نجاح إلحاقها، فلو فشل ملف الشهر التالي لا تُكرَّر في المحاولة القادمة. */
   function flush() {
     if (!state.dir) return Promise.resolve(false);
     if (flushP) return flushP;
     flushP = (async () => {
+      await null;
       try {
         while (buf.length && state.dir) {
-          const pending = buf.slice();
-          const groups = new Map(); for (const e of pending) { const n = fileFor(e.at); if (!groups.has(n)) groups.set(n, []); groups.get(n).push(e); }
-          for (const [name, rows] of groups) { await FL().appendFileIn(state.dir, SUB, name, rows.map(line).join(''), HEADER); state.written += rows.length; state.lastAt = Date.now(); state.lastFile = name; }
-          buf = buf.filter(e => !pending.includes(e)); save(); state.error = null;
+          const groups = new Map(); for (const e of buf) { const n = fileFor(e.at); if (!groups.has(n)) groups.set(n, []); groups.get(n).push(e); }
+          for (const [name, rows] of groups) {
+            await FL().appendFileIn(state.dir, SUB, name, rows.map(line).join(''), HEADER);
+            state.written += rows.length; state.lastAt = Date.now(); state.lastFile = name;
+            const done = new Set(rows); buf = buf.filter(e => !done.has(e)); save();
+          }
+          state.error = null;
         }
       } catch (e) { state.error = e.message || String(e); }
       finally { flushP = null; emit(); }
@@ -54,7 +62,7 @@ window.Egary = window.Egary || {};
     for (const e of buf.concat(auditRows || [])) { const k = [e.at, e.action, e.code, e.summary].join('|'); if (seen.has(k)) continue; seen.add(k); all.push(e); }
     all.sort((a, b) => (b.at > a.at ? 1 : b.at < a.at ? -1 : 0));
     const text = HEADER + all.map(line).join('');
-    FL().downloadBytes(new TextEncoder().encode(text).buffer, 'Egary-log-' + new Date().toISOString().slice(0, 10) + '.csv');
+    FL().downloadBytes(new TextEncoder().encode(text).buffer, 'Egary-log-' + stampNow().slice(0, 10) + '.csv');
     return all.length;
   }
   E.Log = { append, flush, setDir, status, subscribe, entries, downloadCsv, line, HEADER, _state: state };

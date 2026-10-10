@@ -12,7 +12,11 @@ window.Egary = window.Egary || {};
     if (!isoStr || typeof isoStr !== 'string') return null;
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoStr);
     if (!m) return null;
-    return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    const y = +m[1], mo = +m[2], dd = +m[3];
+    const dt = new Date(Date.UTC(y, mo - 1, dd));
+    // تاريخ مستحيل (30 فبراير، شهر 13، 31/11) لا يُدوَّر إلى الشهر التالي بل يُرفض
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== dd) return null;
+    return dt;
   }
   function iso(date) { return date ? date.toISOString().slice(0, 10) : ''; }
   let FAKE_TODAY = null; // للاختبارات: تثبيت «اليوم»
@@ -40,15 +44,17 @@ window.Egary = window.Egary || {};
       // ExcelJS يعطي التاريخ بمنتصف الليل UTC؛ نحميه من انزياح المنطقة الزمنية
       return iso(new Date(Date.UTC(v.getUTCFullYear(), v.getUTCMonth(), v.getUTCDate())));
     }
-    if (typeof v === 'number') { // رقم إكسيل تسلسلي
+    if (typeof v === 'number') { // رقم إكسيل تسلسلي (الكسر = وقت داخل نفس اليوم ⇒ لا يُقرَّب إلى اليوم التالي)
+      if (!isFinite(v)) return '';
       const base = Date.UTC(1899, 11, 30);
-      return iso(new Date(base + Math.round(v) * DAY));
+      return iso(new Date(base + Math.floor(v) * DAY));
     }
-    const s = String(v).trim().replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c));
+    const s = foldDigits(String(v).trim());
+    const valid = (y, mo, dd) => { const out = `${y}-${mo.padStart(2, '0')}-${dd.padStart(2, '0')}`; return d(out) ? out : ''; }; // تاريخ مستحيل ⇒ ''
     let m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(s);
-    if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+    if (m) return valid(m[1], m[2], m[3]);
     m = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/.exec(s);
-    if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+    if (m) return valid(m[3], m[2], m[1]);
     return '';
   }
   const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
@@ -61,6 +67,10 @@ window.Egary = window.Egary || {};
     const dt = d(isoStr); if (!dt) return '—';
     return String(dt.getUTCDate()).padStart(2, '0') + '/' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '/' + dt.getUTCFullYear();
   }
+
+  /* الأرقام العربية الهندية (٠-٩) والفارسية (۰-۹) → لاتينية؛ تُستخدم في الأرقام والتواريخ والأكواد والبحث */
+  const DIGITS = { '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9', '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9' };
+  function foldDigits(s) { return String(s == null ? '' : s).replace(/[٠-٩۰-۹]/g, c => DIGITS[c] || c); }
 
   /* ---------- أرقام ---------- */
   const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
@@ -79,14 +89,14 @@ window.Egary = window.Egary || {};
     if (v == null || v === '') return null;
     if (typeof v === 'number') return isFinite(v) ? v : null;
     if (typeof v === 'object' && v.result != null) return toNum(v.result); // خلية معادلة من ExcelJS
-    const s = String(v).replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/[,\s]/g, '').replace(/ج\.?م?\.?$/, '');
+    // أرقام عربية/فارسية، الفاصلة العشرية العربية (٫) والفاصلة الألفية (٬ أو ,) والمسافات، ولاحقة «ج» أو «ج.م»
+    const s = foldDigits(String(v)).replace(/٫/g, '.').replace(/[٬,\s]/g, '').replace(/(جنيهات|جنيها|جنيه|ج\.?م?\.?|egp|le)$/i, '');
     if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
     return parseFloat(s);
   }
   function round2(n) { return Math.round(n * 100) / 100; }
 
   /* ---------- تطبيع عربي للبحث ---------- */
-  const DIGITS = { '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9', '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9' };
   function normalize(s) {
     return String(s == null ? '' : s)
       .toLowerCase()
@@ -121,5 +131,5 @@ window.Egary = window.Egary || {};
   function groupBy(arr, f) { const m = new Map(); for (const x of arr) { const k = f(x); if (!m.has(k)) m.set(k, []); m.get(k).push(x); } return m; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
-  E.U = { DAY, d, iso, today, setToday, periodOf, monthFirst, monthLast, daysInMonth, addMonths, addDays, daysBetween, cmp, monthsBetween, periods, toIso, MONTHS_AR, periodLabel, fmtDate, fmtDateTime, fmtTime, fmtMoney, fmtNum, fmtPct, toNum, round2, normalize, matches, cellText, foldCode, pad, stamp, uid, clone, sum, groupBy, esc };
+  E.U = { DAY, d, iso, today, setToday, periodOf, monthFirst, monthLast, daysInMonth, addMonths, addDays, daysBetween, cmp, monthsBetween, periods, toIso, MONTHS_AR, periodLabel, fmtDate, fmtDateTime, fmtTime, fmtMoney, fmtNum, fmtPct, toNum, round2, foldDigits, normalize, matches, cellText, foldCode, pad, stamp, uid, clone, sum, groupBy, esc };
 })(window.Egary);

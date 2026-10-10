@@ -41,19 +41,22 @@ window.Egary = window.Egary || {};
 
   /* ---------- اللقطة (لحل التعارض) ---------- */
   function snapName() { return (E.Sync.adapter && E.Sync.adapter.name) || ''; }
-  function saveSnapshot() { try { const snap = W().snapshotOf(S().state()); snap.file = snapName(); localStorage.setItem(SNAP_KEY, JSON.stringify(snap)); } catch (e) { } }
+  let pendingSnap = null; // لقطة الملف كما كُتب — تُحفظ فقط بعد نجاح الكتابة (لو فشلت الكتابة تبقى اللقطة القديمة صحيحة)
+  function snapshotNow() { try { const snap = W().snapshotOf(S().state()); snap.file = snapName(); return snap; } catch (e) { return null; } }
+  function persistSnapshot(snap) { try { if (snap) localStorage.setItem(SNAP_KEY, JSON.stringify(snap)); } catch (e) { } }
+  function saveSnapshot() { persistSnapshot(snapshotNow()); }
   function loadSnapshot() { try { const snap = JSON.parse(localStorage.getItem(SNAP_KEY) || 'null'); return snap && (!snap.file || snap.file === snapName()) ? snap : null; } catch (e) { return null; } }
 
   /* ---------- المزامنة ---------- */
   let lastBytes = null; // آخر ملف مقروء/مكتوب — لحفظ الأوراق التي أضافها المكتب كما هي
   function initSync() {
     E.Sync.init({
-      serialize: async () => { const ov = En().overrideOf(); En().setOverride({}); let buf; try { buf = await W().write(S().state(), { base: lastBytes }); } finally { En().setOverride(ov); } lastBytes = buf; saveSnapshot(); E.FileLink.saveBackup(buf); return buf; }, // الأعمدة المحسوبة في الإكسيل بلا تأثير السلايسر
+      serialize: async () => { const ov = En().overrideOf(); En().setOverride({}); let buf; try { buf = await W().write(S().state(), { base: lastBytes }); } finally { En().setOverride(ov); } lastBytes = buf; pendingSnap = snapshotNow(); E.FileLink.saveBackup(buf); return buf; }, // الأعمدة المحسوبة في الإكسيل بلا تأثير السلايسر
       deserialize: async (buf) => { if (App.mode === 'linked' && E.Sync.adapter) await E.FileLink.saveOriginal(buf, E.Sync.adapter.name); const r = await W().read(buf, { snapshot: loadSnapshot() }); lastBytes = buf; S().load(r.state); App.flags = r.flags; saveSnapshot(); E.FileLink.saveBackup(buf); },
       applyOps: ops => S().applyOps(ops),
       onStatus: renderSync,
-      onExternalChange: () => { if (E.Auth.user() && !E.Auth.revalidate()) { UI().toast('أُلغي حسابك أو عُطِّل من المدير — سيُعاد فتح شاشة الدخول', 'warn', 4000); setTimeout(() => location.reload(), 1500); return; } UI().toast('تم تحديث البيانات من ملف الإكسيل', 'ok'); render(); },
-      onWritten: (buf) => { E.Backup.write(buf, '', false); },
+      onExternalChange: () => { if (E.Auth.user() && !E.Auth.revalidate()) { UI().toast('أُلغي حسابك أو عُطِّل من المدير — سيُعاد فتح شاشة الدخول', 'warn', 4000); setTimeout(() => location.reload(), 1500); return; } UI().toast('تم تحديث البيانات من ملف الإكسيل', 'ok'); render(); notifyRecoded(); },
+      onWritten: (buf) => { if (pendingSnap) { persistSnapshot(pendingSnap); pendingSnap = null; } E.Backup.write(buf, '', false); },
       pollMs: 2000,
     });
     E.Backup.subscribe(() => { if (App.route.view === 'settings') render(); });
@@ -88,6 +91,16 @@ window.Egary = window.Egary || {};
     try { localStorage.setItem('egary-backup-offered', '1'); } catch (e) { }
     const m = UI().modal({ title: 'تفعيل النسخ الاحتياطي التلقائي', size: 'sm', body: h('div', null, h('p', null, 'ليبقى عندك دائمًا نسخة من الإكسيل على القرص: اختر مجلد البرنامج نفسه (المجلد الذي فيه Egary.xlsx) مرة واحدة، وسيحفظ البرنامج نسخًا تلقائية في مجلد فرعي باسم ', h('span', { class: 'code' }, 'backups'), ' بعد كل تعديل وقبل أي حذف.'), h('p', { class: 'muted small mt-s' }, 'يمكنك تفعيله لاحقًا من الإعدادات.')), footer: [h('button', { class: 'btn', onclick: () => m.close() }, 'لاحقًا'), h('button', { class: 'btn primary', id: 'btn-enable-backups', onclick: async () => { m.close(); await enableBackups(); } }, UI().icon('shield'), 'اختيار مجلد البرنامج')] });
   }
+  /* تعارض أكواد أثناء إعادة تطبيق التعديلات المعلّقة (سجل كُتب في الإكسيل بنفس الكود): أُعيد ترقيم سجل الإكسيل — نُخبر المستخدم (الحدث مسجَّل في سجل التعديلات وسجل العمليات) */
+  function notifyRecoded() {
+    try {
+      const rep = S().replayReport && S().replayReport(); if (!rep || !rep.recoded || !rep.recoded.length || rep.at === App._recodedAt) return;
+      App._recodedAt = rep.at;
+      const ent = { payments: 'دفعة', contracts: 'عقد', units: 'وحدة', clients: 'عميل', projects: 'مشروع', maintenance: 'صيانة' };
+      for (const r of rep.recoded.slice(0, 3)) UI().toast(`تعارض أكواد عند المزامنة: ${ent[r.entity] || r.entity} ${r.from} (من الإكسيل) أُعيد ترقيمها إلى ${r.to}`, 'warn', 7000);
+      if (rep.recoded.length > 3) UI().toast(`و${rep.recoded.length - 3} تعارضات أخرى — راجع سجل التعديلات`, 'warn', 7000);
+    } catch (e) { }
+  }
   function renderSync(st) {
     const el = App.els.sync; if (!el) return;
     const map = { unlinked: ['غير مرتبط بملف', 'اضغط لربط ملف الإكسيل'], linked: ['متزامن مع ' + (st.name || 'الإكسيل'), st.lastSync ? 'آخر مزامنة ' + U().fmtTime(st.lastSync) : ''], saving: ['جارٍ الحفظ في الإكسيل…', ''], reading: ['جارٍ القراءة من الإكسيل…', ''], locked: ['الملف مفتوح في Excel — ' + st.pending + ' تعديل بانتظار الحفظ', 'أغلق الملف في Excel وسيُحفظ تلقائيًا'], error: ['خطأ في المزامنة', st.error || ''] };
@@ -95,10 +108,17 @@ window.Egary = window.Egary || {};
     el.className = 'sync ' + st.state; UI().clear(el); el.append(h('span', { class: 'dot' }), h('span', null, t)); el.title = sub;
     const banner = App.els.banner; if (!banner) return; UI().clear(banner);
     if (st.state === 'locked') banner.appendChild(h('div', { class: 'banner warn' }, UI().icon('warning'), h('span', null, `ملف الإكسيل مفتوح في برنامج Excel، لذلك لا يمكن الحفظ الآن. تعديلاتك (${st.pending}) محفوظة مؤقتًا وستُكتب تلقائيًا بمجرد إغلاق الملف.`), h('button', { class: 'btn sm', onclick: () => E.Sync.flush() }, 'حاول الآن')));
-    else if (st.state === 'error') banner.appendChild(h('div', { class: 'banner danger' }, UI().icon('warning'), h('span', null, 'خطأ في المزامنة: ' + (st.error || '')), h('button', { class: 'btn sm', onclick: () => E.Sync.flush() }, 'إعادة المحاولة'), E.FileLink.supported && (!E.Auth.user() || E.Auth.can('unlink')) ? h('button', { class: 'btn sm primary', onclick: linkFile }, UI().icon('link'), 'ربط الملف من جديد') : null));
+    else if (st.state === 'error') banner.appendChild(h('div', { class: 'banner danger' }, UI().icon('warning'), h('span', null, 'خطأ في المزامنة: ' + (st.error || '')), h('button', { class: 'btn sm', onclick: () => E.Sync.flush() }, 'إعادة المحاولة'),
+      /تعذّرت قراءته/.test(st.error || '') && (!E.Auth.user() || E.Auth.can('unlink')) ? h('button', { class: 'btn sm danger', title: 'يكتب بيانات الموقع فوق الملف الذي تعذّرت قراءته (تُحفظ نسخة احتياطية أولًا)', onclick: async () => { if (await UI().confirm({ title: 'استبدال الملف بنسخة الموقع', text: 'تعذّرت قراءة آخر تغيير في ملف الإكسيل. سيُكتب ما على الموقع فوق الملف، وتُحفظ نسخة احتياطية من الملف الحالي أولًا. هل تريد المتابعة؟', danger: true, okText: 'استبدال' })) E.Sync.forceWrite(); } }, 'استبدال الملف بنسخة الموقع') : null,
+      E.FileLink.supported && (!E.Auth.user() || E.Auth.can('unlink')) ? h('button', { class: 'btn sm primary', onclick: linkFile }, UI().icon('link'), 'ربط الملف من جديد') : null));
+    if (st.note) banner.appendChild(h('div', { class: 'banner info' }, UI().icon('info'), h('span', null, 'توجد تعديلات معلّقة تخص ملفًا آخر: ' + st.note + ' — ستُكتب تلقائيًا عند ربط ذلك الملف.'), ...E.Sync.stashed().map(sx => h('button', { class: 'btn sm', onclick: async () => { if (await UI().confirm({ title: 'تجاهل التعديلات المعلّقة', text: `حذف ${sx.count} تعديلًا معلّقًا يخص الملف ${sx.file} نهائيًا؟`, danger: true, okText: 'تجاهل' })) E.Sync.discardStash(sx.file); } }, 'تجاهل تعديلات ' + sx.file))));
     else if (App.mode === 'preview' || App.mode === 'demo' || App.mode === 'file') banner.appendChild(h('div', { class: 'banner info' }, UI().icon('info'), h('span', null, App.mode === 'demo' ? 'وضع تجريبي ببيانات نموذجية — التعديلات لا تُحفظ. اربط ملف الإكسيل لبدء العمل الحقيقي.' : 'الملف مفتوح للعرض بلا ربط — التعديلات تبقى في الذاكرة فقط. يمكنك تنزيل نسخة إكسيل محدثة أو ربط الملف للحفظ التلقائي.'), E.FileLink.supported ? h('button', { class: 'btn sm primary', onclick: linkFile }, UI().icon('link'), 'ربط ملف الإكسيل') : null, h('button', { class: 'btn sm', onclick: downloadCopy }, UI().icon('download'), 'تنزيل نسخة إكسيل')));
   }
-  async function downloadCopy() { const buf = await W().write(S().state(), { base: lastBytes }); E.FileLink.downloadBytes(buf, 'Egary.xlsx'); UI().toast('تم تنزيل نسخة الإكسيل', 'ok'); }
+  async function downloadCopy() { // مثل serialize: الأعمدة المحسوبة في النسخة بلا تأثير سلايسر «المحاسبة من»
+    const ov = En().overrideOf(); En().setOverride({}); let buf;
+    try { buf = await W().write(S().state(), { base: lastBytes }); } finally { En().setOverride(ov); }
+    E.FileLink.downloadBytes(buf, 'Egary.xlsx'); UI().toast('تم تنزيل نسخة الإكسيل', 'ok');
+  }
   async function downloadOriginal() { const b = await E.FileLink.loadOriginal(); if (!b || !b.bytes) { UI().toast('لا يوجد ملف أصلي محفوظ (يُحفظ عند أول ربط)', 'warn'); return; } E.FileLink.downloadBytes(b.bytes, 'Egary-original-' + new Date(b.at).toISOString().slice(0, 10) + '.xlsx'); UI().toast('تم تنزيل الملف الأصلي كما كان قبل أول تحويل (' + new Date(b.at).toLocaleDateString('ar-EG') + ')', 'ok'); }
   async function downloadBackup() { const b = await E.FileLink.loadBackup(); if (!b || !b.bytes) { UI().toast('لا توجد نسخة احتياطية بعد', 'warn'); return; } E.FileLink.downloadBytes(b.bytes, 'Egary-backup-' + new Date(b.at).toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.xlsx'); UI().toast('تم تنزيل النسخة الاحتياطية (' + U().fmtDateTime(b.at) + ')', 'ok'); }
 
@@ -407,7 +427,8 @@ window.Egary = window.Egary || {};
     const bar = h('div', { class: 'flex wrap row-gap', id: 'filter-bar' });
     bar.appendChild(h('span', { class: 'muted small flex' }, UI().icon('filter'), 'الفلاتر:'));
     if (opts.period) { // متصفح الشهر: ◀ الشهر ▶ — يغيّر شهر التقرير في اللوحة والتحليلات ولوحة BI
-      const cur = U().periodOf(U().today()); const from = st.settings.trackingFrom && U().cmp(st.settings.trackingFrom, cur) <= 0 ? st.settings.trackingFrom : cur.slice(0, 4) + '-01';
+      const cur = U().periodOf(U().today()), tf = En().trackingFrom(); // الحد الأدنى = بداية المحاسبة الفعلية (الإعداد أو سلايسر «المحاسبة من»)
+      const from = tf && U().cmp(tf, cur) <= 0 ? tf : cur.slice(0, 4) + '-01';
       const sel = f.period || opts.defaultPeriod || cur; const months = [...U().periods(from, cur)].reverse();
       const setP = (p) => setFilter({ period: p && p !== (opts.defaultPeriod || cur) ? p : '' });
       bar.appendChild(h('span', { class: 'period-nav fgroup', id: 'period-nav' }, h('span', { class: 'lbl' }, 'شهر التقرير'),
