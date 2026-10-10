@@ -1055,7 +1055,7 @@ e2e('17. first run: a workbook without users shows the setup screen, creates own
   await linkReal(page, null, SRC);
   await page.waitForSelector('#setup-form');
   await page.fill('#su-admin-user', 'owner'); await page.fill('#su-admin-name', 'المالك'); await page.fill('#su-admin-pass', 'own@2026'); await page.fill('#su-admin-pass2', 'own@2027');
-  await page.fill('#su-staff-user', 'office'); await page.fill('#su-staff-name', 'موظف'); await page.fill('#su-staff-pass', 'off@2026');
+  await page.fill('#su-staff-user', 'office'); await page.fill('#su-staff-name', 'موظف'); await page.fill('#su-staff-pass', 'off@2026'); await page.fill('#su-staff-pass2', 'off@2026');
   await page.click('#setup-go'); await page.waitForSelector('#setup-err.on');
   assert.ok((await page.textContent('#setup-err')).includes('غير مطابق'));
   await page.fill('#su-admin-pass2', 'own@2026'); await page.click('#setup-go');
