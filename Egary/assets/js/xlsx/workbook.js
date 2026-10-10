@@ -15,7 +15,7 @@ window.Egary = window.Egary || {};
   const XL = () => (typeof ExcelJS !== 'undefined' ? ExcelJS : (typeof require === 'function' ? require('exceljs') : null));
 
   /* ---------- أسماء الأوراق والأعمدة ---------- */
-  const SH = { projects: 'المشاريع', units: 'الوحدات', assets: 'أصول الوحدات', clients: 'العملاء', contracts: 'العقود', payments: 'المدفوعات', maintenance: 'الصيانة', settings: 'الإعدادات', audit: 'سجل التعديلات', summary: 'ملخص المشاريع' };
+  const SH = { projects: 'المشاريع', units: 'الوحدات', assets: 'أصول الوحدات', clients: 'العملاء', contracts: 'العقود', payments: 'المدفوعات', maintenance: 'الصيانة', settings: 'الإعدادات', audit: 'سجل التعديلات', summary: 'ملخص المشاريع', users: 'المستخدمون' };
   const LEDGER_HEAD = ['م', 'المشروع', 'الاسم', 'الممثل القانوني', 'الوحدة', 'العنوان', 'العقد من', 'العقد الى', 'تسجيل ضريبي', 'الرقم القومي / الباسبور', 'يناير', 'فبراير', 'مارس', 'ابريل', 'مايو', 'يونيو', 'يوليو', 'اغسطس', 'سبتمبر', 'اكتوبر', 'نوفمبر', 'ديسمبر', 'الاجمالي', 'ملاحظات', 'كود العقد', 'كود الوحدة', 'كود العميل', 'كود المشروع'];
   const COLS = {
     projects: [['code', 'كود المشروع'], ['name', 'اسم المشروع'], ['address', 'العنوان'], ['area', 'المنطقة'], ['notes', 'ملاحظات'], ['createdAt', 'تاريخ الإضافة'], ['_units', 'عدد الوحدات (محسوب)'], ['_occupied', 'مؤجَّرة (محسوب)'], ['_vacant', 'شاغرة (محسوب)'], ['_arrears', 'المتأخرات (محسوب)'], ['_ytd', 'محصَّل السنة (محسوب)']],
@@ -25,11 +25,13 @@ window.Egary = window.Egary || {};
     contracts: [['code', 'كود العقد'], ['unitCode', 'كود الوحدة'], ['clientCode', 'كود العميل'], ['_project', 'المشروع'], ['_unit', 'الوحدة'], ['_client', 'العميل'], ['start', 'بداية العقد'], ['end', 'نهاية العقد'], ['rent', 'الإيجار الشهري (السنة الأولى)'], ['increasePct', 'الزيادة السنوية %'], ['rentOverrides', 'إيجار كل سنة (يدوي)'], ['deposit', 'التأمين'], ['depositStatus', 'حالة التأمين'], ['dueDay', 'يوم الاستحقاق'], ['prevCode', 'العقد السابق'], ['notes', 'ملاحظات'], ['ledgerOrder', 'ترتيب الورقة'], ['inferred', 'مستنتج'], ['createdAt', 'تاريخ الإضافة'], ['_status', 'الحالة (محسوب)'], ['_currentRent', 'الإيجار الحالي (محسوب)'], ['_paid', 'المسدَّد (محسوب)'], ['_arrears', 'المتأخرات (محسوب)'], ['_schedule', 'جدول السنوات (محسوب)'], ['_statusKey', 'مفتاح الحالة (محسوب)'], ['_daysLeft', 'أيام متبقية (محسوب)']],
     payments: [['code', 'رقم الفاتورة'], ['contractCode', 'كود العقد'], ['_client', 'العميل'], ['_unit', 'الوحدة'], ['period', 'الشهر'], ['amount', 'المبلغ'], ['paidOn', 'تاريخ السداد'], ['method', 'طريقة السداد'], ['ref', 'مرجع / إيصال'], ['notes', 'ملاحظات'], ['source', 'المصدر'], ['createdAt', 'تاريخ التسجيل']],
     maintenance: [['code', 'كود الصيانة'], ['unitCode', 'كود الوحدة'], ['_project', 'المشروع'], ['_unit', 'الوحدة'], ['date', 'التاريخ'], ['kind', 'النوع'], ['description', 'الوصف'], ['cost', 'التكلفة'], ['borneBy', 'يتحملها'], ['status', 'الحالة'], ['closedOn', 'تاريخ الإغلاق'], ['notes', 'ملاحظات'], ['createdAt', 'تاريخ الإضافة'], ['custodianContract', 'العقد وقتها'], ['custodianName', 'المستأجر وقتها'], ['_custodian', 'المستأجر وقتها (محسوب)'], ['_custodianContract', 'العقد وقتها (محسوب)']],
+    users: [['code', 'اسم المستخدم'], ['name', 'الاسم'], ['role', 'الدور'], ['passwordHash', 'كلمة المرور (مشفّرة)'], ['enabled', 'مفعّل'], ['createdAt', 'تاريخ الإضافة'], ['lastLogin', 'آخر دخول']],
   };
   const LISTS = { // الحقول ذات القوائم: مفتاح ⇄ عربي
     'units.type': () => M().UNIT_TYPES, 'clients.kind': () => M().CLIENT_KINDS, 'contracts.depositStatus': () => M().DEPOSIT_STATUS,
     'payments.method': () => [{ key: '', ar: 'غير محدد' }].concat(M().PAY_METHODS), 'payments.source': () => [{ key: 'web', ar: 'الموقع' }, { key: 'excel', ar: 'الإكسيل' }],
     'maintenance.kind': () => M().MAINT_KINDS, 'maintenance.borneBy': () => M().BORNE_BY, 'maintenance.status': () => M().MAINT_STATUS,
+    'users.role': () => E.Auth ? E.Auth.ROLES : [{ key: 'admin', ar: 'مدير' }, { key: 'staff', ar: 'موظف' }, { key: 'viewer', ar: 'مشاهدة فقط' }],
   };
   const DATE_FIELDS = new Set(['start', 'end', 'paidOn', 'date', 'closedOn', 'createdAt']);
   const NUM_FIELDS = new Set(['rent', 'increasePct', 'deposit', 'dueDay', 'amount', 'cost', 'area', 'ledgerOrder']);
@@ -71,6 +73,8 @@ window.Egary = window.Egary || {};
     if (!ledgerSheets.length && !normalized) throw new Error('الملف لا يحتوي على ورقة سنة (مثل 2026) ولا أوراق إيجاري');
     state.settings.ledgerYears = Array.from(new Set(ledgerSheets.map(w => parseInt(w.name, 10)).concat(state.settings.ledgerYears || []))).sort();
     if (!state.settings.trackingFrom || !normalized) state.settings.trackingFrom = String(state.settings.ledgerYears[0] || new Date().getUTCFullYear()) + '-01';
+    // ورقة سنة أقدم أُضيفت (مثل 2025 بجوار 2026): تبدأ المحاسبة من أول سنة موجودة فعلًا
+    if (state.settings.ledgerYears.length && U().cmp(String(state.settings.ledgerYears[0]) + '-01', state.settings.trackingFrom) < 0) state.settings.trackingFrom = String(state.settings.ledgerYears[0]) + '-01';
     state.flags = flags;
     return { state, flags, migrated: !normalized, sheets: names };
   }
@@ -95,6 +99,7 @@ window.Egary = window.Egary || {};
         else if (field === 'rentOverrides') rec[field] = parseOverrides(txt);
         else if (field === 'period') { const iso = v instanceof Date ? U().toIso(v) : (/^\d{4}-\d{2}-\d{2}/.test(txt) ? txt : ''); rec[field] = iso ? iso.slice(0, 7) : txt.replace(/[٠-٩]/g, ch => '٠١٢٣٤٥٦٧٨٩'.indexOf(ch)).replace(/\//g, '-').slice(0, 7); }
         else if (field === 'present' || field === 'inferred') rec[field] = /^(نعم|✓|yes|true|1|موجود)$/i.test(txt);
+        else if (field === 'enabled') rec[field] = txt === '' ? true : /^(نعم|✓|yes|true|1)$/i.test(txt);
         else rec[field] = txt;
       }
       if (any) { rec._row = r; out.push(rec); }
@@ -123,6 +128,9 @@ window.Egary = window.Egary || {};
     for (const p of state.payments) if (p._needsCode) { p.code = C().nextInvoice(state, (p.period || '0000').slice(0, 4)); p.source = p.source || 'excel'; }
     for (const m of state.maintenance) if (m._needsCode) { m.code = C().nextMaintenance(state); }
     for (const ent of ['projects', 'units', 'clients', 'contracts', 'payments', 'maintenance']) for (const r of state[ent]) { delete r._needsCode; delete r._rowNo; delete r._project; delete r._unit; delete r._client; }
+    // المستخدمون (حسابات الدخول)
+    const wu = wb.getWorksheet(SH.users);
+    if (wu) for (const r of readTable(wu, 'users')) { delete r._row; r.code = String(r.code || '').trim().toLowerCase(); if (r.code) state.users.push(r); }
     // الأصول
     const wa = wb.getWorksheet(SH.assets);
     if (wa) {
@@ -144,7 +152,7 @@ window.Egary = window.Egary || {};
       }
     }
     const wsA = wb.getWorksheet(SH.audit);
-    if (wsA) for (let r = 2; r <= Math.min(wsA.rowCount, 501); r++) { const row = wsA.getRow(r); if (!row.hasValues) continue; state.audit.push({ at: U().cellText(row.getCell(1).value), action: U().cellText(row.getCell(2).value), entity: U().cellText(row.getCell(3).value), code: U().cellText(row.getCell(4).value), summary: U().cellText(row.getCell(5).value) }); }
+    if (wsA) for (let r = 2; r <= Math.min(wsA.rowCount, 501); r++) { const row = wsA.getRow(r); if (!row.hasValues) continue; state.audit.push({ at: U().cellText(row.getCell(1).value), action: U().cellText(row.getCell(2).value), entity: U().cellText(row.getCell(3).value), code: U().cellText(row.getCell(4).value), summary: U().cellText(row.getCell(5).value), user: U().cellText(row.getCell(6).value) }); }
   }
   const SETTINGS_KEYS = [
     { key: 'officeName', ar: 'اسم المكتب', type: 'text' }, { key: 'graceDays', ar: 'أيام السماح بعد الاستحقاق', type: 'num' }, { key: 'dueDay', ar: 'يوم الاستحقاق الافتراضي', type: 'num' },
@@ -378,7 +386,7 @@ window.Egary = window.Egary || {};
     const sheetsMeta = {};
     for (const y of years) sheetsMeta[y] = writeLedger(wb, state, String(y), asOf);
     writeSummary(wb, state, String(years[years.length - 1]), sheetsMeta[years[years.length - 1]]);
-    writeProjects(wb, state, asOf); writeUnits(wb, state, asOf); writeAssets(wb, state); writeClients(wb, state, asOf); writeContracts(wb, state, asOf); writePayments(wb, state); writeMaintenance(wb, state, asOf); writeSettings(wb, state); writeAudit(wb, state);
+    writeProjects(wb, state, asOf); writeUnits(wb, state, asOf); writeAssets(wb, state); writeClients(wb, state, asOf); writeContracts(wb, state, asOf); writePayments(wb, state); writeMaintenance(wb, state, asOf); writeSettings(wb, state); writeAudit(wb, state); writeUsers(wb, state);
     // ترتيب الأوراق: أوراق السنوات ثم الملخص ثم أوراقنا ثم أوراق المكتب
     let order = 1; for (const ws of wb.worksheets) if (!foreign.includes(ws.name)) ws.orderNo = order++;
     for (const name of foreign) { const ws = wb.getWorksheet(name); if (ws) ws.orderNo = order++; }
@@ -486,6 +494,8 @@ window.Egary = window.Egary || {};
         else if (field === 'rentOverrides') cell.value = fmtOverrides(v);
         else if (field === 'present') cell.value = v ? 'نعم' : 'لا';
         else if (field === 'inferred') cell.value = v ? 'نعم' : '';
+        else if (field === 'enabled') cell.value = v === false ? 'لا' : 'نعم';
+        else if (field === 'passwordHash') { cell.value = v == null ? '' : String(v); cell.numFmt = '@'; }
         else if (LISTS[entity + '.' + field]) cell.value = M().label(LISTS[entity + '.' + field](), v == null ? '' : v);
         else if (field === 'nationalId' || field === 'taxId' || field === 'phone' || field === 'phone2') { cell.value = v == null ? '' : String(v); cell.numFmt = '@'; }
         else if (field === 'period') { cell.value = v == null ? '' : String(v); cell.numFmt = '@'; }
@@ -526,10 +536,16 @@ window.Egary = window.Egary || {};
     ws.getCell(r + 1, 1).value = 'آخر كتابة من الموقع'; ws.getCell(r + 1, 2).value = new Date().toISOString().slice(0, 19).replace('T', ' ');
     ws.getCell(r + 2, 1).value = 'إصدار البنية'; ws.getCell(r + 2, 2).value = 2;
   }
+  /* ورقة المستخدمين: مخفية في الإكسيل (المدير يستطيع إظهارها)، كلمة المرور مشفّرة لا تُقرأ */
+  function writeUsers(wb, state) {
+    const ws = table(wb, SH.users, 'users', (state.users || []).slice().sort((a, b) => U().cmp(a.code, b.code)), null, { widths: [18, 24, 14, 90, 10, 14, 20] });
+    ws.state = 'hidden';
+    return ws;
+  }
   function writeAudit(wb, state) {
     const ws = wb.addWorksheet(SH.audit, { views: [{ state: 'frozen', ySplit: 1, rightToLeft: true }] });
-    ws.getRow(1).values = ['الوقت', 'العملية', 'الكيان', 'الكود', 'التفاصيل']; styleHeader(ws.getRow(1)); [20, 10, 10, 14, 60].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
-    let r = 2; for (const a of (state.audit || []).slice(0, 500)) { ws.getRow(r).values = [a.at, a.action, a.entity, a.code, a.summary]; r++; }
+    ws.getRow(1).values = ['الوقت', 'العملية', 'الكيان', 'الكود', 'التفاصيل', 'المستخدم']; styleHeader(ws.getRow(1)); [20, 10, 10, 14, 60, 18].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+    let r = 2; for (const a of (state.audit || []).slice(0, 500)) { ws.getRow(r).values = [a.at, a.action, a.entity, a.code, a.summary, a.user || '']; r++; }
   }
 
   /* لقطة لما كتبه/قرأه الموقع آخر مرة (لمعرفة أي جهة تغيّرت عند التعارض) */

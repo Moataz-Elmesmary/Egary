@@ -6,6 +6,8 @@ const { chromium } = require('playwright');
 const URL_ = 'file://' + path.resolve(__dirname, '../Egary/index.html');
 const XLSX_B64 = fs.readFileSync(path.resolve(__dirname, '../Egary/Egary.xlsx')).toString('base64');
 const FAKE = require('./helpers/fake-handle');
+
+async function loginAs(page, u, p) { await page.waitForSelector('#login-form', { timeout: 40000 }); await page.fill('#login-user', u); await page.fill('#login-pass', p); await page.click('#login-go'); await page.waitForSelector('#login', { state: 'detached', timeout: 20000 }); }
 let browser;
 test.before(async () => { browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }); });
 test.after(async () => { await browser.close(); });
@@ -43,6 +45,7 @@ test('backup flow: offer after link → pick folder → original written → del
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto(URL_); await page.waitForSelector('#btn-link');
   await page.click('#btn-link');
+  await loginAs(page, 'admin', 'admin@2026');
   await page.waitForSelector('.kpi', { timeout: 40000 });
   await page.waitForFunction(() => document.querySelector('#sync-status').classList.contains('linked'));
   // العرض يظهر مرة واحدة بعد الربط

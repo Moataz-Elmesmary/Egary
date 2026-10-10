@@ -7,6 +7,9 @@ const { load, readFile, SOURCE, ROOT } = require('./helpers/env');
   const { state, flags } = await E.Workbook.read(readFile(src));
   state.meta.officeName = 'إيجاري';
   E.Store.load(state);
+  // حسابات دخول للنسخة التجريبية/الاختبارات (الملف الحقيقي للمالك يبدأ بلا حسابات ⇒ شاشة الإنشاء الأولى)
+  for (const [code, name, role, pass] of [['admin', 'المدير', 'admin', 'admin@2026'], ['office', 'موظف المكتب', 'staff', 'office@2026'], ['zaer', 'زائر', 'viewer', 'view@2026']]) { const r = await E.Auth.createUser({ code, name, role }, pass); if (r.errors) throw new Error(r.errors.join(' / ')); }
+  state.audit = [];
   const buf = await E.Workbook.write(state);
   const out = path.join(ROOT, 'Egary.xlsx');
   fs.writeFileSync(out, Buffer.from(buf));

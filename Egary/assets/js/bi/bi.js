@@ -278,5 +278,5 @@ window.Egary = window.Egary || {};
     body.appendChild(panel('آخر السجلات', UI().table({ cols: [{ key: 'date', label: 'التاريخ', render: r => U().fmtDate(r.date) }, { key: 'unitLabel', label: 'الوحدة' }, { key: 'description', label: 'الوصف' }, { key: 'cost', label: 'التكلفة', num: true, render: r => fm(r.cost) }, { key: 'custodianName', label: 'في عهدة' }, { key: 'status', label: 'الحالة', render: r => UI().badge(r.status, M().label(M().MAINT_STATUS, r.status)) }], rows: m.items.slice(0, 20), onRow: r => c.open('unit', r.unitCode), sort: 'date', sortDir: -1 })));
   }
 
-  E.BI = { open, close, enterBoard, get isOpen() { return !!root; } };
+  E.BI = { open, close, enterBoard, makeSkyline, get isOpen() { return !!root; } };
 })(window.Egary);

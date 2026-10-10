@@ -48,6 +48,7 @@ window.Egary = window.Egary || {};
         prorationBasis: '30',    // الشهر المقطوع يُحسب على 30 يومًا كما يفعل المكتب ('actual' = بالأيام الفعلية)
       },
       projects: [], units: [], clients: [], contracts: [], payments: [], maintenance: [],
+      users: [],  // حسابات الدخول (كلمة المرور مشفّرة)
       audit: [],
       flags: [], // ملاحظات جودة البيانات المكتشفة عند القراءة (محسوبة، لا تُحفظ)
     };
@@ -61,9 +62,10 @@ window.Egary = window.Egary || {};
     contracts: () => ({ code: '', unitCode: '', clientCode: '', start: '', end: '', rent: 0, increasePct: 0, rentOverrides: {}, deposit: 0, depositStatus: 'none', dueDay: 1, prevCode: '', notes: '', inferred: false, createdAt: '' }),
     payments: () => ({ code: '', contractCode: '', period: '', amount: 0, paidOn: '', method: 'cash', ref: '', notes: '', source: 'web', createdAt: '' }),
     maintenance: () => ({ code: '', unitCode: '', date: '', kind: 'other', description: '', cost: 0, borneBy: 'owner', status: 'open', closedOn: '', notes: '', custodianContract: '', custodianName: '', createdAt: '' }),
+    users: () => ({ code: '', name: '', role: 'staff', passwordHash: '', enabled: true, createdAt: '', lastLogin: '' }),
   };
   const ENTITIES = Object.keys(blank);
-  const ENTITY_AR = { projects: 'مشروع', units: 'وحدة', clients: 'عميل', contracts: 'عقد', payments: 'دفعة', maintenance: 'صيانة' };
+  const ENTITY_AR = { projects: 'مشروع', units: 'وحدة', clients: 'عميل', contracts: 'عقد', payments: 'دفعة', maintenance: 'صيانة', users: 'مستخدم' };
 
   /* تحقق بسيط يعيد قائمة أخطاء بالعربية (فارغة = سليم) */
   function validate(entity, r, state) {

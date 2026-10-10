@@ -64,9 +64,16 @@ window.Egary = window.Egary || {};
     });
   }
   function now() { return U().iso(U().today()); }
+  /* صلاحيات: مشاهدة فقط لا تعدّل، الإعدادات والمستخدمون للمدير */
+  function guard(action, entity) {
+    if (!E.Auth || E.Auth.can(action, entity)) return true;
+    UI().toast(action === 'settings' ? 'الإعدادات للمدير فقط' : action === 'users' ? 'إدارة المستخدمين للمدير فقط' : 'حسابك للمشاهدة فقط — لا يمكنك التعديل', 'warn');
+    return false;
+  }
 
   /* ---------- مشروع ---------- */
   function project(rec) {
+    if (!guard('edit')) return Promise.resolve(null);
     const isNew = !rec; rec = rec || M().blank.projects();
     return openForm({
       title: isNew ? 'مشروع جديد' : 'تعديل مشروع ' + rec.code,
@@ -88,6 +95,7 @@ window.Egary = window.Egary || {};
 
   /* ---------- وحدة (مع قائمة الأصول) ---------- */
   function unit(rec, defaults) {
+    if (!guard('edit')) return Promise.resolve(null);
     const isNew = !rec; rec = rec || Object.assign(M().blank.units(), defaults || {});
     const st = S().state();
     const projOpts = st.projects.map(p => ({ value: p.code, label: `${p.name} (${p.code})` }));
@@ -141,6 +149,7 @@ window.Egary = window.Egary || {};
 
   /* ---------- عميل ---------- */
   function client(rec, defaults) {
+    if (!guard('edit')) return Promise.resolve(null);
     const isNew = !rec; rec = rec || Object.assign(M().blank.clients(), defaults || {});
     return openForm({
       title: isNew ? 'عميل جديد' : 'تعديل عميل ' + rec.code,
@@ -175,6 +184,7 @@ window.Egary = window.Egary || {};
     return st.projects.map(p => ({ group: `${p.name} (${p.code})`, items: S().unitsOf(p.code).map(u => { const s = En().unitStatus(u, asOf); return { value: u.code, label: `${u.label} — ${u.code} — ${En().USTATUS_AR[s.status]}${s.contract && s.contract.code !== current ? ' (' + (S().client(s.contract.clientCode) || {}).name + ')' : ''}` }; }) })).filter(g => g.items.length);
   }
   function contract(rec, defaults) {
+    if (!guard('edit')) return Promise.resolve(null);
     const isNew = !rec; const st = S().state();
     rec = rec || Object.assign(M().blank.contracts(), { increasePct: st.settings.defaultIncreasePct || 0, dueDay: st.settings.dueDay || 1, depositStatus: 'none' }, defaults || {});
     let schedBox, overrides = Object.assign({}, rec.rentOverrides || {});
@@ -234,6 +244,7 @@ window.Egary = window.Egary || {};
 
   /* ---------- دفعة / فاتورة ---------- */
   function payment(rec, defaults) {
+    if (!guard('edit')) return Promise.resolve(null);
     const isNew = !rec; const st = S().state();
     defaults = defaults || {};
     rec = rec || Object.assign(M().blank.payments(), { paidOn: now(), method: 'cash', source: 'web' }, defaults);
@@ -273,6 +284,7 @@ window.Egary = window.Egary || {};
 
   /* ---------- صيانة ---------- */
   function maintenance(rec, defaults) {
+    if (!guard('edit')) return Promise.resolve(null);
     const isNew = !rec; const st = S().state();
     rec = rec || Object.assign(M().blank.maintenance(), { date: now(), status: 'open', borneBy: 'owner', kind: 'other' }, defaults || {});
     return openForm({
@@ -310,6 +322,7 @@ window.Egary = window.Egary || {};
 
   /* ---------- الإعدادات ---------- */
   function settings() {
+    if (!guard('settings')) return Promise.resolve(null);
     const st = S().state(), sg = st.settings;
     return openForm({
       title: 'الإعدادات',
@@ -397,5 +410,40 @@ window.Egary = window.Egary || {};
     return UI().modal({ title: 'كشف حساب — ' + c.name, size: 'lg', body: box, footer: [printBtn] });
   }
 
-  E.Forms = { project, unit, client, contract, payment, maintenance, settings, invoice, statement, field, input, select, number, date, textarea, listOpts };
+  /* ---------- المستخدمون وكلمات المرور ---------- */
+  function user(rec) {
+    if (!guard('users')) return Promise.resolve(null);
+    const isNew = !rec; rec = rec || M().blank.users();
+    return openForm({
+      title: isNew ? 'مستخدم جديد' : 'تعديل مستخدم ' + rec.code,
+      body: () => [
+        field('اسم المستخدم (للدخول)', input('code', rec.code, { placeholder: 'حروف لاتينية وأرقام', disabled: !isNew, dir: 'ltr', autocapitalize: 'off', spellcheck: false }), { req: true, help: isNew ? '3–24 حرفًا لاتينيًا أو أرقامًا بلا مسافات' : 'لا يتغيّر بعد الإنشاء' }),
+        field('الاسم (يظهر في سجل التعديلات)', input('name', rec.name), { req: true }),
+        field('الدور', select('role', E.Auth.ROLES, rec.role), { req: true }),
+        field('الحالة', select('enabled', [{ key: 'yes', ar: 'مفعَّل' }, { key: 'no', ar: 'معطَّل' }], rec.enabled === false ? 'no' : 'yes')),
+        isNew ? field('كلمة المرور', input('password', '', { type: 'password', autocomplete: 'new-password' }), { req: true, help: '6 أحرف على الأقل' }) : null,
+        isNew ? field('تأكيد كلمة المرور', input('password2', '', { type: 'password', autocomplete: 'new-password' }), { req: true }) : null,
+        h('p', { class: 'small muted', style: { gridColumn: '1 / -1' } }, 'مدير: كل الصلاحيات · موظف: إدخال وتعديل، وحذف الدفعات والصيانة فقط (بلا إعدادات ولا مستخدمين) · مشاهدة فقط: بلا أي تعديل.'),
+      ],
+      onSave: async (v) => {
+        if (isNew) { if (v.password !== v.password2) return { errors: ['تأكيد كلمة المرور غير مطابق'] }; const r = await E.Auth.createUser({ code: v.code, name: v.name, role: v.role, enabled: v.enabled !== 'no' }, v.password); if (!r.errors) UI().toast('أُضيف المستخدم ' + v.name, 'ok'); return r; }
+        const r = E.Auth.updateUser(rec.code, { name: v.name, role: v.role, enabled: v.enabled !== 'no' }); if (!r.errors) UI().toast('حُفظ المستخدم', 'ok'); return r;
+      },
+    });
+  }
+  function changePassword(code, requireOld) {
+    const u = E.Auth.find(code); if (!u) { UI().toast('المستخدم غير موجود', 'danger'); return Promise.resolve(null); }
+    if (!requireOld && !guard('users')) return Promise.resolve(null);
+    return openForm({
+      title: requireOld ? 'تغيير كلمة المرور' : 'إعادة تعيين كلمة مرور ' + u.name, size: 'sm',
+      body: () => [
+        requireOld ? field('كلمة المرور الحالية', input('old', '', { type: 'password', autocomplete: 'current-password' }), { req: true, full: true }) : null,
+        field('كلمة المرور الجديدة', input('password', '', { type: 'password', autocomplete: 'new-password' }), { req: true, full: true, help: '6 أحرف على الأقل' }),
+        field('تأكيد كلمة المرور الجديدة', input('password2', '', { type: 'password', autocomplete: 'new-password' }), { req: true, full: true }),
+      ],
+      onSave: async (v) => { if (v.password !== v.password2) return { errors: ['تأكيد كلمة المرور غير مطابق'] }; const r = await E.Auth.setPassword(code, v.password, requireOld ? v.old : undefined); if (!r.errors) UI().toast('تم تغيير كلمة المرور', 'ok'); return r; },
+    });
+  }
+
+  E.Forms = { project, unit, client, contract, payment, maintenance, settings, invoice, statement, user, changePassword, guard, field, input, select, number, date, textarea, listOpts };
 })(window.Egary);

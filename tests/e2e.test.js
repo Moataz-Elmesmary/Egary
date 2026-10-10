@@ -57,15 +57,26 @@ function e2e(name, fn, opts) {
   });
 }
 /* الوضع المرتبط: الملف الحقيقي في محوِّل ذاكرة (بلا منتقي ملفات) */
-async function linkReal(page) {
-  await page.evaluate(async (b64) => {
+const ADMIN = ['admin', 'admin@2026'], STAFF = ['office', 'office@2026'], VIEWER = ['zaer', 'view@2026'];
+async function loginAs(page, creds, remember) {
+  await page.waitForSelector('#login-form', { timeout: 20000 });
+  await page.fill('#login-user', creds[0]); await page.fill('#login-pass', creds[1]);
+  if (remember) await page.check('#login-remember');
+  await page.click('#login-go');
+  await page.waitForSelector('#login', { state: 'detached', timeout: 20000 });
+}
+async function linkReal(page, creds, b64) {
+  await page.evaluate((b64) => {
     const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
     const adapter = Egary.FileLink.memoryAdapter(bytes, 'Egary.xlsx');
     window.__adapter = adapter;
-    await Egary.App.linkAdapter(adapter);
-  }, XLSX_B64);
+    Egary.App.linkAdapter(adapter); // لا ننتظر: بوابة الدخول تنتظر النموذج
+  }, b64 || XLSX_B64);
+  if (creds === null) return; // الاختبار يتعامل مع شاشة الدخول/الإنشاء بنفسه
+  await loginAs(page, creds || ADMIN);
   await page.waitForSelector('#content .kpis .kpi');
-  await page.waitForFunction(() => Egary.Sync.status.state === 'linked');
+  await page.waitForFunction(() => Egary.Sync.status.state === 'linked' && Egary.Sync.status.pending === 0);
+  await page.evaluate(() => { window.__adapter.writes = 0; }); // كتابة سطر الدخول لا تُحسب على الاختبارات
 }
 async function go(page, hash, waitSel) {
   await page.evaluate(h => { if (location.hash === h) Egary.App.render(); else location.hash = h; }, hash);
@@ -602,6 +613,7 @@ e2e('6g. delete a payment from #/payments: «إلغاء» keeps it, «نعم، �
 
 e2e('6h. deleting a project with units shows the cascade warning with counts; cancel keeps everything', async (page) => {
   await linkReal(page);
+  const w0 = 0;
   await go(page, '#/projects', '#content .page-head');
   const deps = await page.evaluate(() => { const d = Egary.Store.dependents('projects', 'P01'); return { units: d.units.length, contracts: d.contracts.length, payments: d.payments.length }; });
   assert.deepEqual(deps, { units: 7, contracts: 7, payments: 41 });
@@ -616,7 +628,7 @@ e2e('6h. deleting a project with units shows the cascade warning with counts; ca
   assert.equal(await navCount(page, 'projects'), '3');
   assert.equal(await navCount(page, 'units'), '71');
   assert.equal(await page.locator('#content .card', { hasText: 'بابل' }).count(), 1);
-  assert.equal(await page.evaluate(() => window.__adapter.writes + Egary.Sync.status.pending), 0);
+  assert.equal(await page.evaluate(() => window.__adapter.writes + Egary.Sync.status.pending), w0, 'cancel writes nothing');
 });
 
 /* =====================================================================
@@ -965,4 +977,103 @@ e2e('15. WhatsApp reminder (text from the numbers, wa.me link with the normalize
   await page.click('.drawer .tabs button[data-t="clients"]'); await page.waitForSelector('.drawer button[title="تذكير واتساب"]');
   await page.locator('.drawer button[title="تذكير واتساب"]').first().click(); await page.waitForSelector('#reminder-text');
   assert.ok((await page.inputValue('#reminder-text')).includes('الإجمالي المستحق'));
+});
+
+/* =====================================================================
+   16. تسجيل الدخول والأدوار وإدارة المستخدمين
+   ===================================================================== */
+e2e('16. login: wrong password shows an error, eye toggles, admin logs in (chip shows name/role), logout returns to login; staff cannot delete a project or edit settings but can delete a payment; viewer cannot edit; admin manages users and the sheet stores hashes', async (page) => {
+  // ربط بلا دخول ⇒ شاشة الدخول فوق أفق المدينة
+  await linkReal(page, null);
+  await page.waitForSelector('#login-form');
+  assert.ok(await page.$('#login svg.skyline'), 'skyline backdrop');
+  await page.fill('#login-user', 'admin'); await page.fill('#login-pass', 'nope'); await page.click('#login-go');
+  await page.waitForSelector('#login-err.on');
+  assert.ok((await page.textContent('#login-err')).includes('غير صحيحة'));
+  assert.equal(await page.getAttribute('#login-pass', 'type'), 'password');
+  await page.click('#login .eye'); assert.equal(await page.getAttribute('#login-pass', 'type'), 'text'); await page.click('#login .eye');
+  await loginAs(page, ADMIN);
+  await page.waitForSelector('#content .kpis .kpi');
+  const chip = await page.textContent('#user-chip');
+  assert.ok(chip.includes('المدير') && chip.includes('مدير'), chip);
+  assert.equal(await page.evaluate(() => Egary.Auth.user().role), 'admin');
+  // سجل التعديلات يحمل اسم المستخدم (سطر الدخول)
+  await go(page, '#/audit', '#content table.tbl');
+  const first = await page.locator('#content table.tbl tbody tr').first().textContent();
+  assert.ok(first.includes('دخول') && first.includes('المدير'), first);
+  // إدارة المستخدمين من الإعدادات: إضافة مستخدم ⇒ يظهر في الجدول وفي ورقة «المستخدمون» بكلمة مرور مشفّرة
+  await go(page, '#/settings', '#users-card');
+  assert.equal(await page.locator('#users-card table.tbl tbody tr').count(), 3);
+  await page.click('#users-card button:has-text("مستخدم جديد")'); await page.waitForSelector('.modal #f_code');
+  await page.fill('.modal #f_code', 'sara'); await page.fill('.modal #f_name', 'سارة'); await page.selectOption('.modal #f_role', 'staff');
+  await page.fill('.modal #f_password', 'sara@2026'); await page.fill('.modal #f_password2', 'sara@2027'); await page.click('.modal .m-foot .btn.primary');
+  await page.waitForSelector('.modal .form-errors, .modal .error, .modal .banner.danger');
+  await page.fill('.modal #f_password2', 'sara@2026'); await page.click('.modal .m-foot .btn.primary');
+  await page.waitForSelector('.modal', { state: 'detached' });
+  await page.waitForFunction(() => Egary.Auth.users().length === 4);
+  assert.equal(await page.locator('#users-card table.tbl tbody tr').count(), 4);
+  await waitWrite(page);
+  const rows = await sheetRows(page, 'المستخدمون');
+  const sara = rows.find(r => r && r[0] === 'sara');
+  assert.ok(sara && /^pbkdf2\$/.test(sara[3]) && sara[2] === 'موظف', JSON.stringify(sara));
+  assert.ok(!JSON.stringify(rows).includes('sara@2026'), 'no plaintext password in the sheet');
+  // تسجيل الخروج ⇒ إعادة تحميل ⇒ الدخول مطلوب من جديد (الجلسة مُسحت)
+  await page.click('#user-chip'); await page.waitForSelector('#btn-logout'); await page.click('#btn-logout');
+  await page.waitForSelector('#btn-demo', { timeout: 20000 });
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('egary-session')), null);
+  // موظف: لا حذف للمشاريع، لا إعدادات، لكن حذف دفعة مسموح
+  await linkReal(page, STAFF);
+  assert.ok((await page.textContent('#user-chip')).includes('موظف'));
+  await go(page, '#/projects', '#content .page-head');
+  await page.locator('#content .card', { hasText: 'بابل' }).locator('button[title="حذف"]').click();
+  await page.waitForSelector('.toast');
+  assert.ok((await page.textContent('.toast')).includes('صلاحياتك'));
+  assert.equal(await page.$('.modal'), null, 'no delete dialog for staff');
+  await go(page, '#/settings', '#users-card');
+  assert.ok((await page.textContent('#content')).includes('الإعدادات للمدير فقط'));
+  assert.equal(await page.$('#users-card table.tbl'), null, 'staff does not see the users table');
+  await go(page, '#/payments', '#content table.tbl');
+  await page.locator('#content table.tbl tbody tr').first().locator('button[title="حذف"]').click();
+  await page.waitForSelector('.modal:has-text("تأكيد الحذف")'); await closeModal(page);
+  await page.click('#user-chip'); await page.waitForSelector('#btn-logout'); await page.click('#btn-logout');
+  await page.waitForSelector('#btn-demo', { timeout: 20000 });
+  // مشاهدة فقط: لا نماذج
+  await linkReal(page, VIEWER);
+  await go(page, '#/projects', '#content .page-head');
+  await page.click('text=مشروع جديد'); await page.waitForSelector('.toast');
+  assert.ok((await page.textContent('.toast')).includes('للمشاهدة فقط'));
+  assert.equal(await page.$('.modal'), null);
+});
+
+/* =====================================================================
+   17. أول تشغيل: ملف بلا حسابات ⇒ شاشة إنشاء الحسابات ⇒ الدخول كمدير والحسابات في الإكسيل؛ «تذكرني» يستعيد الجلسة بعد إعادة التحميل
+   ===================================================================== */
+e2e('17. first run: a workbook without users shows the setup screen, creates owner + staff, logs in as owner, writes the sheet; remember-me restores the session after reload', async (page) => {
+  const SRC = fs.readFileSync(path.resolve(__dirname, 'fixtures', 'source-anon.xlsx')).toString('base64');
+  await linkReal(page, null, SRC);
+  await page.waitForSelector('#setup-form');
+  await page.fill('#su-admin-user', 'owner'); await page.fill('#su-admin-name', 'المالك'); await page.fill('#su-admin-pass', 'own@2026'); await page.fill('#su-admin-pass2', 'own@2027');
+  await page.fill('#su-staff-user', 'office'); await page.fill('#su-staff-name', 'موظف'); await page.fill('#su-staff-pass', 'off@2026');
+  await page.click('#setup-go'); await page.waitForSelector('#setup-err.on');
+  assert.ok((await page.textContent('#setup-err')).includes('غير مطابق'));
+  await page.fill('#su-admin-pass2', 'own@2026'); await page.click('#setup-go');
+  await page.waitForSelector('#content .kpis .kpi', { timeout: 30000 });
+  assert.equal(await page.evaluate(() => Egary.Auth.user().username), 'owner');
+  await waitWrite(page);
+  const rows = await sheetRows(page, 'المستخدمون');
+  assert.deepEqual(rows.slice(1).map(r => [r[0], r[2]]).sort(), [['office', 'موظف'], ['owner', 'مدير']]);
+  // تذكرني ⇒ بعد إعادة التحميل والربط من جديد لا تظهر شاشة الدخول
+  await page.click('#user-chip'); await page.waitForSelector('#btn-logout'); await page.click('#btn-logout');
+  await page.waitForSelector('#btn-demo', { timeout: 20000 });
+  const bytes = await page.evaluate(() => { const u = new Uint8Array(window.__adapter.bytes()); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); });
+  await linkReal(page, null, bytes);
+  await loginAs(page, ['owner', 'own@2026'], true);
+  await page.waitForSelector('#content .kpis .kpi');
+  assert.ok(await page.evaluate(() => !!localStorage.getItem('egary-remember')));
+  await page.reload(); await page.waitForSelector('#btn-demo');
+  await page.evaluate(t => Egary.U.setToday(t), TODAY);
+  await linkReal(page, null, bytes);
+  await page.waitForSelector('#content .kpis .kpi', { timeout: 20000 });
+  assert.equal(await page.$('#login'), null, 'remembered session: no login screen');
+  assert.equal(await page.evaluate(() => Egary.Auth.user().username), 'owner');
 });

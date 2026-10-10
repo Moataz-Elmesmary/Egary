@@ -52,6 +52,7 @@ window.Egary = window.Egary || {};
   /* ---------- تطبيق العمليات ---------- */
   function applyOp(op) {
     if (op && op.type === 'settings') return applySettingsOp(op);
+    if (op && op.type === 'audit') { if (!op.record) return false; STATE.audit.unshift(Object.assign({}, op.record)); if (STATE.audit.length > 500) STATE.audit.length = 500; return true; }
     const list = STATE[op.entity];
     if (!list) return false;
     const k = U().foldCode(op.code);
@@ -80,8 +81,16 @@ window.Egary = window.Egary || {};
     return n;
   }
   function audit(op) {
-    STATE.audit.unshift({ at: new Date().toISOString().slice(0, 19).replace('T', ' '), action: op.type === 'delete' ? 'حذف' : (op.isNew ? 'إضافة' : 'تعديل'), entity: M().ENTITY_AR[op.entity] || op.entity, code: op.code, summary: op.summary || '' });
+    STATE.audit.unshift({ at: new Date().toISOString().slice(0, 19).replace('T', ' '), action: op.type === 'delete' ? 'حذف' : (op.isNew ? 'إضافة' : 'تعديل'), entity: M().ENTITY_AR[op.entity] || op.entity, code: op.code, summary: op.summary || '', user: currentUser() });
     if (STATE.audit.length > 500) STATE.audit.length = 500;
+  }
+  function currentUser() { try { const u = E.Auth && E.Auth.user(); return u ? u.name : ''; } catch (e) { return ''; } }
+  /* سطر في سجل التعديلات بلا تغيير بيانات (مثل الدخول) — يمر بالمزامنة ليُكتب في الإكسيل */
+  function log(entry) {
+    const op = { type: 'audit', at: new Date().toISOString(), record: Object.assign({ at: new Date().toISOString().slice(0, 19).replace('T', ' '), action: '', entity: '', code: '', summary: '', user: currentUser() }, entry) };
+    applyOp(op); notify('change');
+    if (recorder) recorder(op);
+    return op;
   }
   /* الواجهة العامة: upsert/remove تُرجع العملية بعد تطبيقها وتسجيلها */
   function upsert(entity, record, summary) {
@@ -137,5 +146,5 @@ window.Egary = window.Egary || {};
     return ops;
   }
 
-  E.Store = { load, state, subscribe, notify, setRecorder, idx, get, project, unit, client, contract, unitsOf, contractsOfUnit, contractsOfClient, paymentsOf, paymentsOfCell, maintenanceOf, nextContract, applyOp, applyOps, upsert, remove, batch, dependents, cascadeOps };
+  E.Store = { load, state, subscribe, notify, setRecorder, idx, get, project, unit, client, contract, unitsOf, contractsOfUnit, contractsOfClient, paymentsOf, paymentsOfCell, maintenanceOf, nextContract, applyOp, applyOps, upsert, remove, log, batch, dependents, cascadeOps };
 })(window.Egary);

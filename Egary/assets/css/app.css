@@ -349,3 +349,63 @@ input.chip[type="date"] { padding: 0 8px; direction: ltr; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 @media print { body.printing > *:not(.overlay) { display: none !important; } body.printing .overlay { position: static; background: #fff; padding: 0; display: block; } body.printing .modal { box-shadow: none; max-height: none; width: 100%; } body.printing .m-head, body.printing .m-foot { display: none; } }
+
+/* ===== شاشة الدخول (خلفية أفق المدينة نفسها + بطاقة زجاجية) ===== */
+#login { position: fixed; inset: 0; z-index: 60; background: #080D19; color: #E9EEF7; overflow: hidden; direction: rtl; --px: 0; --py: 0; display: grid; place-items: center; padding: 24px; perspective: 1400px; }
+#login * { box-sizing: border-box; }
+#login .login-card { position: relative; width: min(440px, 100%); background: linear-gradient(180deg, rgba(20, 30, 54, .78), rgba(12, 19, 36, .86)); border: 1px solid rgba(255, 255, 255, .1); border-radius: 24px; padding: 30px 30px 24px; box-shadow: 0 30px 80px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .06); backdrop-filter: blur(14px); transition: transform .25s ease; transform-style: preserve-3d; }
+#login .login-card.wide { width: min(640px, 100%); }
+#login .login-logo { width: 64px; height: 64px; border-radius: 20px; margin: 0 auto 12px; background: linear-gradient(135deg, #4F8CFF, #2BC6B6); display: grid; place-items: center; color: #fff; box-shadow: 0 10px 30px rgba(79, 140, 255, .35); }
+#login h1 { margin: 0; text-align: center; font-size: 24px; color: #F4F7FD; }
+#login .sub { text-align: center; color: #9DAAC6; font-size: 13px; margin: 6px 0 20px; }
+#login .lf { display: grid; gap: 12px; }
+#login .lf.two { grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+#login .lf .full { grid-column: 1 / -1; }
+#login label { display: block; font-size: 12.5px; color: #B9C4DA; margin-bottom: 5px; font-weight: 600; }
+#login .in { position: relative; }
+#login input[type="text"], #login input[type="password"], #login select { width: 100%; height: 44px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .06); color: #F4F7FD; padding: 0 14px; outline: none; font: inherit; transition: border-color .2s, box-shadow .2s, background .2s; }
+#login input:focus, #login select:focus { border-color: #5B8DEF; box-shadow: 0 0 0 3px rgba(91, 141, 239, .22); background: rgba(255, 255, 255, .09); }
+#login input::placeholder { color: #6F7D98; }
+#login .eye { position: absolute; inset-inline-end: 8px; top: 7px; width: 30px; height: 30px; border: 0; background: transparent; color: #9DAAC6; border-radius: 8px; cursor: pointer; display: grid; place-items: center; }
+#login .eye:hover { background: rgba(255, 255, 255, .08); color: #F4F7FD; }
+#login .eye svg { width: 18px; height: 18px; }
+#login .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: #B9C4DA; }
+#login .row label { display: inline-flex; align-items: center; gap: 7px; margin: 0; cursor: pointer; }
+#login .btn-go { height: 46px; border-radius: 13px; border: 0; width: 100%; background: linear-gradient(90deg, #3F7BF0, #5B8DEF 50%, #39B8AB); color: #fff; font: inherit; font-weight: 800; font-size: 15px; cursor: pointer; box-shadow: 0 10px 28px rgba(63, 123, 240, .35); transition: transform .15s, box-shadow .2s, filter .2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+#login .btn-go:hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 14px 34px rgba(63, 123, 240, .45); }
+#login .btn-go:disabled { opacity: .6; cursor: progress; transform: none; }
+#login .err { display: none; background: rgba(239, 107, 103, .12); border: 1px solid rgba(239, 107, 103, .4); color: #FFB4B1; border-radius: 12px; padding: 9px 12px; font-size: 13px; }
+#login .err.on { display: block; animation: shake .35s; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(5px); } 75% { transform: translateX(-5px); } }
+#login .hint { text-align: center; color: #7F8DAA; font-size: 12px; margin-top: 14px; line-height: 1.7; }
+#login .hint b { color: #B9C4DA; }
+#login .foot-links { display: flex; justify-content: center; gap: 14px; margin-top: 12px; font-size: 12.5px; }
+#login .foot-links button { background: none; border: 0; color: #9DBBFF; cursor: pointer; font: inherit; font-size: 12.5px; }
+#login .foot-links button:hover { text-decoration: underline; }
+#login .role-note { font-size: 12px; color: #9DAAC6; background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .08); border-radius: 10px; padding: 8px 10px; line-height: 1.7; }
+@media (prefers-reduced-motion: reduce) { #login .login-card { transition: none; } }
+
+/* ===== شريحة المستخدم في الشريط العلوي ===== */
+.user-chip { display: inline-flex; align-items: center; gap: 9px; height: 40px; padding: 0 12px 0 6px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; color: var(--text); max-width: 220px; }
+.user-chip:hover { border-color: var(--primary); }
+.user-chip .av { width: 28px; height: 28px; border-radius: 9px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 12px; flex: none; }
+.user-chip .nm { display: grid; line-height: 1.15; text-align: start; min-width: 0; }
+.user-chip .nm b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-chip .nm span { font-size: 11px; color: var(--muted); }
+@media (max-width: 700px) { .user-chip .nm { display: none; } .user-chip { padding: 0 6px; } }
+.user-menu { display: grid; gap: 6px; }
+.user-menu .who { display: flex; gap: 10px; align-items: center; padding: 8px 4px 12px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.user-menu .who .av { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; display: grid; place-items: center; font-weight: 800; }
+.user-menu button.item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: start; padding: 10px 12px; border-radius: 10px; border: 1px solid transparent; background: transparent; cursor: pointer; }
+.user-menu button.item:hover { background: var(--surface-2); border-color: var(--line); }
+.user-menu button.item.danger { color: var(--danger); }
+
+/* ===== لوحة المؤشرات: بطاقات رئيسية أكبر + بطاقات ثانوية مدمجة ===== */
+.kpis.primary { grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); }
+.kpis.primary .kpi .v { font-size: 30px; }
+.kpis.secondary { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 10px; }
+.kpis.secondary .kpi { padding: 11px 14px 10px; }
+.kpis.secondary .kpi .v { font-size: 20px; }
+.kpis.secondary .kpi .d { font-size: 11.5px; }
+.kpis-head { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 6px; color: var(--muted); font-size: 12.5px; font-weight: 700; }
+.badge.role { background: var(--primary-soft); color: var(--primary); }
