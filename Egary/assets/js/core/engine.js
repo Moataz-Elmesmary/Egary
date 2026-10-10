@@ -143,11 +143,13 @@ window.Egary = window.Egary || {};
     }
     const past = cs.filter(c => U().d(c.end) && U().d(c.end) < asOf);
     const future = cs.find(c => U().d(c.start) && U().d(c.start) > asOf);
+    // آخر عقد منتهٍ = أحدث نهاية (لا آخر صف في ترتيب الورقة) — نفس ما تحسبه معادلة «شاغرة منذ» في الإكسيل
+    const last = past.length ? past.reduce((a, c) => (U().d(c.end) > U().d(a.end) ? c : a)) : null;
     let since = '';
-    if (past.length) since = U().iso(U().addDays(U().d(past[past.length - 1].end), 1));
+    if (last) since = U().iso(U().addDays(U().d(last.end), 1));
     else if (u.createdAt && U().d(u.createdAt)) since = u.createdAt;
     const vacantDays = since ? Math.max(0, U().daysBetween(U().d(since), asOf)) : null;
-    return { status: 'vacant', contract: null, last: past[past.length - 1] || null, next: future || null, vacantSince: since, vacantDays };
+    return { status: 'vacant', contract: null, last, next: future || null, vacantSince: since, vacantDays };
   }
   const USTATUS_AR = { occupied: 'مؤجَّرة', ending: 'تنتهي خلال 90 يومًا', vacant: 'شاغرة' }; // نفس العبارة في الفلتر والبطاقات والجداول
 
@@ -432,6 +434,8 @@ window.Egary = window.Egary || {};
     for (const u of st().units) if (!S().project(u.projectCode)) add('danger', 'units', u.code, 'الوحدة تشير إلى مشروع غير موجود');
     for (const p of st().payments) if (!S().contract(p.contractCode)) add('danger', 'payments', p.code, `الدفعة ${p.code} تشير إلى عقد غير موجود (${p.contractCode}) — ربما حُذف صفه من ورقة العقود`);
     for (const m of st().maintenance) if (!S().unit(m.unitCode)) add('danger', 'maintenance', m.code, `صيانة ${m.code} تشير إلى وحدة غير موجودة (${m.unitCode || 'فارغ'}) — راجع كود الوحدة في ورقة الصيانة`);
+    // عقدان ساريان اليوم على نفس الوحدة: البرنامج يعتمد الأقدم بداية، ومعادلات الإكسيل تعتمد أول صف في الورقة — صحّحوا تاريخ أحدهما
+    for (const u of st().units) { const act = S().contractsOfUnit(u.code).filter(c => contractStatus(c) === 'active'); if (act.length > 1) add('warn', 'units', u.code, `الوحدة ${u.label || u.code} عليها ${act.length} عقود سارية في نفس الوقت (${act.map(c => c.code).join('، ')}) — راجع تواريخ البداية والنهاية`); }
     for (const c of st().contracts) { // تنبيه واحد لكل شهر مهما تعددت دفعاته
       const s0 = U().d(c.start), e0 = U().d(c.end); if (!s0 || !e0) continue;
       for (const period of new Set(S().paymentsOf(c.code).map(p => p.period))) { const ci = cell(c, period); if (ci.status === 'paid' && ci.over) add('warn', 'contracts', c.code, `${(S().client(c.clientCode) || {}).name || ''} / ${(S().unit(c.unitCode) || {}).label || ''}: المسدَّد في ${U().periodLabel(period, true)} (${U().fmtMoney(ci.paid)}) أعلى من المستحق (${U().fmtMoney(ci.due.amount)})`); }

@@ -4,33 +4,45 @@
 //  ينتج سجلًا واحدًا فيه الجداول: Projects, Units, Clients, Contracts, Payments, Maintenance,
 //  UnitAssets, Calendar, Months, DueMonths (كل عقد × كل شهر مع الإيجار المحسوب)
 //  بعد اللصق: في نافذة الاستعلام اضغط بزر الماوس الأيمن على كل حقل من السجل → Add as New Query
+//  يطابق إصدار تنسيق الملف 3 (العناوين الجديدة: الأعمدة الخضراء معادلات إكسيل، والرمادية تنتهي بـ«(من البرنامج)»).
+//  Power BI يقرأ القيم المحفوظة في الملف: بعد أي تعديل في الإكسيل احفظ الملف ثم Refresh.
+//  مفتاح الحالة (StatusKey) لم يعد عمودًا في الإكسيل؛ يُشتق هنا من نص الحالة العربي.
 // ======================================================================
 let
     FilePath = "C:\Egary\Egary.xlsx",
     Source = Excel.Workbook(File.Contents(FilePath), null, true),
     Sheet = (name as text) => Table.PromoteHeaders(Source{[Item = name, Kind = "Sheet"]}[Data], [PromoteAllScalars = true]),
+    // نص الخلية كما هو (فارغ أو null ⇒ "") لاشتقاق المفاتيح من نص الحالة العربي
+    TextOf = (v as any) as text => if v = null then "" else Text.Trim(Text.From(v)),
 
     // ---------- المشاريع ----------
     Projects0 = Sheet("المشاريع"),
     Projects = Table.TransformColumnTypes(Table.RenameColumns(Table.SelectColumns(Projects0, {"كود المشروع", "اسم المشروع", "العنوان", "المنطقة"}), {{"كود المشروع", "ProjectCode"}, {"اسم المشروع", "ProjectName"}, {"العنوان", "Address"}, {"المنطقة", "Area"}}), {{"ProjectCode", type text}, {"ProjectName", type text}}),
 
     // ---------- الوحدات ----------
+    // «حالة الوحدة اليوم» / «المستأجر الحالي» / «الإيجار الشهري الحالي» / «أيام الشغور» معادلات إكسيل (عناوين خضراء)
     Units0 = Sheet("الوحدات"),
-    Units1 = Table.RenameColumns(Table.SelectColumns(Units0, {"كود الوحدة", "كود المشروع", "رقم / اسم الوحدة", "النوع", "الدور", "المساحة م²", "الحالة (محسوب)", "المستأجر الحالي (محسوب)", "الإيجار الحالي (محسوب)", "أيام الشغور (محسوب)"}), {{"كود الوحدة", "UnitCode"}, {"كود المشروع", "ProjectCode"}, {"رقم / اسم الوحدة", "UnitLabel"}, {"النوع", "UnitType"}, {"الدور", "Floor"}, {"المساحة م²", "AreaM2"}, {"الحالة (محسوب)", "Status"}, {"المستأجر الحالي (محسوب)", "CurrentTenant"}, {"الإيجار الحالي (محسوب)", "CurrentRent"}, {"أيام الشغور (محسوب)", "VacantDays"}}),
+    Units1 = Table.RenameColumns(Table.SelectColumns(Units0, {"كود الوحدة", "كود المشروع", "رقم / اسم الوحدة", "النوع", "الدور", "المساحة م²", "حالة الوحدة اليوم", "المستأجر الحالي", "الإيجار الشهري الحالي", "أيام الشغور"}), {{"كود الوحدة", "UnitCode"}, {"كود المشروع", "ProjectCode"}, {"رقم / اسم الوحدة", "UnitLabel"}, {"النوع", "UnitType"}, {"الدور", "Floor"}, {"المساحة م²", "AreaM2"}, {"حالة الوحدة اليوم", "Status"}, {"المستأجر الحالي", "CurrentTenant"}, {"الإيجار الشهري الحالي", "CurrentRent"}, {"أيام الشغور", "VacantDays"}}),
+    // الوحدة المؤجَّرة تكون «أيام الشغور» فيها فارغة، والوحدة الشاغرة يكون «الإيجار الشهري الحالي» فارغًا
     Units2 = Table.ReplaceValue(Units1, "", null, Replacer.ReplaceValue, {"VacantDays", "CurrentRent"}),
     Units3 = Table.TransformColumnTypes(Units2, {{"UnitCode", type text}, {"ProjectCode", type text}, {"UnitType", type text}, {"CurrentRent", type number}, {"VacantDays", Int64.Type}}),
-    Units = Table.AddColumn(Units3, "StatusKey", each if [Status] = "شاغرة" then "vacant" else if [Status] = "تنتهي قريبًا" then "ending" else "occupied", type text),
+    // StatusKey من نص «حالة الوحدة اليوم»: شاغرة ⇒ vacant · تنتهي خلال 90 يومًا ⇒ ending · مؤجَّرة ⇒ occupied (حالة فارغة ⇒ null)
+    Units = Table.AddColumn(Units3, "StatusKey", each let s = TextOf([Status]) in if s = "" then null else if Text.Contains(s, "شاغرة") then "vacant" else if Text.Contains(s, "تنتهي") then "ending" else "occupied", type text),
 
     // ---------- العملاء ----------
     Clients0 = Sheet("العملاء"),
     Clients = Table.TransformColumnTypes(Table.RenameColumns(Table.SelectColumns(Clients0, {"كود العميل", "الاسم", "النوع", "الممثل القانوني", "الرقم القومي / الباسبور", "تسجيل ضريبي", "التليفون"}), {{"كود العميل", "ClientCode"}, {"الاسم", "ClientName"}, {"النوع", "ClientKind"}, {"الممثل القانوني", "LegalRep"}, {"الرقم القومي / الباسبور", "NationalId"}, {"تسجيل ضريبي", "TaxId"}, {"التليفون", "Phone"}}), {{"ClientCode", type text}, {"NationalId", type text}, {"TaxId", type text}, {"Phone", type text}}),
 
     // ---------- العقود ----------
+    // «حالة العقد اليوم» و«الإيجار الشهري الحالي» معادلات إكسيل (عناوين خضراء)
     Contracts0 = Sheet("العقود"),
-    Contracts1 = Table.RenameColumns(Table.SelectColumns(Contracts0, {"كود العقد", "كود الوحدة", "كود العميل", "بداية العقد", "نهاية العقد", "الإيجار الشهري (السنة الأولى)", "الزيادة السنوية %", "إيجار كل سنة (يدوي)", "التأمين", "حالة التأمين", "يوم الاستحقاق", "العقد السابق", "الحالة (محسوب)", "الإيجار الحالي (محسوب)"}), {{"كود العقد", "ContractCode"}, {"كود الوحدة", "UnitCode"}, {"كود العميل", "ClientCode"}, {"بداية العقد", "StartDate"}, {"نهاية العقد", "EndDate"}, {"الإيجار الشهري (السنة الأولى)", "Rent"}, {"الزيادة السنوية %", "IncreasePct"}, {"إيجار كل سنة (يدوي)", "RentOverrides"}, {"التأمين", "Deposit"}, {"حالة التأمين", "DepositStatus"}, {"يوم الاستحقاق", "DueDay"}, {"العقد السابق", "PrevContract"}, {"الحالة (محسوب)", "Status"}, {"الإيجار الحالي (محسوب)", "CurrentRent"}}),
-    Contracts2 = Table.TransformColumnTypes(Contracts1, {{"ContractCode", type text}, {"StartDate", type date}, {"EndDate", type date}, {"Rent", type number}, {"IncreasePct", type number}, {"Deposit", type number}, {"DueDay", Int64.Type}}),
+    Contracts1 = Table.RenameColumns(Table.SelectColumns(Contracts0, {"كود العقد", "كود الوحدة", "كود العميل", "بداية العقد", "نهاية العقد", "الإيجار الشهري (السنة الأولى)", "الزيادة السنوية %", "إيجار كل سنة (يدوي)", "التأمين", "حالة التأمين", "يوم الاستحقاق", "العقد السابق", "حالة العقد اليوم", "الإيجار الشهري الحالي"}), {{"كود العقد", "ContractCode"}, {"كود الوحدة", "UnitCode"}, {"كود العميل", "ClientCode"}, {"بداية العقد", "StartDate"}, {"نهاية العقد", "EndDate"}, {"الإيجار الشهري (السنة الأولى)", "Rent"}, {"الزيادة السنوية %", "IncreasePct"}, {"إيجار كل سنة (يدوي)", "RentOverrides"}, {"التأمين", "Deposit"}, {"حالة التأمين", "DepositStatus"}, {"يوم الاستحقاق", "DueDay"}, {"العقد السابق", "PrevContract"}, {"حالة العقد اليوم", "Status"}, {"الإيجار الشهري الحالي", "CurrentRent"}}),
+    // العقد ذو التواريخ غير الصحيحة يكون «الإيجار الشهري الحالي» فيه فارغًا
+    Contracts1b = Table.ReplaceValue(Contracts1, "", null, Replacer.ReplaceValue, {"CurrentRent"}),
+    Contracts2 = Table.TransformColumnTypes(Contracts1b, {{"ContractCode", type text}, {"StartDate", type date}, {"EndDate", type date}, {"Rent", type number}, {"IncreasePct", type number}, {"CurrentRent", type number}, {"Deposit", type number}, {"DueDay", Int64.Type}}),
     Contracts3 = Table.AddColumn(Contracts2, "DaysLeft", each Duration.Days([EndDate] - Date.From(DateTime.LocalNow())), Int64.Type),
-    Contracts = Table.AddColumn(Contracts3, "StatusKey", each if [Status] = "ساري" then "active" else if [Status] = "لم يبدأ" then "future" else if Text.Contains([Status], "أُجِّرت") then "renewed" else "ended", type text),
+    // StatusKey من نص «حالة العقد اليوم»: ساري ⇒ active · لم يبدأ ⇒ future · منتهٍ (أُجِّرت بعده) ⇒ renewed · تواريخ غير صحيحة ⇒ invalid · منتهٍ ⇒ ended
+    Contracts = Table.AddColumn(Contracts3, "StatusKey", each let s = TextOf([Status]) in if s = "" then null else if Text.Contains(s, "ساري") then "active" else if Text.Contains(s, "لم يبدأ") then "future" else if Text.Contains(s, "أُجِّرت") or Text.Contains(s, "بعده") then "renewed" else if Text.Contains(s, "غير صحيحة") then "invalid" else "ended", type text),
 
     // ---------- المدفوعات ----------
     Payments0 = Sheet("المدفوعات"),
@@ -39,8 +51,9 @@ let
     Payments = Table.AddColumn(Payments2, "MonthStart", each try #date(Number.From(Text.Start([MonthKey], 4)), Number.From(Text.Middle([MonthKey], 5, 2)), 1) otherwise null, type date),
 
     // ---------- الصيانة ----------
+    // «المستأجر وقت الصيانة» معادلة إكسيل (الاسم المكتوب يدويًا في «المستأجر وقتها» يتقدم عليها)
     Maintenance0 = Sheet("الصيانة"),
-    Maintenance = Table.TransformColumnTypes(Table.RenameColumns(Table.SelectColumns(Maintenance0, {"كود الصيانة", "كود الوحدة", "التاريخ", "النوع", "الوصف", "التكلفة", "يتحملها", "الحالة", "المستأجر وقتها (محسوب)"}), {{"كود الصيانة", "MaintCode"}, {"كود الوحدة", "UnitCode"}, {"التاريخ", "Date"}, {"النوع", "Kind"}, {"الوصف", "Description"}, {"التكلفة", "Cost"}, {"يتحملها", "BorneBy"}, {"الحالة", "Status"}, {"المستأجر وقتها (محسوب)", "Custodian"}}), {{"Date", type date}, {"Cost", type number}}),
+    Maintenance = Table.TransformColumnTypes(Table.RenameColumns(Table.SelectColumns(Maintenance0, {"كود الصيانة", "كود الوحدة", "التاريخ", "النوع", "الوصف", "التكلفة", "يتحملها", "الحالة", "المستأجر وقت الصيانة"}), {{"كود الصيانة", "MaintCode"}, {"كود الوحدة", "UnitCode"}, {"التاريخ", "Date"}, {"النوع", "Kind"}, {"الوصف", "Description"}, {"التكلفة", "Cost"}, {"يتحملها", "BorneBy"}, {"الحالة", "Status"}, {"المستأجر وقت الصيانة", "Custodian"}}), {{"Date", type date}, {"Cost", type number}}),
 
     // ---------- أصول الوحدات ----------
     UnitAssets0 = Sheet("أصول الوحدات"),

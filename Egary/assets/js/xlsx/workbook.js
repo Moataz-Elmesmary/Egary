@@ -17,16 +17,69 @@ window.Egary = window.Egary || {};
   /* ---------- أسماء الأوراق والأعمدة ---------- */
   const SH = { projects: 'المشاريع', units: 'الوحدات', assets: 'أصول الوحدات', clients: 'العملاء', contracts: 'العقود', payments: 'المدفوعات', maintenance: 'الصيانة', settings: 'الإعدادات', audit: 'سجل التعديلات', summary: 'ملخص المشاريع', users: 'المستخدمون' };
   const LEDGER_HEAD = ['م', 'المشروع', 'الاسم', 'الممثل القانوني', 'الوحدة', 'العنوان', 'العقد من', 'العقد الى', 'تسجيل ضريبي', 'الرقم القومي / الباسبور', 'يناير', 'فبراير', 'مارس', 'ابريل', 'مايو', 'يونيو', 'يوليو', 'اغسطس', 'سبتمبر', 'اكتوبر', 'نوفمبر', 'ديسمبر', 'الاجمالي', 'ملاحظات', 'كود العقد', 'كود الوحدة', 'كود العميل', 'كود المشروع'];
+  /* كل عمود: [الحقل، العنوان الحالي، …عناوين قديمة تُقرأ كمرادفات]
+     • الحقل الذي يبدأ بـ«_» عمود تلقائي لا يقرأه البرنامج أبدًا (هذا هو السبب الوحيد لتجاهله، لا نص العنوان ولا كونه معادلة)؛
+       الاستثناء: المشروع/الوحدة/العميل تُقرأ كنص بديل عندما يكون الكود فارغًا (صف كتبه المكتب باليد).
+     • «{Y}» في العنوان تُستبدل بسنة التقرير عند الكتابة (عمود «المحصَّل في 2026» في المشاريع). */
   const COLS = {
-    projects: [['code', 'كود المشروع'], ['name', 'اسم المشروع'], ['address', 'العنوان'], ['area', 'المنطقة'], ['notes', 'ملاحظات'], ['createdAt', 'تاريخ الإضافة'], ['_units', 'عدد الوحدات (محسوب)'], ['_occupied', 'مؤجَّرة (محسوب)'], ['_vacant', 'شاغرة (محسوب)'], ['_arrears', 'المتأخرات (محسوب)'], ['_ytd', 'محصَّل السنة (محسوب)']],
-    units: [['code', 'كود الوحدة'], ['projectCode', 'كود المشروع'], ['_project', 'المشروع'], ['label', 'رقم / اسم الوحدة'], ['type', 'النوع'], ['floor', 'الدور'], ['area', 'المساحة م²'], ['notes', 'ملاحظات'], ['createdAt', 'تاريخ الإضافة'], ['_assets', 'الأصول (ملخص)'], ['_status', 'الحالة (محسوب)'], ['_tenant', 'المستأجر الحالي (محسوب)'], ['_contract', 'العقد الحالي (محسوب)'], ['_rent', 'الإيجار الحالي (محسوب)'], ['_vacantSince', 'شاغرة منذ (محسوب)'], ['_vacantDays', 'أيام الشغور (محسوب)'], ['_statusKey', 'مفتاح الحالة (محسوب)']],
+    projects: [['code', 'كود المشروع'], ['name', 'اسم المشروع'], ['address', 'العنوان'], ['area', 'المنطقة'], ['notes', 'ملاحظات'], ['createdAt', 'تاريخ الإضافة'], ['_units', 'عدد الوحدات', 'عدد الوحدات (محسوب)'], ['_occupied', 'مؤجَّرة اليوم', 'مؤجَّرة (محسوب)'], ['_vacant', 'شاغرة اليوم', 'شاغرة (محسوب)'], ['_arrears', 'المتأخرات (من البرنامج)', 'المتأخرات (محسوب)', 'المتأخرات — من البرنامج'], ['_ytd', 'المحصَّل في {Y}', 'محصَّل سنة التقرير', 'محصَّل السنة (محسوب)', 'محصَّل السنة', 'المحصَّل هذه السنة'], ['_rate', 'نسبة الإشغال']],
+    units: [['code', 'كود الوحدة'], ['projectCode', 'كود المشروع'], ['_project', 'المشروع'], ['label', 'رقم / اسم الوحدة'], ['type', 'النوع'], ['floor', 'الدور'], ['area', 'المساحة م²'], ['notes', 'ملاحظات'], ['createdAt', 'تاريخ الإضافة'], ['_assets', 'ملخص الأصول (من البرنامج)', 'الأصول (ملخص)'], ['_status', 'حالة الوحدة اليوم', 'الحالة (محسوب)', 'الحالة'], ['_tenant', 'المستأجر الحالي', 'المستأجر الحالي (محسوب)'], ['_contract', 'العقد الحالي', 'العقد الحالي (محسوب)', 'العقد الساري اليوم'], ['_rent', 'الإيجار الشهري الحالي', 'الإيجار الحالي (محسوب)', 'الإيجار الحالي', 'الإيجار الحالي (من البرنامج)'], ['_vacantSince', 'شاغرة منذ', 'شاغرة منذ (محسوب)'], ['_vacantDays', 'أيام الشغور', 'أيام الشغور (محسوب)'], ['_contractEnd', 'نهاية العقد الحالي', 'نهاية العقد الساري'], ['_daysLeft', 'الأيام المتبقية على نهاية العقد']],
     assets: [['unitCode', 'كود الوحدة'], ['name', 'الأصل'], ['present', 'موجود'], ['details', 'التفاصيل']],
-    clients: [['code', 'كود العميل'], ['name', 'الاسم'], ['kind', 'النوع'], ['rep', 'الممثل القانوني'], ['nationalId', 'الرقم القومي / الباسبور'], ['taxId', 'تسجيل ضريبي'], ['phone', 'التليفون'], ['phone2', 'تليفون آخر'], ['email', 'البريد الإلكتروني'], ['address', 'العنوان'], ['notes', 'ملاحظات'], ['createdAt', 'تاريخ الإضافة'], ['_contracts', 'عدد العقود (محسوب)'], ['_active', 'عقود سارية (محسوب)'], ['_arrears', 'المتأخرات (محسوب)'], ['_paid', 'إجمالي المسدَّد (محسوب)']],
-    contracts: [['code', 'كود العقد'], ['unitCode', 'كود الوحدة'], ['clientCode', 'كود العميل'], ['_project', 'المشروع'], ['_unit', 'الوحدة'], ['_client', 'العميل'], ['start', 'بداية العقد'], ['end', 'نهاية العقد'], ['rent', 'الإيجار الشهري (السنة الأولى)'], ['increasePct', 'الزيادة السنوية %'], ['rentOverrides', 'إيجار كل سنة (يدوي)'], ['deposit', 'التأمين'], ['depositStatus', 'حالة التأمين'], ['dueDay', 'يوم الاستحقاق'], ['prevCode', 'العقد السابق'], ['notes', 'ملاحظات'], ['ledgerOrder', 'ترتيب الورقة'], ['inferred', 'مستنتج'], ['createdAt', 'تاريخ الإضافة'], ['_status', 'الحالة (محسوب)'], ['_currentRent', 'الإيجار الحالي (محسوب)'], ['_paid', 'المسدَّد (محسوب)'], ['_arrears', 'المتأخرات (محسوب)'], ['_schedule', 'جدول السنوات (محسوب)'], ['_statusKey', 'مفتاح الحالة (محسوب)'], ['_daysLeft', 'أيام متبقية (محسوب)']],
-    payments: [['code', 'رقم الفاتورة'], ['contractCode', 'كود العقد'], ['_client', 'العميل'], ['_unit', 'الوحدة'], ['period', 'الشهر'], ['amount', 'المبلغ'], ['paidOn', 'تاريخ السداد'], ['method', 'طريقة السداد'], ['ref', 'مرجع / إيصال'], ['notes', 'ملاحظات'], ['source', 'المصدر'], ['createdAt', 'تاريخ التسجيل']],
-    maintenance: [['code', 'كود الصيانة'], ['unitCode', 'كود الوحدة'], ['_project', 'المشروع'], ['_unit', 'الوحدة'], ['date', 'التاريخ'], ['kind', 'النوع'], ['description', 'الوصف'], ['cost', 'التكلفة'], ['borneBy', 'يتحملها'], ['status', 'الحالة'], ['closedOn', 'تاريخ الإغلاق'], ['notes', 'ملاحظات'], ['createdAt', 'تاريخ الإضافة'], ['custodianContract', 'العقد وقتها'], ['custodianName', 'المستأجر وقتها'], ['_custodian', 'المستأجر وقتها (محسوب)'], ['_custodianContract', 'العقد وقتها (محسوب)']],
+    clients: [['code', 'كود العميل'], ['name', 'الاسم'], ['kind', 'النوع'], ['rep', 'الممثل القانوني'], ['nationalId', 'الرقم القومي / الباسبور'], ['taxId', 'تسجيل ضريبي'], ['phone', 'التليفون'], ['phone2', 'تليفون آخر'], ['email', 'البريد الإلكتروني'], ['address', 'العنوان'], ['notes', 'ملاحظات'], ['createdAt', 'تاريخ الإضافة'], ['_contracts', 'عدد العقود', 'عدد العقود (محسوب)'], ['_active', 'عقود سارية اليوم', 'عقود سارية (محسوب)', 'عقود سارية'], ['_arrears', 'المتأخرات (من البرنامج)', 'المتأخرات (محسوب)'], ['_paid', 'إجمالي المسدَّد', 'إجمالي المسدَّد (محسوب)', 'إجمالي المسدَّد حتى اليوم']],
+    contracts: [['code', 'كود العقد'], ['unitCode', 'كود الوحدة'], ['clientCode', 'كود العميل'], ['_project', 'المشروع'], ['_unit', 'الوحدة'], ['_client', 'العميل'], ['start', 'بداية العقد'], ['end', 'نهاية العقد'], ['rent', 'الإيجار الشهري (السنة الأولى)'], ['increasePct', 'الزيادة السنوية %'], ['rentOverrides', 'إيجار كل سنة (يدوي)'], ['deposit', 'التأمين'], ['depositStatus', 'حالة التأمين'], ['dueDay', 'يوم الاستحقاق'], ['prevCode', 'العقد السابق'], ['notes', 'ملاحظات'], ['ledgerOrder', 'ترتيب الصف في ورقة السنة', 'ترتيب الورقة'], ['inferred', 'مستنتج تلقائيًا من الورقة', 'مستنتج'], ['createdAt', 'تاريخ الإضافة'], ['_status', 'حالة العقد اليوم', 'الحالة (محسوب)', 'الحالة'], ['_currentRent', 'الإيجار الشهري الحالي', 'الإيجار الحالي (محسوب)', 'الإيجار الحالي بعد الزيادات', 'الإيجار الحالي (من البرنامج)'], ['_paid', 'إجمالي المسدَّد', 'المسدَّد (محسوب)', 'المسدَّد', 'المسدَّد حتى اليوم'], ['_arrears', 'المتأخرات (من البرنامج)', 'المتأخرات (محسوب)'], ['_yearIndex', 'سنة العقد الحالية'], ['_projectCode', 'كود المشروع'], ['_daysLeft', 'الأيام المتبقية على نهاية العقد', 'أيام متبقية (محسوب)', 'أيام متبقية'], ['_nYears', 'عدد سنوات العقد'], ['_nextIncreaseOn', 'تاريخ الزيادة القادمة'], ['_nextRent', 'الإيجار بعد الزيادة القادمة'], ['_rentY1', 'إيجار السنة 1'], ['_rentY2', 'إيجار السنة 2'], ['_rentY3', 'إيجار السنة 3'], ['_rentY4', 'إيجار السنة 4'], ['_rentY5', 'إيجار السنة 5'], ['_rentY6', 'إيجار السنة 6'], ['_rentY7', 'إيجار السنة 7'], ['_rentY8', 'إيجار السنة 8'], ['_rentY9', 'إيجار السنة 9'], ['_rentY10', 'إيجار السنة 10'], ['_ovKey', 'مفتاح الإيجار اليدوي (للمعادلات)'], ['_activeUnitKey', 'الوحدة لو العقد ساري (للمعادلات)']],
+    payments: [['code', 'رقم الفاتورة'], ['contractCode', 'كود العقد'], ['_client', 'العميل'], ['_unit', 'الوحدة'], ['period', 'الشهر'], ['amount', 'المبلغ'], ['paidOn', 'تاريخ السداد'], ['method', 'طريقة السداد'], ['ref', 'مرجع / إيصال'], ['notes', 'ملاحظات'], ['source', 'المصدر'], ['createdAt', 'تاريخ التسجيل'], ['_projectName', 'المشروع']],
+    maintenance: [['code', 'كود الصيانة'], ['unitCode', 'كود الوحدة'], ['_project', 'المشروع'], ['_unit', 'الوحدة'], ['date', 'التاريخ'], ['kind', 'النوع'], ['description', 'الوصف'], ['cost', 'التكلفة'], ['borneBy', 'يتحملها'], ['status', 'الحالة'], ['closedOn', 'تاريخ الإغلاق'], ['notes', 'ملاحظات'], ['createdAt', 'تاريخ الإضافة'], ['custodianContract', 'العقد وقتها'], ['custodianName', 'المستأجر وقتها'], ['_custodian', 'المستأجر وقت الصيانة', 'المستأجر وقتها (محسوب)', 'مستأجر الوحدة وقت الصيانة'], ['_custodianContract', 'العقد وقت الصيانة', 'العقد وقتها (محسوب)', 'العقد الساري وقت الصيانة']],
     users: [['code', 'اسم المستخدم'], ['name', 'الاسم'], ['role', 'الدور'], ['passwordHash', 'كلمة المرور (مشفّرة)'], ['enabled', 'مفعّل'], ['createdAt', 'تاريخ الإضافة'], ['lastLogin', 'آخر دخول']],
   };
+  /* عناوين أعمدة تلقائية من إصدارات سابقة لم يعد لها عمود: تبقى «معروفة» حتى لا يُحفظ عمود قديم على أنه عمود أضافه المكتب */
+  const RETIRED = { units: ['مفتاح الحالة (محسوب)'], contracts: ['مفتاح الحالة (محسوب)', 'جدول السنوات (محسوب)', 'جدول سنوات العقد (من البرنامج)'] };
+  /* نوع كل عمود (يحدد لون العنوان وملاحظته وتنسيق خلاياه):
+     input = يكتبه المكتب (أزرق) · formula = معادلة إكسيل تتحدّث فورًا (أخضر) · program = يحسبه البرنامج عند الحفظ فقط (رمادي، العنوان ينتهي بـ«(من البرنامج)») · helper = عمود مساعد مخفي للمعادلات
+     اللون يتبع مصدر الرقم لا طريقة حسابه: مجموع المتأخرات في العملاء/المشاريع معادلة لكنه رمادي لأنه لا يتحرك إلا بالحفظ */
+  const KIND = { program: { projects: ['_arrears'], units: ['_assets'], clients: ['_arrears'], contracts: ['_arrears'] }, helper: { contracts: ['_ovKey', '_activeUnitKey'] } };
+  function kindOf(entity, field) { if ((KIND.helper[entity] || []).includes(field)) return 'helper'; if ((KIND.program[entity] || []).includes(field)) return 'program'; return field.startsWith('_') ? 'formula' : 'input'; }
+  /* تنسيق خلايا الأعمدة التلقائية */
+  const FMT = { _currentRent: '#,##0.00', _paid: '#,##0.00', _arrears: '#,##0.00', _rent: '#,##0.00', _ytd: '#,##0.00', _nextRent: '#,##0.00', _daysLeft: '0', _vacantDays: '0', _units: '0', _occupied: '0', _vacant: '0', _contracts: '0', _active: '0', _yearIndex: '0', _nYears: '0', _rate: '0%', _vacantSince: 'dd/mm/yyyy', _contractEnd: 'dd/mm/yyyy', _nextIncreaseOn: 'dd/mm/yyyy' };
+  for (let k = 1; k <= 10; k++) FMT['_rentY' + k] = '#,##0.00';
+  /* ملاحظات العناوين (تعليق على خلية العنوان؛ لا يقرأها البرنامج) */
+  const NOTE = {
+    formula: 'يُحسب تلقائيًا بمعادلة إكسيل من البيانات التي تكتبها، ويتحدّث فورًا مع أي تعديل — لا تكتب هنا؛ البرنامج يعيد كتابته عند كل حفظ.',
+    program: 'يحسبه البرنامج ويتحدّث عند الحفظ من الموقع فقط (انظر «آخر كتابة من الموقع» في الإعدادات) — لا يتغيّر وأنت تكتب في الإكسيل؛ لا تكتب هنا.',
+    key: 'يعطيه البرنامج تلقائيًا — اتركه فارغًا في صف جديد.',
+    fkey: 'كود الربط بالورقة الأخرى: لو كتبته في صف جديد (انسخه من ورقته) تعمل المعادلات فورًا — ولو تركته فارغًا يستنتجه البرنامج من الاسم المجاور عند الحفظ التالي.',
+    name: 'يُملأ تلقائيًا من الكود — في صف جديد اكتب الاسم هنا لو لم تعرف الكود.',
+    helper: 'عمود مساعد للمعادلات — لا تعدّله ولا تحذفه.',
+    month: 'اكتب هنا المبلغ المسدَّد عن الشهر',
+    rowTotal: 'مجموع خانات الشهور — معادلة، لا تكتب هنا',
+    unread: 'الشهر غير مقروء — لا يُحتسب في البرنامج لكنه يدخل في مجموع الإكسيل',
+  };
+  /* جملة خاصة بعمود بعينه تُسبق الجملة العامة */
+  const NOTE_OF = {
+    'contracts.increasePct': '10 = عشرة بالمئة (لا تكتب %)',
+    'contracts.rentOverrides': 'مثال: 2:83600; 3:91960 (سنة العقد:الإيجار)',
+    'contracts._arrears': 'المستحق غير المسدَّد حتى آخر شهر مسجَّل، بعد أيام السماح والفرق المقبول — يحسبه البرنامج عند الحفظ من الموقع.',
+    'contracts._paid': 'مجموع كل ما سُجِّل لهذا العقد في ورقة المدفوعات (حتى الصفوف التي شهرها غير مقروء، وهي ملوَّنة بالأحمر هناك ولا يحتسبها البرنامج حتى تُصحَّح).',
+    'contracts._projectCode': 'كود مشروع الوحدة — مفتاح تستخدمه معادلات المشاريع وملخص المشاريع.',
+    'contracts._currentRent': 'إيجار سنة العقد الحالية من أعمدة «إيجار السنة …» (العقود الأطول من 10 سنوات تأخذ رقم البرنامج حتى الحفظ التالي).',
+    'projects._arrears': 'مجموع «المتأخرات (من البرنامج)» لعقود هذا المشروع من ورقة العقود — يتحدّث عند الحفظ من الموقع.',
+    'projects._ytd': 'مجموع عمود «الاجمالي» في ورقة {Y} لعقود هذا المشروع (كل ما سُدِّد عن شهور {Y}) — يتحدّث فورًا مع أي مبلغ تكتبه في الورقة.',
+    'clients._arrears': 'مجموع «المتأخرات (من البرنامج)» لعقود هذا العميل من ورقة العقود — يتحدّث عند الحفظ من الموقع.',
+    'units._assets': 'الأصول الموجودة من ورقة «أصول الوحدات» — عدّلها هناك.',
+    'maintenance.custodianContract': 'اكتبه فقط لو أردت تثبيت العقد يدويًا — وإلا يُستنتج في «العقد وقت الصيانة».',
+    'maintenance.custodianName': 'اكتبه فقط لو أردت تثبيت المستأجر يدويًا — وإلا يُستنتج في «المستأجر وقت الصيانة».',
+    'payments._client': 'يُملأ من كود العقد — لو لا تعرف الكود اكتب اسم العميل هنا.',
+  };
+  const NAME_FIELDS = new Set(['_project', '_unit', '_client']); // أعمدة الأسماء التي يقرأها البرنامج كنص بديل في الصف اليدوي (معادلة بالكود وإلا)
+  const KEY_FIELDS = new Set(['code', 'unitCode', 'clientCode', 'projectCode', 'contractCode']);
+  function headerNote(entity, field, ctx) {
+    const kind = kindOf(entity, field); const own = NOTE_OF[entity + '.' + field];
+    // الكود الأساسي (code) يعطيه البرنامج؛ أكواد الربط (كود الوحدة/العميل/المشروع/العقد) يُستحسن أن يكتبها المكتب حتى تعمل المعادلات قبل الحفظ
+    let base = kind === 'helper' ? NOTE.helper : kind === 'program' ? NOTE.program : kind === 'formula' ? (NAME_FIELDS.has(field) ? NOTE.name : NOTE.formula) : (KEY_FIELDS.has(field) && entity !== 'users' && entity !== 'assets' ? (field === 'code' ? NOTE.key : NOTE.fkey) : '');
+    if (field === '_client' && entity === 'payments') base = '';
+    const txt = [own, base].filter(Boolean).join('\n');
+    return txt ? txt.replace(/\{Y\}/g, ctx && ctx.report ? ctx.report.Y : '{Y}') : '';
+  }
+  const headerText = (h, ctx) => String(h).replace(/\{Y\}/g, ctx && ctx.report ? ctx.report.Y : '');
   const LISTS = { // الحقول ذات القوائم: مفتاح ⇄ عربي
     'units.type': () => M().UNIT_TYPES, 'clients.kind': () => M().CLIENT_KINDS, 'contracts.depositStatus': () => M().DEPOSIT_STATUS,
     'payments.method': () => [{ key: '', ar: 'غير محدد' }].concat(M().PAY_METHODS), 'payments.source': () => [{ key: 'web', ar: 'الموقع' }, { key: 'excel', ar: 'الإكسيل' }],
@@ -35,7 +88,8 @@ window.Egary = window.Egary || {};
   };
   const DATE_FIELDS = new Set(['start', 'end', 'paidOn', 'date', 'closedOn', 'createdAt']);
   const NUM_FIELDS = new Set(['rent', 'increasePct', 'deposit', 'dueDay', 'amount', 'cost', 'area', 'ledgerOrder']);
-  const STYLE = { head: 'FF1F4E78', headFont: 'FFFFFFFF', total: 'FFD9D9D9', computed: 'FFEDEDED', rowFills: ['FFFFF2CC', 'FFDDEBF7', 'FFE2EFDA', 'FFFCE4D6', 'FFEDEDED'] };
+  /* الألوان: عنوان أزرق = يكتبه المكتب · أخضر = معادلة إكسيل · رمادي = من البرنامج (الدليل مكتوب في ورقة الإعدادات) */
+  const STYLE = { head: 'FF1F4E78', headFormula: 'FF548235', headProgram: 'FF595959', headFont: 'FFFFFFFF', total: 'FFD9D9D9', computed: 'FFEDEDED', formulaCell: 'FFEBF1DE', formulaFont: 'FF1F1F1F', programFont: 'FF595959', unread: 'FFFFC7CE', rowFills: ['FFFFF2CC', 'FFDDEBF7', 'FFE2EFDA', 'FFFCE4D6', 'FFEDEDED'] };
 
   /* ---------- أدوات ورقة ---------- */
   function headerMap(ws, headerRow) {
@@ -43,10 +97,18 @@ window.Egary = window.Egary || {};
     row.eachCell((cell, col) => { const t = U().normalize(U().cellText(cell.value)); if (t) map[t] = col; });
     return map;
   }
-  function findCol(map, name) { return map[U().normalize(name)] || 0; }
+  /* عمود باسمه أو بأي من مرادفاته (الأول في القائمة هو العنوان الحالي، وبعده العناوين القديمة) */
+  function findCol(map, names) { for (const n of (Array.isArray(names) ? names : [names])) { const c = map[U().normalize(n)]; if (c) return c; } return 0; }
   function styleHeader(row) {
     row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.head } }; cell.font = { bold: true, color: { argb: STYLE.headFont }, size: 11 }; cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; cell.border = { bottom: { style: 'thin' } }; });
     row.height = 28;
+  }
+  /* لون خلية عنوان بحسب نوع العمود (الأزرق هو ما يضعه styleHeader) */
+  function styleHeadKind(cell, kind) { const argb = kind === 'formula' ? STYLE.headFormula : (kind === 'program' || kind === 'helper') ? STYLE.headProgram : STYLE.head; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb } }; }
+  /* تنسيق خلية بيانات تلقائية */
+  function styleAutoCell(cell, kind) {
+    if (kind === 'formula') { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.formulaCell } }; cell.font = { color: { argb: STYLE.formulaFont } }; }
+    else if (kind === 'program' || kind === 'helper') { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.computed } }; cell.font = { color: { argb: STYLE.programFont }, italic: true }; }
   }
   function rtl(ws, xSplit, ySplit) { ws.views = [{ state: 'frozen', xSplit: xSplit || 0, ySplit: ySplit || 1, rightToLeft: true }]; }
   function listValidation(ws, col, fromRow, toRow, values) {
@@ -82,13 +144,21 @@ window.Egary = window.Egary || {};
   }
   /* نص تعليق خلية (ExcelJS: نص أو {texts:[…]}) */
   function noteText(note) { if (!note) return ''; if (typeof note === 'string') return note.trim(); if (Array.isArray(note.texts)) return note.texts.map(t => t.text || '').join('').trim(); return ''; }
-  /* الأعمدة التي أضافها المكتب في ورقة منظَّمة (ليست من أعمدتنا): تُقرأ كما هي وتُعاد كتابتها بعد الأعمدة المعروفة */
-  function extraHeaders(ws, headerRow, knownSet) {
+  /* الأعمدة التي أضافها المكتب في ورقة منظَّمة (ليست من أعمدتنا): تُقرأ كما هي وتُعاد كتابتها بعد الأعمدة المعروفة.
+     known: مجموعة أسماء مطبَّعة، أو { set, patterns } (أنماط للعناوين التي تحمل سنة مثل «المحصَّل في 2026») */
+  function extraHeaders(ws, headerRow, known) {
     const out = []; const row = ws.getRow(headerRow || 1);
-    row.eachCell((cell, col) => { const t = U().cellText(cell.value).trim(); if (!t) return; if (knownSet.has(U().normalize(t))) return; out.push({ name: t, col }); });
+    const isKnown = (n) => known instanceof Set ? known.has(n) : (known.set.has(n) || known.patterns.some(p => p.test(n)));
+    row.eachCell((cell, col) => { const t = U().cellText(cell.value).trim(); if (!t) return; if (isKnown(U().normalize(t))) return; out.push({ name: t, col }); });
     return out;
   }
   function knownSetOf(names) { return new Set(names.map(n => U().normalize(n))); }
+  /* كل عناوين الكيان (الحالية والقديمة والمتقاعدة): عمود بأي منها ليس «عمودًا إضافيًا من المكتب» ولا يُعاد كتابته مرتين */
+  function knownOf(entity) {
+    const plain = [], patterns = [];
+    for (const c of COLS[entity]) for (const h of c.slice(1)) { if (h.includes('{Y}')) patterns.push(new RegExp('^' + U().normalize(h.replace('{Y}', '9999')).replace('9999', '\\d{4}') + '$')); else plain.push(h); }
+    return { set: knownSetOf(plain.concat(RETIRED[entity] || [])), patterns };
+  }
   const KNOWN_LEDGER = () => knownSetOf(LEDGER_HEAD.concat(['العقد إلى', 'الرقم القومي'], U().MONTHS_AR));
   /* قيمة خلية إضافية كما قُرئت (تاريخ/رقم/نص/معادلة) مع تنسيقها حتى تُكتب كما كانت */
   function captureExtra(row, extras, into, fmts) {
@@ -103,12 +173,23 @@ window.Egary = window.Egary || {};
   /* =====================================================================
      القراءة
      ===================================================================== */
+  /* مصنف ExcelJS يتسامح مع ملف حُفظ بأداة تضع التعليقات في xl/comments/… (مثل openpyxl) بدل xl/comments1.xml الذي يعرفه ExcelJS:
+     تُسقَط علاقة التعليقات غير المقروءة بدل أن تتوقف قراءة الملف كله (إكسيل وليبر أوفيس يكتبان الصيغة المعروفة فلا يتأثران) */
+  function newWorkbook() {
+    const wb = new (XL().Workbook)(); const x = wb.xlsx; const orig = x.reconcile;
+    x.reconcile = function (model, options) {
+      try { const rels = model.worksheetRels || {}; for (const k of Object.keys(rels)) { const before = (rels[k] || []).length; rels[k] = (rels[k] || []).filter(r => !(r && /\/comments$/.test(String(r.Type || '')) && !(model.comments && model.comments[r.Target]))); if (rels[k].length !== before) wb._droppedComments = true; } } catch (e) { /* لا شيء: نترك ExcelJS يتصرف */ }
+      return orig.call(this, model, options);
+    };
+    return wb;
+  }
   async function read(buf, opts) {
     opts = opts || {};
-    const wb = new (XL().Workbook)();
+    const wb = newWorkbook();
     await wb.xlsx.load(buf);
     const names = wb.worksheets.map(w => w.name);
     const flags = [];
+    if (wb._droppedComments) flags.push({ sev: 'info', entity: 'sheet', code: 'الملف', text: 'تعليقات الخلايا في الملف مكتوبة بصيغة لا يقرأها البرنامج (ملف محفوظ بأداة غير إكسيل) — لن تُنقل إلى الحفظ التالي من الموقع' });
     const state = M().emptyState();
     const isYearName = (n) => /^\d{4}$/.test(U().foldCode(n));
     const ledgerSheets = wb.worksheets.filter(w => isYearName(w.name));
@@ -149,7 +230,8 @@ window.Egary = window.Egary || {};
     delete state._newestYear;
     C().syncSeq(state); // العدّادات لا تقل عن أعلى كود موجود
     state.flags = flags;
-    return { state, flags, migrated: !normalized, sheets: names };
+    const formatVersion = state._formatVersion == null ? (normalized ? 2 : 0) : state._formatVersion; delete state._formatVersion; // «إصدار تنسيق الملف» (أو «إصدار البنية» القديم)
+    return { state, flags, migrated: !normalized, sheets: names, formatVersion };
   }
 
   /* هل في الملف رسم بياني أو جدول محوري؟ نفحص أسماء الأجزاء في فهرس الـzip (ExcelJS يُسقطها بصمت عند الكتابة) */
@@ -165,15 +247,16 @@ window.Egary = window.Egary || {};
   /* readTable: الصفوف بأسماء الأعمدة. extra (اختياري) يُملأ بالأعمدة التي أضافها المكتب: { headers: [...], fmts: {...} } وكل صف يحمل _extra بقيمها كما قُرئت */
   function readTable(ws, entity, headerRow, extra) {
     const map = headerMap(ws, headerRow || 1), cols = COLS[entity], out = [];
-    const xh = extraHeaders(ws, headerRow || 1, knownSetOf(cols.map(c => c[1])));
+    const xh = extraHeaders(ws, headerRow || 1, knownOf(entity));
     if (extra) { extra.headers = xh.map(x => x.name); extra.fmts = {}; }
     for (let r = (headerRow || 1) + 1; r <= ws.rowCount; r++) {
       const row = ws.getRow(r); if (!row || !row.hasValues) continue;
       const rec = M().blank[entity] ? M().blank[entity]() : {};
       let any = false;
-      for (const [field, ar] of cols) {
-        if (field.startsWith('_') && field !== '_project' && field !== '_unit' && field !== '_client') continue;
-        const col = findCol(map, ar); if (!col) continue;
+      for (const c of cols) {
+        const field = c[0], ar = c[1];
+        if (field.startsWith('_') && field !== '_project' && field !== '_unit' && field !== '_client') continue; // الأعمدة التلقائية لا تُقرأ (بأي عنوان كانت ومهما كتب فيها أحد)
+        const col = findCol(map, c.slice(1)); if (!col) continue;
         const cell = row.getCell(col); const v = cell.value; const txt = U().cellText(v);
         if (txt !== '') any = true;
         if (field.startsWith('_')) { if (txt !== '') rec[field] = txt; continue; }
@@ -281,8 +364,12 @@ window.Egary = window.Egary || {};
         const cellV = wsS.getCell(r, 2);
         const k = U().cellText(wsS.getCell(r, 1).value), v = cellV.value, txt = U().cellText(v);
         if (!k) continue;
-        const f = SETTINGS_KEYS.find(s => U().normalize(s.ar) === U().normalize(k)); if (!f) continue;
-        if (f.type === 'num') state.settings[f.key] = U().toNum(v) == null ? state.settings[f.key] : U().toNum(v);
+        const nk = U().normalize(k);
+        const f = SETTINGS_KEYS.find(s => U().normalize(s.ar) === nk || (s.aliases || []).some(a => U().normalize(a) === nk)); // العنوان الحالي أو عنوان قديم
+        if (!f) { const iv = INFO_ROWS.find(s => U().normalize(s.ar) === nk || (s.aliases || []).some(a => U().normalize(a) === nk)); if (iv && iv.key === 'formatVersion') state._formatVersion = U().toNum(v); continue; } // صفوف معلومات (الدليل، آخر كتابة…) لا تُقرأ
+        if (f.key === 'trackingMode') { const n = U().normalize(txt); if (n) state.settings.trackingMode = n === U().normalize('تلقائي') || n === 'auto' ? 'auto' : n === U().normalize('يدوي') || n === 'manual' ? 'manual' : txt; } // القيمة بالعربية (تلقائي/يدوي) أو القديمة
+        else if (f.key === 'prorationBasis') { const n = U().normalize(txt); if (n) state.settings.prorationBasis = /^(فعلي|فعليه|actual)$/.test(n) ? 'actual' : /30/.test(n) ? '30' : txt; }
+        else if (f.type === 'num') state.settings[f.key] = U().toNum(v) == null ? state.settings[f.key] : U().toNum(v);
         else if (f.type === 'pct') { const n = pctOf(cellV); if (n != null) { state.settings[f.key] = n; if (n < 0 || n > 100) flags.push({ sev: 'warn', entity: 'sheet', code: SH.settings, text: `الإعدادات: «${f.ar}» = ${n} خارج النطاق 0–100 — راجع القيمة (10% تُكتب 10)` }); } }
         else if (f.type === 'period') { // سنة-شهر: Excel يحوّل «2026-01» تلقائيًا إلى تاريخ ⇒ نقبل التاريخ والنص ونرفض الباقي
           if (v == null || txt === '') { if (f.key !== 'trackingFrom') state.settings[f.key] = ''; }
@@ -297,12 +384,26 @@ window.Egary = window.Egary || {};
     const wsA = wb.getWorksheet(SH.audit);
     if (wsA) for (let r = 2; r <= Math.min(wsA.rowCount, 501); r++) { const row = wsA.getRow(r); if (!row.hasValues) continue; state.audit.push({ at: U().cellText(row.getCell(1).value), action: U().cellText(row.getCell(2).value), entity: U().cellText(row.getCell(3).value), code: U().cellText(row.getCell(4).value), summary: U().cellText(row.getCell(5).value), user: U().cellText(row.getCell(6).value) }); }
   }
-  const SETTINGS_KEYS = [
+  const SETTINGS_KEYS = [ // ar = العنوان الحالي · aliases = عناوين قديمة تُقرأ أيضًا
     { key: 'officeName', ar: 'اسم المكتب', type: 'text' }, { key: 'graceDays', ar: 'أيام السماح بعد الاستحقاق', type: 'num' }, { key: 'dueDay', ar: 'يوم الاستحقاق الافتراضي', type: 'num' },
-    { key: 'vacancyMonths', ar: 'عتبة الشغور الطويل (شهور)', type: 'num' }, { key: 'trackingFrom', ar: 'بداية المحاسبة (سنة-شهر)', type: 'period' }, { key: 'defaultIncreasePct', ar: 'الزيادة السنوية الافتراضية %', type: 'pct' },
-    { key: 'ledgerYears', ar: 'سنوات الورقة', type: 'years' }, { key: 'codeSeq', ar: 'أعلى أرقام الأكواد الصادرة', type: 'json' }, { key: 'trackingMode', ar: 'بداية المحاسبة (تلقائي/يدوي)', type: 'text' }, { key: 'invoicePrefix', ar: 'بادئة رقم الفاتورة', type: 'text' }, { key: 'currency', ar: 'العملة', type: 'text' },
-    { key: 'enteredThrough', ar: 'آخر شهر مسجَّل في الورقة (سنة-شهر أو فارغ = تلقائي)', type: 'period' }, { key: 'tolerancePct', ar: 'فرق مقبول في السداد %', type: 'pct' }, { key: 'toleranceMin', ar: 'الحد الأدنى للفرق المقبول (ج)', type: 'num' }, { key: 'prorationBasis', ar: 'أساس الشهر المقطوع (30 أو actual)', type: 'text' },
+    { key: 'vacancyMonths', ar: 'تنبيه الشغور الطويل بعد (شهور)', aliases: ['عتبة الشغور الطويل (شهور)'], type: 'num' }, { key: 'trackingFrom', ar: 'بداية المحاسبة (سنة-شهر)', type: 'period' }, { key: 'defaultIncreasePct', ar: 'الزيادة السنوية المقترحة للعقود الجديدة %', aliases: ['الزيادة السنوية الافتراضية %'], type: 'pct' },
+    { key: 'ledgerYears', ar: 'سنوات الورقة', type: 'years' }, { key: 'codeSeq', ar: 'أعلى أرقام الأكواد الصادرة', type: 'json', kind: 'program' }, { key: 'trackingMode', ar: 'بداية المحاسبة (تلقائي/يدوي)', type: 'text' }, { key: 'invoicePrefix', ar: 'بادئة رقم الفاتورة', type: 'text' }, { key: 'currency', ar: 'العملة', type: 'text' },
+    { key: 'enteredThrough', ar: 'آخر شهر مسجَّل في الورقة (سنة-شهر أو فارغ = تلقائي)', type: 'period' }, { key: 'tolerancePct', ar: 'فرق مقبول في السداد %', type: 'pct' }, { key: 'toleranceMin', ar: 'الحد الأدنى للفرق المقبول (ج)', type: 'num' }, { key: 'prorationBasis', ar: 'حساب الشهر المقطوع (30 = على أساس 30 يومًا · فعلي = بأيام الشهر الحقيقية)', aliases: ['أساس الشهر المقطوع (30 أو actual)'], type: 'text' },
   ]; // period: سنة-شهر (تاريخ إكسيل أو نص) · pct: نسبة مئوية (0.1 بتنسيق % = 10)
+  /* صفوف معلومات في ورقة الإعدادات (يكتبها البرنامج ولا يقرأها): */
+  const INFO_ROWS = [
+    { key: 'enteredThroughAuto', ar: 'آخر شهر مسجَّل (كما اكتشفه البرنامج)' },
+    { key: 'lastWrite', ar: 'آخر كتابة من الموقع' },
+    { key: 'formatVersion', ar: 'إصدار تنسيق الملف', aliases: ['إصدار البنية'] },
+  ];
+  const FORMAT_VERSION = 3; // 3 = عناوين مفهومة + معادلات حية (2 = الأعمدة «(محسوب)» الثابتة)
+  /* دليل ألوان العناوين (يُكتب في ورقة الإعدادات): [لون العنوان، النوع، الشرح] */
+  const LEGEND = [
+    { title: 'عنوان أزرق', kind: 'تكتبه أنت', argb: STYLE.head, text: 'تكتبه أنت: هذه هي البيانات التي يقرأها البرنامج من الملف (خانات الشهور في ورقة السنة، المدفوعات، العقود، العملاء، الوحدات، الصيانة، الإعدادات). الأكواد يعطيها البرنامج تلقائيًا؛ اتركها فارغة في الصف الجديد.' },
+    { title: 'عنوان أخضر', kind: 'معادلة إكسيل', argb: STYLE.headFormula, text: 'معادلة إكسيل: يحسبه الإكسيل فورًا من البيانات التي تكتبها (مثل إجمالي المسدَّد، حالة العقد اليوم، الإيجار الشهري الحالي، عدد العقود) — لا تكتب فيه؛ البرنامج يعيد كتابته عند كل حفظ.' },
+    { title: 'عنوان رمادي (من البرنامج)', kind: 'يحسبه البرنامج عند الحفظ', argb: STYLE.headProgram, text: 'يحسبه البرنامج عند الحفظ فقط: المتأخرات (بعد أيام السماح والفرق المقبول وحتى آخر شهر مسجَّل) وملخص الأصول — لا يتغيّر وأنت تكتب في الإكسيل، بل عند الحفظ من الموقع (التاريخ في «آخر كتابة من الموقع»)؛ لا تكتب فيه.' },
+  ];
+  const LEGEND_FOOT = 'الخلايا الخضراء الفاتحة والرمادية لا تُكتب: تُحسب تلقائيًا. السطر «آخر شهر مسجَّل (كما اكتشفه البرنامج)» يوضح آخر شهر تُحسب عليه المتأخرات.';
 
   /* ---------- قراءة ورقة سنة (الشكل المعتاد) ---------- */
   const TOTAL_RE = /(^|\s)(ال)?(اجمالي|مجموع|total)(\s|$)/; // على النص المطبَّع: الاجمالي · الإجمالى العام · اجمالي بابل · مجموع · Total
@@ -621,11 +722,113 @@ window.Egary = window.Egary || {};
 
   /* =====================================================================
      الكتابة
+     • الأعمدة التلقائية معادلات إكسيل حية (أخضر) إلا ما لا تستطيع معادلة 2016 حسابه: المتأخرات وملخص الأصول (رمادي، من البرنامج).
+     • كل خلية معادلة تُكتب { formula, result } والنتيجة المخزَّنة هي قيمة المعادلة نفسها بتاريخ البرنامج (رقم/نص فارغ/تاريخ)،
+       فيرى من يفتح الملف بلا إعادة حساب نفس الأرقام التي سيحسبها الإكسيل.
+     • الحروف داخل المعادلات تُشتق من ترتيب COLS (الدالة L) ومن LEDGER_HEAD (LL) — لا حرف ثابت يمكن أن ينزاح.
      ===================================================================== */
+  const colLetter = n => { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+  const colIndex = (entity, field) => { const i = COLS[entity].findIndex(c => c[0] === field); if (i < 0) throw new Error('عمود غير معروف: ' + entity + '.' + field); return i + 1; };
+  const L = (entity, field) => colLetter(colIndex(entity, field));              // حرف عمود في ورقة كيان
+  const LL = name => colLetter(LEDGER_HEAD.indexOf(name) + 1);                   // حرف عمود في ورقة السنة
+  const Q = entity => `'${SH[entity]}'`;                                         // اسم الورقة بين علامتي اقتباس
+  const WC = (entity, field) => `${Q(entity)}!$${L(entity, field)}:$${L(entity, field)}`; // عمود كامل في ورقة أخرى (داخل COUNTIF/SUMIF/INDEX/MATCH فقط)
+  const SC = (entity, field, r) => `$${L(entity, field)}${r}`;                   // خلية في نفس الورقة
+  const BR = (entity, field, NC) => `${Q(entity)}!$${L(entity, field)}$2:$${L(entity, field)}$${NC}`; // نطاق محدود (داخل SUMPRODUCT)
+  const LOOKUP = (keyCell, from, field, by) => `IF(${keyCell}="","",IFERROR(INDEX(${WC(from, field)},MATCH(${keyCell},${WC(from, by)},0)),""))`; // بحث بالكود مع حراسة المفتاح
+  /* الأشهر: حرف كل شهر في ورقة السنة */
+  const SUMMARY_HEAD = (Y) => ['المشروع', `عدد العقود في ورقة ${Y}`, `المحصَّل في ${Y}`, 'عدد الوحدات', 'مؤجَّرة اليوم', 'شاغرة اليوم', 'نسبة الإشغال', 'المتأخرات (من البرنامج)', 'كود المشروع'];
+  const SUMMARY_KIND = ['input', 'formula', 'formula', 'formula', 'formula', 'formula', 'formula', 'program', 'input'];
+  const SUMMARY_KEY = 9; // عمود كود المشروع في الملخص (مفتاح كل معادلاته)
+  const summaryNote = (i) => SUMMARY_KIND[i] === 'formula' ? NOTE.formula : SUMMARY_KIND[i] === 'program' ? NOTE_OF['projects._arrears'] + '\n' + NOTE.program : i + 1 === SUMMARY_KEY ? 'مفتاح معادلات هذا الملخص — ' + NOTE.key : '';
+  /* قوالب المعادلات: F[كيان][حقل](r, ctx, lit) ⇒ نص المعادلة بلا «=»
+     ctx = { NC (آخر صف محدود للنطاقات داخل SUMPRODUCT), report: { Y } } · lit = أرقام البرنامج التي تُدمج حرفيًا حيث لا تكفي المعادلة (عقود أطول من 10 سنوات) */
+  const F = { contracts: {}, units: {}, clients: {}, projects: {}, payments: {}, maintenance: {}, summary: {} };
+  const AR_ACTIVE = 'ساري', AR_OCC = 'مؤجَّرة', AR_ENDING = 'تنتهي خلال 90 يومًا', AR_VACANT = 'شاغرة', AR_INVALID = 'تواريخ غير صحيحة', AR_FUTURE = 'لم يبدأ', AR_ENDED = 'منتهٍ', AR_RENEWED = 'منتهٍ (أُجِّرت بعده)';
+  // العقود
+  F.contracts._project = r => LOOKUP(SC('contracts', '_projectCode', r), 'projects', 'name', 'code');
+  F.contracts._unit = r => LOOKUP(SC('contracts', 'unitCode', r), 'units', 'label', 'code');
+  F.contracts._client = r => LOOKUP(SC('contracts', 'clientCode', r), 'clients', 'name', 'code');
+  F.contracts._status = r => { const A = SC('contracts', 'code', r), B = SC('contracts', 'unitCode', r), G = SC('contracts', 'start', r), H = SC('contracts', 'end', r), cB = '$' + L('contracts', 'unitCode') + ':$' + L('contracts', 'unitCode'), cG = '$' + L('contracts', 'start') + ':$' + L('contracts', 'start'), cO = '$' + L('contracts', 'prevCode') + ':$' + L('contracts', 'prevCode');
+    // منتهٍ (أُجِّرت بعده) = عقد آخر يذكره كعقد سابق، أو عقد على نفس الوحدة يبدأ بعد نهايته (الصف نفسه يُستبعد لو تواريخه معكوسة)
+    return `IF(NOT(AND(ISNUMBER(${G}),ISNUMBER(${H}))),"${AR_INVALID}",IF(TODAY()<${G},"${AR_FUTURE}",IF(TODAY()>${H},IF(IF(${A}="",0,COUNTIF(${cO},${A}))+IF(${B}="",0,COUNTIFS(${cB},${B},${cG},">"&${H})-IF(${G}>${H},1,0))>0,"${AR_RENEWED}","${AR_ENDED}"),"${AR_ACTIVE}")))`; };
+  F.contracts._currentRent = (r, ctx, lit) => { const X = SC('contracts', '_yearIndex', r); return `IF(${X}="","",IF(${X}>10,${lit.engineCurrentRent},INDEX(${SC('contracts', '_rentY1', r)}:${SC('contracts', '_rentY10', r)},1,${X})))`; };
+  F.contracts._paid = r => `IF(${SC('contracts', 'code', r)}="","",SUMIFS(${WC('payments', 'amount')},${WC('payments', 'contractCode')},${SC('contracts', 'code', r)}))`;
+  F.contracts._yearIndex = r => { const G = SC('contracts', 'start', r), H = SC('contracts', 'end', r), AA = SC('contracts', '_nYears', r); return `IF(OR(NOT(ISNUMBER(${G})),NOT(ISNUMBER(${H})),${AA}=""),"",IF(TODAY()<${G},1,MIN(${AA},DATEDIF(${G},TODAY(),"y")+1)))`; };
+  F.contracts._projectCode = r => LOOKUP(SC('contracts', 'unitCode', r), 'units', 'projectCode', 'code');
+  F.contracts._daysLeft = r => { const H = SC('contracts', 'end', r); return `IF(ISNUMBER(${H}),${H}-TODAY(),"")`; };
+  F.contracts._nYears = r => { const G = SC('contracts', 'start', r), H = SC('contracts', 'end', r); return `IF(AND(ISNUMBER(${G}),ISNUMBER(${H})),IFERROR(DATEDIF(${G},${H},"y")+1,""),"")`; };
+  F.contracts._nextIncreaseOn = r => { const G = SC('contracts', 'start', r), X = SC('contracts', '_yearIndex', r), AA = SC('contracts', '_nYears', r); return `IF(OR(${X}="",${X}>=${AA}),"",DATE(YEAR(${G})+${X},MONTH(${G}),DAY(${G})))`; };
+  F.contracts._nextRent = (r, ctx, lit) => { const X = SC('contracts', '_yearIndex', r), AB = SC('contracts', '_nextIncreaseOn', r); return `IF(${AB}="","",IF(${X}+1>10,${lit.engineNextRent},INDEX(${SC('contracts', '_rentY1', r)}:${SC('contracts', '_rentY10', r)},1,${X}+1)))`; };
+  // مفتاح الإيجار اليدوي: «2:83600; 3:91960» أو «2 = 83,600 ، 3:91960» ⇒ «;2:83600;3:91960;» حتى تبحث كل سنة عن «;k:» بأمان
+  F.contracts._ovKey = r => { const K = SC('contracts', 'rentOverrides', r); return `";"&SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(${K}," ",""),"،",";"),CHAR(10),";"),"=",":"),",",""),"٫",".")&";"`; };
+  const normOvKey = s => ';' + String(s || '').replace(/ /g, '').replace(/،/g, ';').replace(/\n/g, ';').replace(/=/g, ':').replace(/,/g, '').replace(/٫/g, '.') + ';'; // نفس التطبيع في JS (للنتيجة المخزَّنة)
+  F.contracts._activeUnitKey = r => `IF(${SC('contracts', '_status', r)}="${AR_ACTIVE}",${SC('contracts', 'unitCode', r)},"")`;
+  // إيجار السنة k: الإيجار اليدوي لتلك السنة إن وُجد، وإلا السنة السابقة × (1 + الزيادة) مقرَّبًا — نفس Engine.schedule
+  for (let k = 1; k <= 10; k++) {
+    F.contracts['_rentY' + k] = r => {
+      const AN = SC('contracts', '_ovKey', r), AA = SC('contracts', '_nYears', r), tag = `";${k}:"`, len = String(k).length + 2;
+      const ovr = `IFERROR(VALUE(MID(${AN},SEARCH(${tag},${AN})+${len},SEARCH(";",${AN},SEARCH(${tag},${AN})+${len})-SEARCH(${tag},${AN})-${len})),`;
+      if (k === 1) return `IF(${AA}="","",${ovr}${SC('contracts', 'rent', r)}))`;
+      return `IF(OR(${AA}="",${k}>${AA}),"",${ovr}ROUND(${SC('contracts', '_rentY' + (k - 1), r)}*(1+${SC('contracts', 'increasePct', r)}/100),0)))`;
+    };
+  }
+  // الوحدات
+  F.units._project = r => LOOKUP(SC('units', 'projectCode', r), 'projects', 'name', 'code');
+  F.units._contract = r => LOOKUP(SC('units', 'code', r), 'contracts', 'code', '_activeUnitKey'); // أول عقد ساري على الوحدة بترتيب الورقة
+  F.units._tenant = r => LOOKUP(SC('units', '_contract', r), 'contracts', '_client', 'code');
+  F.units._rent = r => LOOKUP(SC('units', '_contract', r), 'contracts', '_currentRent', 'code');
+  F.units._contractEnd = r => LOOKUP(SC('units', '_contract', r), 'contracts', 'end', 'code');
+  F.units._daysLeft = r => { const Qe = SC('units', '_contractEnd', r); return `IF(${Qe}="","",${Qe}-TODAY())`; };
+  F.units._status = r => { const Mc = SC('units', '_contract', r), R = SC('units', '_daysLeft', r), Qe = SC('units', '_contractEnd', r); return `IF(${Mc}="","${AR_VACANT}",IF(AND(${R}<=90,COUNTIFS(${WC('contracts', 'unitCode')},${SC('units', 'code', r)},${WC('contracts', 'start')},">"&${Qe})=0),"${AR_ENDING}","${AR_OCC}"))`; };
+  // شاغرة منذ = اليوم التالي لآخر عقد منتهٍ (SUMPRODUCT(MAX()) بديل MAXIFS في إكسيل 2016)، وإلا تاريخ إضافة الوحدة
+  F.units._vacantSince = (r, ctx) => { const A = SC('units', 'code', r), Mc = SC('units', '_contract', r), I = SC('units', 'createdAt', r), NC = ctx.NC; return `IF(OR(${A}="",${Mc}<>""),"",IF(COUNTIFS(${WC('contracts', 'unitCode')},${A},${WC('contracts', 'end')},"<"&TODAY())=0,IF(ISNUMBER(${I}),${I},""),IFERROR(SUMPRODUCT(MAX((${BR('contracts', 'unitCode', NC)}=${A})*(${BR('contracts', 'end', NC)}<TODAY())*${BR('contracts', 'end', NC)}))+1,"")))`; };
+  F.units._vacantDays = r => { const O = SC('units', '_vacantSince', r); return `IF(${O}="","",MAX(0,TODAY()-${O}))`; };
+  // العملاء
+  F.clients._contracts = r => `IF(${SC('clients', 'code', r)}="","",COUNTIF(${WC('contracts', 'clientCode')},${SC('clients', 'code', r)}))`;
+  F.clients._active = r => `IF(${SC('clients', 'code', r)}="","",COUNTIFS(${WC('contracts', 'clientCode')},${SC('clients', 'code', r)},${WC('contracts', '_status')},"${AR_ACTIVE}"))`;
+  F.clients._arrears = r => `IF(${SC('clients', 'code', r)}="","",SUMIFS(${WC('contracts', '_arrears')},${WC('contracts', 'clientCode')},${SC('clients', 'code', r)}))`;
+  F.clients._paid = r => `IF(${SC('clients', 'code', r)}="","",SUMIFS(${WC('contracts', '_paid')},${WC('contracts', 'clientCode')},${SC('clients', 'code', r)}))`;
+  // المشاريع (وملخص المشاريع بنفس المعادلات مع المفتاح في عمود الكود)
+  const occFormulas = (key) => ({
+    units: `IF(${key}="","",COUNTIF(${WC('units', 'projectCode')},${key}))`,
+    occupied: `IF(${key}="","",COUNTIFS(${WC('units', 'projectCode')},${key},${WC('units', '_status')},"${AR_OCC}")+COUNTIFS(${WC('units', 'projectCode')},${key},${WC('units', '_status')},"${AR_ENDING}"))`,
+    vacant: `IF(${key}="","",COUNTIFS(${WC('units', 'projectCode')},${key},${WC('units', '_status')},"${AR_VACANT}"))`,
+    arrears: `IF(${key}="","",SUMIFS(${WC('contracts', '_arrears')},${WC('contracts', '_projectCode')},${key}))`,
+  });
+  F.projects._units = r => occFormulas(SC('projects', 'code', r)).units;
+  F.projects._occupied = r => occFormulas(SC('projects', 'code', r)).occupied;
+  F.projects._vacant = r => occFormulas(SC('projects', 'code', r)).vacant;
+  F.projects._arrears = r => occFormulas(SC('projects', 'code', r)).arrears;
+  F.projects._ytd = (r, ctx) => `IF(${SC('projects', 'code', r)}="","",SUMIF('${ctx.report.Y}'!$${LL('كود المشروع')}:$${LL('كود المشروع')},${SC('projects', 'code', r)},'${ctx.report.Y}'!$${LL('الاجمالي')}:$${LL('الاجمالي')}))`;
+  F.projects._rate = r => { const G = SC('projects', '_units', r), H = SC('projects', '_occupied', r); return `IF(OR(${G}="",${G}=0),"",${H}/${G})`; };
+  const SK = r => '$' + colLetter(SUMMARY_KEY) + r;
+  F.summary.B = (r, ctx) => `COUNTIF('${ctx.report.Y}'!$${LL('كود المشروع')}:$${LL('كود المشروع')},${SK(r)})`;
+  F.summary.C = (r, ctx) => `SUMIF('${ctx.report.Y}'!$${LL('كود المشروع')}:$${LL('كود المشروع')},${SK(r)},'${ctx.report.Y}'!$${LL('الاجمالي')}:$${LL('الاجمالي')})`;
+  F.summary.D = r => occFormulas(SK(r)).units;
+  F.summary.E = r => occFormulas(SK(r)).occupied;
+  F.summary.F = r => occFormulas(SK(r)).vacant;
+  F.summary.G = r => `IF(OR($D${r}="",$D${r}=0),"",$E${r}/$D${r})`;
+  F.summary.H = r => occFormulas(SK(r)).arrears;
+  // المدفوعات
+  F.payments._client = r => LOOKUP(SC('payments', 'contractCode', r), 'contracts', '_client', 'code');
+  F.payments._unit = r => LOOKUP(SC('payments', 'contractCode', r), 'contracts', '_unit', 'code');
+  F.payments._projectName = r => LOOKUP(SC('payments', 'contractCode', r), 'contracts', '_project', 'code');
+  // الصيانة
+  F.maintenance._project = r => LOOKUP(SC('maintenance', 'unitCode', r), 'units', '_project', 'code');
+  F.maintenance._unit = r => LOOKUP(SC('maintenance', 'unitCode', r), 'units', 'label', 'code');
+  F.maintenance._custodian = r => { const O = SC('maintenance', 'custodianName', r), Qc = SC('maintenance', '_custodianContract', r); return `IF(${O}<>"",${O},${LOOKUP(Qc, 'contracts', '_client', 'code')})`; };
+  // العقد وقت الصيانة: المكتوب يدويًا، وإلا أول عقد (بترتيب الورقة) يغطي تاريخ الصيانة — أو اليوم لو التاريخ فارغ
+  F.maintenance._custodianContract = (r, ctx) => { const N = SC('maintenance', 'custodianContract', r), B = SC('maintenance', 'unitCode', r), Ed = SC('maintenance', 'date', r), NC = ctx.NC; const D = `IF(ISNUMBER(${Ed}),${Ed},TODAY())`;
+    return `IF(${N}<>"",${N},IF(${B}="","",IF(COUNTIFS(${WC('contracts', 'unitCode')},${B},${WC('contracts', 'start')},"<="&${D},${WC('contracts', 'end')},">="&${D})=0,"",IFERROR(INDEX(${BR('contracts', 'code', NC)},(${NC}+1)-SUMPRODUCT(MAX((${BR('contracts', 'unitCode', NC)}=${B})*(${BR('contracts', 'start', NC)}<=${D})*(${BR('contracts', 'end', NC)}>=${D})*((${NC}+1)-ROW(${BR('contracts', 'code', NC)}))))-1),""))))`; };
+  /* خلية معادلة بنتيجتها المخزَّنة ('' للفراغ — لا null حتى لا تسقط القيمة من الملف) */
+  const fcell = (entity, field, r, ctx, result, lit) => ({ formula: F[entity][field](r, ctx, lit || {}), result: result == null ? '' : result });
+  const r2 = x => Math.round(x * 100) / 100;
+
   async function write(state, opts) {
     opts = opts || {};
     const En = E.Engine, S = E.Store;
-    const wb = new (XL().Workbook)();
+    const wb = newWorkbook();
     // الأوراق غير المعروفة (أضافها المكتب) تُحفظ كما هي: نبدأ من آخر ملف مقروء ونستبدل أوراقنا فقط
     let foreign = [];
     if (opts.base && opts.base.byteLength) {
@@ -646,11 +849,15 @@ window.Egary = window.Egary || {};
     // كل السنوات من الأقدم إلى الأحدث بلا فجوات: سنة بلا ورقة لا يمكن تسجيل مبالغها
     const years = []; for (let y = known[0]; y <= known[known.length - 1]; y++) years.push(y);
     state.settings.ledgerYears = years;
+    const reportYear = years.filter(y => y <= asOf.getUTCFullYear()).pop() || years[years.length - 1]; // ملخص المشاريع و«المحصَّل في السنة» لسنة التقرير لا لسنة قادمة فارغة
+    // سياق المعادلات (يُبنى مرة واحدة من أعداد الحالة حتى لا يعتمد على ترتيب كتابة الأوراق)
+    const unreadByCode = {}; for (const p of (state._unreadPayments || [])) { const k = U().foldCode(p.contractCode); if (k) unreadByCode[k] = (unreadByCode[k] || 0) + (U().toNum(p.amount) || 0); }
+    const ctx = { NC: Math.max(201, state.contracts.length + 1 + 200), asOf, report: { Y: String(reportYear), hasSheet: true }, years, L, LL, paidOf: code => r2(U().sum(S.paymentsOf(code), x => U().toNum(x.amount)) + (unreadByCode[U().foldCode(code)] || 0)) };
     const sheetsMeta = {};
     for (const y of years) sheetsMeta[y] = writeLedger(wb, state, String(y), asOf);
-    const reportYear = years.filter(y => y <= asOf.getUTCFullYear()).pop() || years[years.length - 1]; // ملخص المشاريع لسنة التقرير لا لسنة قادمة فارغة
-    writeSummary(wb, state, String(reportYear), sheetsMeta[reportYear]);
-    writeProjects(wb, state, asOf); writeUnits(wb, state, asOf); writeAssets(wb, state); writeClients(wb, state, asOf); writeContracts(wb, state, asOf); writePayments(wb, state); writeMaintenance(wb, state, asOf); writeSettings(wb, state); writeAudit(wb, state); writeUsers(wb, state);
+    ctx.sheetsMeta = sheetsMeta; ctx.report.hasSheet = !!sheetsMeta[reportYear];
+    writeSummary(wb, state, String(reportYear), sheetsMeta[reportYear], ctx);
+    writeProjects(wb, state, ctx); writeUnits(wb, state, ctx); writeAssets(wb, state); writeClients(wb, state, ctx); writeContracts(wb, state, ctx); writePayments(wb, state, ctx); writeMaintenance(wb, state, ctx); writeSettings(wb, state, asOf); writeAudit(wb, state); writeUsers(wb, state);
     // ترتيب الأوراق: أوراق السنوات ثم الملخص ثم أوراقنا ثم أوراق المكتب
     let order = 1; for (const ws of wb.worksheets) if (!foreign.includes(ws.name)) ws.orderNo = order++;
     for (const name of foreign) { const ws = wb.getWorksheet(name); if (ws) ws.orderNo = order++; }
@@ -683,13 +890,18 @@ window.Egary = window.Egary || {};
     // الأعمدة التي أضافها المكتب في هذه الورقة تُعاد بعد أعمدة الأكواد بقيمها المحفوظة لكل عقد
     const extra = (state._extra && state._extra[year]) || null; const xHead = extra ? extra.headers : [];
     ws.getRow(2).values = LEDGER_HEAD.concat(xHead); styleHeader(ws.getRow(2));
+    // ورقة المكتب تبقى كما هي: العنوان الوحيد الأخضر هو «الاجمالي» (معادلة)، وملاحظات على الشهور وأعمدة الأكواد
+    const cTot = LEDGER_HEAD.indexOf('الاجمالي') + 1, cM1 = LEDGER_HEAD.indexOf('يناير') + 1, cK1 = LEDGER_HEAD.indexOf('كود العقد') + 1;
+    styleHeadKind(ws.getCell(2, cTot), 'formula'); ws.getCell(2, cTot).note = NOTE.rowTotal + '\n' + NOTE.formula;
+    for (let m = 0; m < 12; m++) ws.getCell(2, cM1 + m).note = NOTE.month;
+    for (let col = cK1; col <= LEDGER_HEAD.length; col++) ws.getCell(2, col).note = NOTE.key;
     const widths = [5, 12, 34, 30, 12, 26, 12, 12, 13, 18, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 14, 40, 11, 12, 11, 12];
     widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
     xHead.forEach((hname, i) => { ws.getColumn(29 + i).width = Math.max(12, Math.min(30, hname.length + 4)); });
     const lastCol = 28 + xHead.length;
     const rows = ledgerRows(state, year);
     const projIdx = new Map(state.projects.map((p, i) => [p.code, i]));
-    let r = 3, serial = 1; const colSums = {};
+    let r = 3, serial = 1; const colSums = {}; const byProject = {};
     const monthFirstCol = 11;
     for (const c of rows) {
       const cl = S.client(c.clientCode) || {}, u = S.unit(c.unitCode) || {}, p = S.project(u.projectCode) || {};
@@ -710,6 +922,7 @@ window.Egary = window.Egary || {};
         cell.numFmt = '#,##0.00';
         if (cc[period]) cell.note = cc[period]; // تعليق الخلية كما كتبه المكتب
       }
+      rowSum = r2(rowSum);
       colSums[13] = (colSums[13] || 0) + rowSum;
       row.getCell(23).value = { formula: `SUM(K${r}:V${r})`, result: rowSum }; row.getCell(23).numFmt = '#,##0.00'; row.getCell(23).font = { bold: true };
       row.getCell(24).value = c.notes || '';
@@ -719,55 +932,66 @@ window.Egary = window.Egary || {};
       const fill = STYLE.rowFills[(projIdx.get(p.code) || 0) % STYLE.rowFills.length];
       row.eachCell({ includeEmpty: true }, (cell, col) => { if (col <= lastCol) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } }; cell.border = { top: { style: 'hair' }, bottom: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' } }; } });
       for (let col = 25; col <= 28; col++) row.getCell(col).font = { color: { argb: 'FF7F7F7F' }, size: 9 };
+      const pc = p.code || ''; byProject[pc] = byProject[pc] || { n: 0, sum: 0 }; byProject[pc].n++; byProject[pc].sum = r2(byProject[pc].sum + rowSum); // ما كُتب فعلًا في عمود الاجمالي (مفتاح الملخص و«المحصَّل في السنة»)
       r++;
     }
     const last = r - 1;
     const tr = ws.getRow(r);
     tr.getCell(3).value = 'الاجمالي العام'; tr.getCell(3).font = { bold: true };
-    for (let col = 11; col <= 23; col++) { const L = ws.getColumn(col).letter; tr.getCell(col).value = last >= 3 ? { formula: `SUM(${L}3:${L}${last})`, result: Math.round((colSums[col - 10] || 0) * 100) / 100 } : 0; tr.getCell(col).numFmt = '#,##0.00'; tr.getCell(col).font = { bold: true }; }
+    for (let col = 11; col <= 23; col++) { const Lc = ws.getColumn(col).letter; tr.getCell(col).value = last >= 3 ? { formula: `SUM(${Lc}3:${Lc}${last})`, result: Math.round((colSums[col - 10] || 0) * 100) / 100 } : 0; tr.getCell(col).numFmt = '#,##0.00'; tr.getCell(col).font = { bold: true }; }
     tr.eachCell({ includeEmpty: true }, (cell, col) => { if (col <= lastCol) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.total } }; });
     ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: Math.max(2, last), column: lastCol } };
-    return { firstRow: 3, lastRow: Math.max(3, last), totalRow: r, count: rows.length, byProject: rows.reduce((m, c) => { const u = S.unit(c.unitCode) || {}; const pc = u.projectCode || ''; m[pc] = m[pc] || { n: 0, sum: 0 }; m[pc].n++; m[pc].sum += U().sum(S.paymentsOf(c.code).filter(x => x.period.startsWith(year)), x => U().toNum(x.amount)); return m; }, {}) };
+    return { firstRow: 3, lastRow: Math.max(3, last), totalRow: r, count: rows.length, byProject };
   }
-  function writeSummary(wb, state, year, meta) {
+  /* ملخص المشاريع: كل المعادلات بمفتاح «كود المشروع» (العمود الأخير) لا بالاسم، وبأعمدة كاملة حتى تُحسب الصفوف التي يضيفها المكتب */
+  function writeSummary(wb, state, year, meta, ctx) {
     const En = E.Engine;
     const ws = wb.addWorksheet(SH.summary, { views: [{ state: 'frozen', ySplit: 1, rightToLeft: true }] });
-    ws.getRow(1).values = ['المشروع', `عدد الصفوف في ${year}`, `إجمالي ${year}`, 'عدد الوحدات', 'مؤجَّرة', 'شاغرة', 'نسبة الإشغال', 'المتأخرات', 'كود المشروع']; styleHeader(ws.getRow(1));
-    [18, 16, 18, 12, 10, 10, 12, 16, 12].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
-    let r = 2;
+    const heads = SUMMARY_HEAD(year);
+    ws.getRow(1).values = heads; styleHeader(ws.getRow(1));
+    heads.forEach((h, i) => { styleHeadKind(ws.getCell(1, i + 1), SUMMARY_KIND[i]); const note = summaryNote(i); if (note) ws.getCell(1, i + 1).note = note; });
+    [18, 18, 18, 12, 12, 12, 12, 16, 12].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+    let r = 2; const tot = { B: 0, C: 0, D: 0, E: 0, F: 0, H: 0 };
     for (const p of state.projects) {
-      const k = En.kpis({ projectCode: p.code });
-      ws.getCell(r, 1).value = p.name;
-      const bp = (meta.byProject && meta.byProject[p.code]) || { n: 0, sum: 0 };
-      ws.getCell(r, 2).value = { formula: `COUNTIF('${year}'!B${meta.firstRow}:B${meta.lastRow},A${r})`, result: bp.n };
-      ws.getCell(r, 3).value = { formula: `SUMIF('${year}'!B${meta.firstRow}:B${meta.lastRow},A${r},'${year}'!W${meta.firstRow}:W${meta.lastRow})`, result: Math.round(bp.sum * 100) / 100 }; ws.getCell(r, 3).numFmt = '#,##0.00';
-      ws.getCell(r, 4).value = k.occupancy.total; ws.getCell(r, 5).value = k.occupancy.occupiedCount; ws.getCell(r, 6).value = k.occupancy.vacant.length;
-      ws.getCell(r, 7).value = k.occupancy.rate == null ? '' : k.occupancy.rate; ws.getCell(r, 7).numFmt = '0%';
-      ws.getCell(r, 8).value = k.arrears.total; ws.getCell(r, 8).numFmt = '#,##0';
-      ws.getCell(r, 9).value = p.code;
+      const sc = En.scope({ projectCode: p.code }); const occ = En.occupancy(sc, ctx.asOf), ar = En.arrears(sc, ctx.asOf);
+      const bp = (meta && meta.byProject && meta.byProject[p.code]) || { n: 0, sum: 0 };
+      const vals = { B: bp.n, C: r2(bp.sum), D: occ.total, E: occ.occupiedCount, F: occ.vacant.length, G: occ.rate == null ? '' : occ.rate, H: r2(ar.total) };
+      ws.getCell(r, 1).value = p.name; ws.getCell(r, SUMMARY_KEY).value = p.code;
+      for (const col of Object.keys(vals)) { const cell = ws.getCell(col + r); cell.value = { formula: F.summary[col](r, ctx), result: vals[col] }; styleAutoCell(cell, SUMMARY_KIND[col.charCodeAt(0) - 65]); if (col in tot) tot[col] += U().toNum(vals[col]) || 0; }
+      ws.getCell(r, 3).numFmt = '#,##0.00'; ws.getCell(r, 7).numFmt = '0%'; ws.getCell(r, 8).numFmt = '#,##0';
       r++;
     }
     ws.getCell(r, 1).value = 'الاجمالي'; ws.getCell(r, 1).font = { bold: true };
-    for (const col of [2, 3, 4, 5, 6, 8]) { const L = ws.getColumn(col).letter; let tot = 0; for (let rr = 2; rr < r; rr++) { const v = ws.getCell(rr, col).value; tot += U().toNum(v) || 0; } ws.getCell(r, col).value = r > 2 ? { formula: `SUM(${L}2:${L}${r - 1})`, result: Math.round(tot * 100) / 100 } : 0; ws.getCell(r, col).font = { bold: true }; ws.getCell(r, col).numFmt = col === 3 ? '#,##0.00' : '#,##0'; }
+    for (const col of ['B', 'C', 'D', 'E', 'F', 'H']) { ws.getCell(col + r).value = r > 2 ? { formula: `SUM(${col}2:${col}${r - 1})`, result: r2(tot[col]) } : 0; ws.getCell(col + r).font = { bold: true }; ws.getCell(col + r).numFmt = col === 'C' ? '#,##0.00' : '#,##0'; }
+    ws.getCell('G' + r).value = r > 2 ? { formula: `IF(OR(D${r}="",D${r}=0),"",E${r}/D${r})`, result: tot.D ? tot.E / tot.D : '' } : ''; ws.getCell('G' + r).numFmt = '0%'; ws.getCell('G' + r).font = { bold: true };
     ws.getRow(r).eachCell({ includeEmpty: true }, (cell, col) => { if (col <= 9) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.total } }; });
   }
+  /* جدول كيان: العناوين من COLS (بألوانها وملاحظاتها)، ثم صف لكل سجل؛ extra(rec, r, ctx) يعطي الأعمدة التلقائية (قيمة أو { formula, result }) */
   function table(wb, name, entity, records, extra, opts) {
-    opts = opts || {};
+    opts = opts || {}; const ctx = opts.ctx || null;
     const cols = COLS[entity];
     const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', xSplit: opts.xSplit || 1, ySplit: 1, rightToLeft: true }] });
     // الأعمدة التي أضافها المكتب في هذه الورقة (state._extra[entity]) تُعاد بعد أعمدة البرنامج بقيمها لكل كود
     const office = (opts.extra && opts.extra.headers && opts.extra.headers.length) ? opts.extra : null; const xHead = office ? office.headers : [];
-    ws.getRow(1).values = cols.map(c => c[1]).concat(xHead); styleHeader(ws.getRow(1));
-    cols.forEach((c, i) => { ws.getColumn(i + 1).width = opts.widths && opts.widths[i] ? opts.widths[i] : (c[0] === 'notes' || c[0] === 'description' || c[0] === '_schedule' || c[0] === '_assets' ? 36 : c[1].length > 14 ? 20 : 14); });
+    ws.getRow(1).values = cols.map(c => headerText(c[1], ctx)).concat(xHead); styleHeader(ws.getRow(1));
+    cols.forEach((c, i) => {
+      const kind = kindOf(entity, c[0]); const cell = ws.getCell(1, i + 1);
+      styleHeadKind(cell, kind); const note = headerNote(entity, c[0], ctx); if (note) cell.note = note;
+      if (kind === 'helper') ws.getColumn(i + 1).hidden = true;                   // عمود مساعد للمعادلات
+      if (/^_rentY\d+$/.test(c[0])) ws.getColumn(i + 1).outlineLevel = 1;         // كتلة «إيجار السنة …» قابلة للطي
+      ws.getColumn(i + 1).width = opts.widths && opts.widths[i] ? opts.widths[i] : (c[0] === 'notes' || c[0] === 'description' || c[0] === '_assets' ? 36 : c[1].length > 14 ? 20 : 14);
+    });
+    if (cols.some(c => /^_rentY\d+$/.test(c[0]))) ws.properties.outlineLevelCol = 1;
     xHead.forEach((hname, i) => { ws.getColumn(cols.length + 1 + i).width = Math.max(12, Math.min(30, hname.length + 4)); });
     let r = 2;
     for (const rec of records) {
-      const ex = extra ? extra(rec) : {};
+      const ex = extra ? extra(rec, r, ctx) : {};
       if (office) { const ox = office.rows[rec.code] || {}; xHead.forEach((hname, i) => { const cell = ws.getCell(r, cols.length + 1 + i); cell.value = ox[hname] == null ? null : ox[hname]; if (office.fmts && office.fmts[hname]) cell.numFmt = office.fmts[hname]; }); }
       cols.forEach((c, i) => {
         const field = c[0]; let v = field.startsWith('_') ? ex[field] : rec[field];
         const cell = ws.getCell(r, i + 1);
-        if (DATE_FIELDS.has(field)) { cell.value = toDate(v); cell.numFmt = 'dd/mm/yyyy'; }
+        if (v && typeof v === 'object' && !(v instanceof Date) && 'formula' in v) { cell.value = { formula: v.formula, result: v.result instanceof Date ? v.result : (v.result == null ? '' : v.result) }; if (FMT[field]) cell.numFmt = FMT[field]; } // خلية معادلة بنتيجتها
+        else if (DATE_FIELDS.has(field) || v instanceof Date) { cell.value = v instanceof Date ? v : toDate(v); cell.numFmt = FMT[field] || 'dd/mm/yyyy'; }
         else if (field === 'rentOverrides') cell.value = fmtOverrides(v);
         else if (field === 'present') cell.value = v ? 'نعم' : 'لا';
         else if (field === 'inferred') cell.value = v ? 'نعم' : '';
@@ -776,44 +1000,144 @@ window.Egary = window.Egary || {};
         else if (LISTS[entity + '.' + field]) cell.value = M().label(LISTS[entity + '.' + field](), v == null ? '' : v);
         else if (field === 'nationalId' || field === 'taxId' || field === 'phone' || field === 'phone2') { cell.value = v == null ? '' : String(v); cell.numFmt = '@'; }
         else if (field === 'period') { cell.value = v == null ? '' : String(v); cell.numFmt = '@'; }
-        else if (NUM_FIELDS.has(field) || typeof v === 'number' || v === null) { cell.value = v == null || v === '' ? null : v; if (['rent', 'deposit', 'amount', 'cost', '_currentRent', '_paid', '_arrears', '_rent', '_ytd'].includes(field)) cell.numFmt = '#,##0.00'; }
-        else cell.value = v == null ? '' : v;
-        if (field.startsWith('_')) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.computed } }; cell.font = { color: { argb: 'FF595959' } }; }
+        else if (NUM_FIELDS.has(field) || typeof v === 'number' || v === null) { cell.value = v == null || v === '' ? null : v; if (FMT[field]) cell.numFmt = FMT[field]; else if (['rent', 'deposit', 'amount', 'cost'].includes(field)) cell.numFmt = '#,##0.00'; }
+        else { cell.value = v == null ? '' : v; if (FMT[field] && v !== '' && v != null) cell.numFmt = FMT[field]; }
+        styleAutoCell(cell, kindOf(entity, field));
       });
+      if (opts.afterRow) opts.afterRow(ws, r, rec);
       r++;
     }
     const lastRow = Math.max(r - 1, 2);
     cols.forEach((c, i) => { const lk = LISTS[entity + '.' + c[0]]; if (lk) listValidation(ws, i + 1, 2, Math.max(lastRow, 200), lk().map(x => x.ar).filter(Boolean)); });
     if (entity === 'assets') listValidation(ws, 3, 2, Math.max(lastRow, 400), ['نعم', 'لا']);
+    if (entity === 'contracts') { // الزيادة السنوية رقم من 0 إلى 100 (10 = 10%) ويوم الاستحقاق 1..31
+      for (let rr = 2; rr <= Math.max(lastRow, 200); rr++) {
+        ws.getCell(rr, colIndex('contracts', 'increasePct')).dataValidation = { type: 'decimal', operator: 'between', allowBlank: true, formulae: [0, 100], showErrorMessage: true, errorTitle: 'نسبة غير صحيحة', error: 'اكتب الرقم فقط: 10 تعني 10%' };
+        ws.getCell(rr, colIndex('contracts', 'dueDay')).dataValidation = { type: 'whole', operator: 'between', allowBlank: true, formulae: [1, 31], showErrorMessage: true, errorTitle: 'يوم غير صحيح', error: 'اكتب يومًا من 1 إلى 31' };
+      }
+    }
     ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: lastRow, column: cols.length + xHead.length } };
     return ws;
   }
-  /* خيارات الجدول مع الأعمدة الإضافية المحفوظة لهذه الورقة */
-  function withExtra(state, entity, opts) { return Object.assign({}, opts || {}, { extra: state._extra && state._extra[entity] }); }
-  function writeProjects(wb, state, asOf) { const En = E.Engine; table(wb, SH.projects, 'projects', state.projects, p => { const k = En.kpis({ projectCode: p.code }, asOf); return { _units: k.occupancy.total, _occupied: k.occupancy.occupiedCount, _vacant: k.occupancy.vacant.length, _arrears: k.arrears.total, _ytd: k.ytd.collected }; }, withExtra(state, 'projects', { widths: [12, 22, 30, 14, 30, 14, 12, 12, 12, 14, 16] })); }
-  function writeUnits(wb, state, asOf) {
+  /* خيارات الجدول مع الأعمدة الإضافية المحفوظة لهذه الورقة وسياق المعادلات */
+  function withExtra(state, entity, opts, ctx) { return Object.assign({}, opts || {}, { extra: state._extra && state._extra[entity], ctx }); }
+  /* قيمة تلقائية: معادلة بنتيجتها، أو القيمة وحدها لو الشرط غير متحقق (صف بلا كود ⇒ النص البديل كما هو) */
+  const auto = (entity, r, ctx, lit) => (field, result, cond) => cond === false ? (result == null ? '' : result) : fcell(entity, field, r, ctx, result, lit);
+  function writeProjects(wb, state, ctx) {
+    const En = E.Engine; const Y = ctx.report.Y;
+    table(wb, SH.projects, 'projects', state.projects, (p, r) => {
+      const sc = En.scope({ projectCode: p.code }); const occ = En.occupancy(sc, ctx.asOf), ar = En.arrears(sc, ctx.asOf);
+      const bp = (ctx.sheetsMeta && ctx.sheetsMeta[Y] && ctx.sheetsMeta[Y].byProject[p.code]) || { n: 0, sum: 0 };
+      const f = auto('projects', r, ctx);
+      return { _units: f('_units', occ.total), _occupied: f('_occupied', occ.occupiedCount), _vacant: f('_vacant', occ.vacant.length), _arrears: f('_arrears', r2(ar.total)), _ytd: ctx.report.hasSheet ? f('_ytd', r2(bp.sum)) : 0, _rate: f('_rate', occ.rate == null ? '' : occ.rate) };
+    }, withExtra(state, 'projects', { widths: [12, 22, 30, 14, 30, 14, 12, 12, 12, 16, 16, 12] }, ctx));
+  }
+  function writeUnits(wb, state, ctx) {
     const En = E.Engine, S = E.Store;
-    table(wb, SH.units, 'units', state.units, u => { const s = En.unitStatus(u, asOf); const cl = s.contract ? S.client(s.contract.clientCode) : null; return { _project: (S.project(u.projectCode) || {}).name || '', _assets: (u.assets || []).filter(a => a.present).map(a => a.name + (a.details ? ' (' + a.details + ')' : '')).join(' · '), _status: En.USTATUS_AR[s.status], _tenant: cl ? cl.name : '', _contract: s.contract ? s.contract.code : '', _rent: s.contract ? En.currentRent(s.contract, asOf) : null, _vacantSince: s.vacantSince ? U().fmtDate(s.vacantSince) : '', _vacantDays: s.vacantDays == null ? null : s.vacantDays, _statusKey: s.status }; }, withExtra(state, 'units', { widths: [12, 12, 16, 16, 10, 8, 10, 30, 14, 36, 14, 26, 12, 14, 14, 12], xSplit: 1 }));
+    table(wb, SH.units, 'units', state.units, (u, r) => {
+      const s = En.unitStatus(u, ctx.asOf); const cl = s.contract ? S.client(s.contract.clientCode) : null;
+      const f = auto('units', r, ctx);
+      return {
+        _project: f('_project', (S.project(u.projectCode) || {}).name || '', !!u.projectCode),
+        _assets: (u.assets || []).filter(a => a.present).map(a => a.name + (a.details ? ' (' + a.details + ')' : '')).join(' · '),
+        _status: f('_status', En.USTATUS_AR[s.status]), _tenant: f('_tenant', cl ? cl.name : ''), _contract: f('_contract', s.contract ? s.contract.code : ''),
+        _rent: f('_rent', s.contract ? En.currentRent(s.contract, ctx.asOf) : ''),
+        _vacantSince: f('_vacantSince', !s.contract && s.vacantSince ? toDate(s.vacantSince) : ''), _vacantDays: f('_vacantDays', !s.contract && s.vacantDays != null ? s.vacantDays : ''),
+        _contractEnd: f('_contractEnd', s.contract ? toDate(s.contract.end) : ''), _daysLeft: f('_daysLeft', s.contract ? s.daysLeft : ''),
+      };
+    }, withExtra(state, 'units', { widths: [12, 12, 16, 16, 10, 8, 10, 30, 14, 36, 18, 26, 12, 14, 14, 12, 14, 14], xSplit: 1 }, ctx));
   }
   function writeAssets(wb, state) { const rows = []; for (const u of state.units) for (const a of (u.assets || [])) rows.push({ unitCode: u.code, name: a.name, present: !!a.present, details: a.details || '' }); table(wb, SH.assets, 'assets', rows, null, { widths: [12, 20, 10, 40] }); }
-  function writeClients(wb, state, asOf) {
+  function writeClients(wb, state, ctx) {
     const En = E.Engine, S = E.Store;
-    table(wb, SH.clients, 'clients', state.clients, c => { const cs = S.contractsOfClient(c.code); const sc = { contracts: cs, contractSet: new Set(cs.map(x => x.code)) }; const ar = En.arrears(sc, asOf); return { _contracts: cs.length, _active: cs.filter(x => En.contractStatus(x, asOf) === 'active').length, _arrears: ar.total, _paid: U().sum(cs, x => U().sum(S.paymentsOf(x.code), p => U().toNum(p.amount))) }; }, withExtra(state, 'clients', { widths: [10, 34, 8, 28, 18, 14, 14, 14, 20, 26, 30, 12, 10, 10, 14, 16] }));
+    table(wb, SH.clients, 'clients', state.clients, (c, r) => {
+      const cs = S.contractsOfClient(c.code); const sc = { contracts: cs, contractSet: new Set(cs.map(x => x.code)) }; const ar = En.arrears(sc, ctx.asOf);
+      const f = auto('clients', r, ctx);
+      return { _contracts: f('_contracts', cs.length), _active: f('_active', cs.filter(x => En.contractStatus(x, ctx.asOf) === 'active').length), _arrears: f('_arrears', r2(ar.total)), _paid: f('_paid', r2(U().sum(cs, x => ctx.paidOf(x.code)))) };
+    }, withExtra(state, 'clients', { widths: [10, 34, 8, 28, 18, 14, 14, 14, 20, 26, 30, 12, 10, 12, 16, 16] }, ctx));
   }
-  function writeContracts(wb, state, asOf) {
+  function writeContracts(wb, state, ctx) {
+    const En = E.Engine, S = E.Store; const asOf = ctx.asOf;
+    table(wb, SH.contracts, 'contracts', state.contracts, (c, r) => {
+      const u = S.unit(c.unitCode) || {}, cl = S.client(c.clientCode) || {}, p = S.project(u.projectCode) || {};
+      const sch = En.schedule(c), n = sch.length, status = En.contractStatus(c, asOf), g = U().d(c.start), h = U().d(c.end);
+      let k = ''; if (g && h && n) { const idx = sch.findIndex(y => U().d(y.from) <= asOf && asOf <= U().d(y.to)); k = asOf < g ? 1 : (idx >= 0 ? idx + 1 : n); } // سنة العقد الحالية (1 قبل البداية، الأخيرة بعد النهاية)
+      const cur = En.currentRent(c, asOf);
+      const nextOn = k !== '' && k < n ? sch[k].from : '', nextRent = k !== '' && k < n ? sch[k].rent : '';
+      const f = auto('contracts', r, ctx, { engineCurrentRent: cur, engineNextRent: nextRent || 0 });
+      const out = {
+        _project: f('_project', p.name || '', !!c.unitCode), _unit: f('_unit', u.label || '', !!c.unitCode), _client: f('_client', cl.name || '', !!c.clientCode),
+        _status: f('_status', En.CSTATUS_AR[status]), _currentRent: f('_currentRent', k === '' ? '' : cur), _paid: f('_paid', ctx.paidOf(c.code)),
+        _arrears: r2(En.arrears({ contracts: [c], contractSet: new Set([c.code]) }, asOf).total),
+        _yearIndex: f('_yearIndex', k), _projectCode: f('_projectCode', p.code || ''), _daysLeft: f('_daysLeft', h ? U().daysBetween(asOf, h) : ''),
+        _nYears: f('_nYears', n || ''), _nextIncreaseOn: f('_nextIncreaseOn', nextOn ? toDate(nextOn) : ''), _nextRent: f('_nextRent', nextRent),
+        _ovKey: f('_ovKey', normOvKey(fmtOverrides(c.rentOverrides))), _activeUnitKey: f('_activeUnitKey', status === 'active' ? c.unitCode : ''),
+      };
+      for (let kk = 1; kk <= 10; kk++) out['_rentY' + kk] = f('_rentY' + kk, sch[kk - 1] ? sch[kk - 1].rent : '');
+      return out;
+    }, withExtra(state, 'contracts', { widths: [10, 12, 10, 14, 12, 30, 12, 12, 16, 10, 22, 12, 14, 10, 12, 36, 12, 14, 16, 18, 16, 14, 16, 10, 12, 14, 10, 14, 16, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 14, 14] }, ctx));
+  }
+  function writePayments(wb, state, ctx) {
+    const S = E.Store;
+    const unread = new Set(state._unreadPayments || []);
+    const rows = state.payments.slice().sort((a, b) => U().cmp(a.period, b.period) || U().cmp(a.code, b.code)).concat(state._unreadPayments || []); /* صفوف بشهر غير مقروء تبقى في آخر الورقة كما كُتبت حتى تُصحَّح */
+    table(wb, SH.payments, 'payments', rows, (p, r) => {
+      const c = S.contract(p.contractCode); const cl = c ? S.client(c.clientCode) : null, u = c ? S.unit(c.unitCode) : null, pr = u ? S.project(u.projectCode) : null;
+      const f = auto('payments', r, ctx); const has = !!String(p.contractCode || '').trim();
+      return { _client: f('_client', cl ? cl.name : '', has), _unit: f('_unit', u ? u.label : '', has), _projectName: f('_projectName', pr ? pr.name : '', has) };
+    }, withExtra(state, 'payments', { widths: [16, 10, 30, 12, 10, 14, 12, 14, 16, 30, 10, 12, 16], afterRow: (ws, r, rec) => { if (unread.has(rec)) { const cell = ws.getCell(r, colIndex('payments', 'period')); cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.unread } }; cell.note = NOTE.unread; } } }, ctx));
+  }
+  function writeMaintenance(wb, state, ctx) {
     const En = E.Engine, S = E.Store;
-    table(wb, SH.contracts, 'contracts', state.contracts, c => { const u = S.unit(c.unitCode) || {}, cl = S.client(c.clientCode) || {}, p = S.project(u.projectCode) || {}; const sc = { contracts: [c], contractSet: new Set([c.code]) }; return { _project: p.name || '', _unit: u.label || '', _client: cl.name || '', _status: En.CSTATUS_AR[En.contractStatus(c, asOf)], _currentRent: En.currentRent(c, asOf), _paid: U().sum(S.paymentsOf(c.code), x => U().toNum(x.amount)), _arrears: En.arrears(sc, asOf).total, _schedule: En.schedule(c).map(y => `س${y.k} ${U().fmtDate(y.from)}–${U().fmtDate(y.to)}: ${U().fmtNum(y.rent)}`).join(' | '), _statusKey: En.contractStatus(c, asOf), _daysLeft: U().d(c.end) ? U().daysBetween(asOf, U().d(c.end)) : null }; }, withExtra(state, 'contracts', { widths: [10, 12, 10, 14, 12, 30, 12, 12, 16, 10, 22, 12, 14, 10, 12, 36, 10, 12, 16, 14, 14, 14, 60] }));
+    table(wb, SH.maintenance, 'maintenance', state.maintenance, (m, r) => {
+      const u = S.unit(m.unitCode); const typed = String(m.custodianContract || '').trim();
+      const code = typed || (u ? ((En.activeContractOf(u.code, U().d(m.date) || ctx.asOf) || {}).code || '') : ''); // المكتوب يدويًا كما هو، وإلا العقد الساري وقت الصيانة
+      const c = code ? S.contract(code) : null; const cl = c ? S.client(c.clientCode) : null;
+      const f = auto('maintenance', r, ctx);
+      return { _project: f('_project', u ? (S.project(u.projectCode) || {}).name || '' : '', !!m.unitCode), _unit: f('_unit', u ? u.label : '', !!m.unitCode), _custodian: f('_custodian', m.custodianName || (cl ? cl.name : '')), _custodianContract: f('_custodianContract', code) };
+    }, withExtra(state, 'maintenance', { widths: [10, 12, 14, 12, 12, 12, 40, 12, 12, 10, 12, 30, 12, 12, 26, 26, 14] }, ctx));
   }
-  function writePayments(wb, state) { const S = E.Store; const rows = state.payments.slice().sort((a, b) => U().cmp(a.period, b.period) || U().cmp(a.code, b.code)).concat(state._unreadPayments || []); /* صفوف بشهر غير مقروء تبقى في آخر الورقة كما كُتبت حتى تُصحَّح */ table(wb, SH.payments, 'payments', rows, p => { const c = S.contract(p.contractCode); const cl = c ? S.client(c.clientCode) : null, u = c ? S.unit(c.unitCode) : null; return { _client: cl ? cl.name : '', _unit: u ? u.label : '' }; }, withExtra(state, 'payments', { widths: [16, 10, 30, 12, 10, 14, 12, 14, 16, 30, 10, 12] })); }
-  function writeMaintenance(wb, state, asOf) { const En = E.Engine, S = E.Store; table(wb, SH.maintenance, 'maintenance', state.maintenance, m => { const u = S.unit(m.unitCode); const c = m.custodianContract ? S.contract(m.custodianContract) : (u ? En.activeContractOf(u.code, U().d(m.date) || asOf) : null); const cl = c ? S.client(c.clientCode) : null; return { _project: u ? (S.project(u.projectCode) || {}).name || '' : '', _unit: u ? u.label : '', _custodian: m.custodianName || (cl ? cl.name : ''), _custodianContract: c ? c.code : '' }; }, withExtra(state, 'maintenance', { widths: [10, 12, 14, 12, 12, 12, 40, 12, 12, 10, 12, 30, 12, 12, 26, 26, 12] })); }
-  function writeSettings(wb, state) {
+  /* القيمة المكتوبة لإعداد (الكلمات العربية بدل auto/manual/actual) */
+  function settingOut(key, v) {
+    if (key === 'trackingMode') return v === 'auto' ? 'تلقائي' : v === 'manual' ? 'يدوي' : (v == null ? '' : v);
+    if (key === 'prorationBasis') return v === 'actual' ? 'فعلي' : '30';
+    return Array.isArray(v) ? v.join(', ') : (v && typeof v === 'object' ? JSON.stringify(v) : (v == null ? '' : v));
+  }
+  function writeSettings(wb, state, asOf) {
+    const En = E.Engine;
     const ws = wb.addWorksheet(SH.settings, { views: [{ state: 'frozen', ySplit: 1, rightToLeft: true }] });
-    ws.getRow(1).values = ['الإعداد', 'القيمة', 'الشرح']; styleHeader(ws.getRow(1)); ws.getColumn(1).width = 30; ws.getColumn(2).width = 20; ws.getColumn(3).width = 60;
-    const help = { enteredThrough: 'الشهور بعده تُعرض «لم يُسجَّل بعد» لا «متأخرة»', tolerancePct: 'يُقبل المبلغ كسداد كامل لو الفرق أقل من هذه النسبة', toleranceMin: 'حد أدنى للفرق المقبول بالجنيه', prorationBasis: '30 = الشهر 30 يومًا (النصف 15/30) كما يحسب المكتب', officeName: 'يظهر أعلى الورقة والموقع', graceDays: 'بعدها يُعتبر الشهر متأخرًا', dueDay: 'يوم الشهر الذي يستحق فيه الإيجار ما لم يحدد العقد غيره', vacancyMonths: 'الوحدة الشاغرة أطول من ذلك تظهر كتنبيه', trackingFrom: 'الشهور قبله لا تُحاسَب (بداية الورقة)', defaultIncreasePct: 'تُقترح عند إنشاء عقد جديد', ledgerYears: 'أوراق السنوات الموجودة (تُضاف تلقائيًا)', codeSeq: 'لا تُعدَّل: تضمن ألا يُعاد استخدام كود محذوف', trackingMode: 'auto = تبدأ من أقدم ورقة سنة · manual = كما ضبطها المدير', invoicePrefix: 'مثل INV-2026-0001', currency: 'رمز العملة في العرض' };
+    ws.getRow(1).values = ['الإعداد', 'القيمة', 'الشرح']; styleHeader(ws.getRow(1)); ws.getColumn(1).width = 36; ws.getColumn(2).width = 22; ws.getColumn(3).width = 70;
+    const help = { enteredThrough: 'الشهور بعده تُعرض «لم يُسجَّل بعد» لا «متأخرة»', tolerancePct: 'يُقبل المبلغ كسداد كامل لو الفرق أقل من هذه النسبة', toleranceMin: 'حد أدنى للفرق المقبول بالجنيه', prorationBasis: '30 = الشهر 30 يومًا (النصف 15/30) كما يحسب المكتب · فعلي = بعدد أيام الشهر', officeName: 'يظهر أعلى الورقة والموقع', graceDays: 'بعدها يُعتبر الشهر متأخرًا', dueDay: 'يوم الشهر الذي يستحق فيه الإيجار ما لم يحدد العقد غيره', vacancyMonths: 'الوحدة الشاغرة أطول من ذلك تظهر كتنبيه', trackingFrom: 'الشهور قبله لا تُحاسَب (بداية الورقة)', defaultIncreasePct: 'تُقترح عند إنشاء عقد جديد فقط ولا تغيّر العقود القائمة', ledgerYears: 'أوراق السنوات الموجودة (تُضاف تلقائيًا)', codeSeq: 'لا تُعدَّل: تضمن ألا يُعاد استخدام كود محذوف', trackingMode: 'تلقائي = تبدأ من أقدم ورقة سنة · يدوي = كما ضبطها المدير', invoicePrefix: 'الحروف التي يبدأ بها رقم الفاتورة (ثم السنة والرقم المتسلسل)', currency: 'رمز العملة في العرض' };
     let r = 2;
-    for (const s of SETTINGS_KEYS) { ws.getCell(r, 1).value = s.ar; const v = s.key === 'officeName' ? state.meta.officeName : state.settings[s.key]; ws.getCell(r, 2).value = Array.isArray(v) ? v.join(', ') : (v && typeof v === 'object' ? JSON.stringify(v) : (v == null ? '' : v)); if (s.type === 'period' || s.type === 'years') ws.getCell(r, 2).numFmt = '@'; ws.getCell(r, 3).value = help[s.key] || ''; r++; } // سنة-شهر كنص حتى لا يحوّلها Excel إلى تاريخ
-    ws.getCell(r + 1, 1).value = 'آخر كتابة من الموقع'; ws.getCell(r + 1, 2).value = U().stamp(); // ساعة المكتب المحلية
-    ws.getCell(r + 2, 1).value = 'إصدار البنية'; ws.getCell(r + 2, 2).value = 2;
+    for (const s of SETTINGS_KEYS) {
+      ws.getCell(r, 1).value = s.ar; const v = s.key === 'officeName' ? state.meta.officeName : state.settings[s.key];
+      ws.getCell(r, 2).value = settingOut(s.key, v); if (s.type === 'period' || s.type === 'years') ws.getCell(r, 2).numFmt = '@'; // سنة-شهر كنص حتى لا يحوّلها Excel إلى تاريخ
+      if (s.kind === 'program') { styleAutoCell(ws.getCell(r, 2), 'program'); ws.getCell(r, 2).note = NOTE.program; }
+      ws.getCell(r, 3).value = help[s.key] || ''; r++;
+    }
+    // صفوف معلومات (لا يقرأها البرنامج): آخر شهر مسجَّل كما اكتشفه، طابع آخر كتابة، إصدار التنسيق
+    r++;
+    const et = En ? En.enteredThrough(asOf) : '';
+    ws.getCell(r, 1).value = INFO_ROWS[0].ar; ws.getCell(r, 2).value = et ? U().periodLabel(et, true) + ' (' + et + ')' : ''; ws.getCell(r, 2).numFmt = '@'; ws.getCell(r, 3).value = 'آخر شهر يُحاسَب عليه: الشهور بعده «لم تُسجَّل بعد» لا «متأخرة» (يُثبَّت من «آخر شهر مسجَّل في الورقة» أعلاه)'; styleAutoCell(ws.getCell(r, 2), 'program'); r++;
+    ws.getCell(r, 1).value = INFO_ROWS[1].ar; ws.getCell(r, 2).value = U().stamp(); ws.getCell(r, 3).value = 'الأعمدة الرمادية (من البرنامج) تعكس البيانات حتى هذا الوقت'; r++; // ساعة المكتب المحلية
+    ws.getCell(r, 1).value = INFO_ROWS[2].ar; ws.getCell(r, 2).value = FORMAT_VERSION; ws.getCell(r, 3).value = 'رقم يكتبه البرنامج ليعرف شكل الملف — لا يُعدَّل'; r++;
+    // دليل ألوان العناوين
+    r++;
+    ws.getCell(r, 1).value = 'دليل ألوان العناوين'; ws.getCell(r, 1).font = { bold: true, size: 12 }; r++;
+    for (const g of LEGEND) {
+      const a = ws.getCell(r, 1); a.value = g.title; a.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: g.argb } }; a.font = { bold: true, color: { argb: STYLE.headFont } }; a.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getCell(r, 2).value = g.kind; ws.getCell(r, 3).value = g.text; ws.getCell(r, 3).alignment = { wrapText: true, vertical: 'top' }; ws.getRow(r).height = 48; r++;
+    }
+    ws.getCell(r, 3).value = LEGEND_FOOT; ws.getCell(r, 3).alignment = { wrapText: true, vertical: 'top' }; ws.getRow(r).height = 32;
+  }
+  /* وصف التخطيط كما يكتبه هذا الملف (للوثائق والاختبارات): الأعمدة ونوعها وقالب معادلتها وملاحظتها */
+  function layout() {
+    const tctx = { NC: '{NC}', report: { Y: '{Y}' } }; const lit = { engineCurrentRent: '{engineCurrentRent}', engineNextRent: '{engineNextRent}' };
+    const sheets = {};
+    sheets['{Y}'] = LEDGER_HEAD.map(h => ({ header: h, kind: h === 'الاجمالي' ? 'formula' : 'input', formulaTemplate: h === 'الاجمالي' ? 'SUM(K{r}:V{r})' : null, note: h === 'الاجمالي' ? NOTE.rowTotal : (U().MONTHS_AR.includes(h) || LEDGER_HEAD.indexOf(h) >= 10 && LEDGER_HEAD.indexOf(h) <= 21 ? NOTE.month : /^كود /.test(h) ? NOTE.key : '') }));
+    sheets[SH.summary] = SUMMARY_HEAD('{Y}').map((h, i) => { const col = colLetter(i + 1); return { header: h, kind: SUMMARY_KIND[i], formulaTemplate: F.summary[col] ? F.summary[col]('{r}', tctx) : null, note: summaryNote(i) }; });
+    for (const ent of ['projects', 'units', 'assets', 'clients', 'contracts', 'payments', 'maintenance', 'users']) sheets[SH[ent]] = COLS[ent].map(c => ({ field: c[0], header: c[1], oldHeaders: c.slice(2), kind: kindOf(ent, c[0]), formulaTemplate: F[ent] && F[ent][c[0]] ? F[ent][c[0]]('{r}', tctx, lit) : null, note: headerNote(ent, c[0], null) }));
+    return { formatVersion: FORMAT_VERSION, sheets, retired: RETIRED, settings: SETTINGS_KEYS.map(s => ({ label: s.ar, aliases: s.aliases || [], kind: s.kind || 'input' })).concat(INFO_ROWS.map(s => ({ label: s.ar, aliases: s.aliases || [], kind: 'info' }))), legend: LEGEND.map(g => ({ title: g.title, kind: g.kind, argb: g.argb, text: g.text })).concat([{ text: LEGEND_FOOT }]), style: STYLE, fmt: FMT };
   }
   /* ورقة المستخدمين: مخفية في الإكسيل (المدير يستطيع إظهارها)، كلمة المرور مشفّرة لا تُقرأ */
   function writeUsers(wb, state) {
@@ -836,5 +1160,5 @@ window.Egary = window.Egary || {};
     return { cells, rows, at: new Date().toISOString() };
   }
 
-  E.Workbook = { read, write, snapshotOf, SH, COLS, LEDGER_HEAD, SETTINGS_KEYS, fmtOverrides, parseOverrides };
+  E.Workbook = { read, write, snapshotOf, layout, newWorkbook, SH, COLS, RETIRED, LEDGER_HEAD, SETTINGS_KEYS, INFO_ROWS, FORMAT_VERSION, LEGEND, STYLE, FMT, kindOf, headerNote, formulas: F, colLetter, L, LL, fmtOverrides, parseOverrides };
 })(window.Egary);

@@ -462,7 +462,8 @@ e2e('6c. client: invalid phone is rejected, valid client saved, counted and writ
   assert.ok(row, 'C065 in العملاء');
   assert.equal(row[1], 'عميل اختبار E2E'); assert.equal(row[2], 'شركة'); assert.equal(row[3], 'ممثل الاختبار');
   assert.equal(row[4], '29901011234567'); assert.equal(String(row[6]), '01000000001');
-  assert.equal(row[12], 0, 'no contracts yet (computed column)');
+  // «عدد العقود» أصبح معادلة COUNTIF حية بمفتاح كود العميل؛ ExcelJS في المتصفح يُسقط النتيجة المخزَّنة عندما تكون 0 فيعيد نص المعادلة
+  assert.ok(row[12] === 0 || /^=IF\(\$A\d+="","",COUNTIF\('العقود'!\$C:\$C,\$A\d+\)\)$/.test(String(row[12])), 'no contracts yet (live computed column): ' + row[12]);
   // ويظهر في البحث فورًا
   await page.fill('#global-search', 'C065');
   await page.waitForSelector('#suggest:not(.hidden) .item');

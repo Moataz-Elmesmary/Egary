@@ -502,7 +502,7 @@ e2e('E9. add-year modal from the ledger year select: validation, the 2025 sheet 
   assert.deepEqual(led[1].slice(0, 5), ['م', 'المشروع', 'الاسم', 'الممثل القانوني', 'الوحدة']);
   assert.equal(led.filter(r => r && /^T\d{4}$/.test(String(r[24]))).length, eng);
   let s = await sheetRows(page, 'الإعدادات');
-  assert.equal(String(settingVal(s, 'سنوات الورقة')), '2025, 2026'); assert.equal(settingVal(s, 'بداية المحاسبة (سنة-شهر)'), '2025-01'); assert.equal(settingVal(s, 'بداية المحاسبة (تلقائي/يدوي)'), 'auto');
+  assert.equal(String(settingVal(s, 'سنوات الورقة')), '2025, 2026'); assert.equal(settingVal(s, 'بداية المحاسبة (سنة-شهر)'), '2025-01'); assert.equal(settingVal(s, 'بداية المحاسبة (تلقائي/يدوي)'), 'تلقائي');
   const audit = await sheetRows(page, 'سجل التعديلات');
   assert.deepEqual(audit[1].slice(1, 4), ['إضافة', 'سنة', '2025']); assert.equal(audit[1][5], 'المدير');
   const f = await exportBytes(page, 'e2e_extra_year.xlsx');

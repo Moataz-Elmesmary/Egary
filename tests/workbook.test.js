@@ -198,7 +198,7 @@ print(json.dumps({'sep': [r for r in rows if r['كود العقد']=='T0008' and
   assert.equal(pays.t7.length, 0);
   const units = py(`
 import sys, json, openpyxl
-wb = openpyxl.load_workbook(sys.argv[1]); ws = wb['الوحدات']
+wb = openpyxl.load_workbook(sys.argv[1], data_only=True); ws = wb['الوحدات']   # data_only: الأعمدة التلقائية معادلات ونتيجتها المخزَّنة هي ما يراه المكتب
 hdr = [c.value for c in ws[1]]
 rows = [dict(zip(hdr, [c.value for c in r])) for r in ws.iter_rows(min_row=2)]
 wa = wb['أصول الوحدات']; ha = [c.value for c in wa[1]]
@@ -209,7 +209,7 @@ wk = wb['العقود']; hk = [c.value for c in wk[1]]
 ks = [dict(zip(hk, [c.value for c in r])) for r in wk.iter_rows(min_row=2)]
 print(json.dumps({'g': [r for r in rows if r['كود الوحدة']==sys.argv[2]], 'a': [a for a in assets if a['كود الوحدة']==sys.argv[2]], 'c1': [c for c in clients if c['كود العميل']=='C001'], 't7': [k for k in ks if k['كود العقد']=='T0007']}, ensure_ascii=False, default=str))
 `, file, ucode);
-  assert.equal(units.g.length, 1); assert.equal(units.g[0]['النوع'], 'جراج'); assert.equal(units.g[0]['الحالة (محسوب)'], 'شاغرة');
+  assert.equal(units.g.length, 1); assert.equal(units.g[0]['النوع'], 'جراج'); assert.equal(units.g[0]['حالة الوحدة اليوم'], 'شاغرة');
   assert.equal(units.a.length, 2); assert.equal(units.a[0]['موجود'], 'نعم'); assert.equal(units.a[0]['التفاصيل'], 'ريموت 2');
   assert.equal(units.c1[0]['التليفون'], '01001234567');
   assert.equal(units.t7.length, 0);

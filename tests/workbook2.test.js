@@ -38,10 +38,10 @@ test('settings and audit log round-trip through their sheets; maintenance with c
   const f = path.join(OUT, 'maint.xlsx'); fs.writeFileSync(f, Buffer.from(buf));
   const info = py(`
 import sys, json, openpyxl
-wb = openpyxl.load_workbook(sys.argv[1]); ws = wb['الصيانة']
+wb = openpyxl.load_workbook(sys.argv[1], data_only=True); ws = wb['الصيانة']   # data_only: «العقد وقت الصيانة» و«المستأجر وقت الصيانة» معادلتان بنتيجة مخزَّنة
 hdr = [c.value for c in ws[1]]; r = dict(zip(hdr, [c.value for c in ws[2]]))
 s = wb['الإعدادات']; sett = {s.cell(i,1).value: s.cell(i,2).value for i in range(2, s.max_row+1)}
-print(json.dumps({'cust': r['المستأجر وقتها (محسوب)'], 'k': r['العقد وقتها (محسوب)'], 'grace': sett.get('أيام السماح بعد الاستحقاق'), 'office': sett.get('اسم المكتب')}, ensure_ascii=False))`, f);
+print(json.dumps({'cust': r['المستأجر وقت الصيانة'], 'k': r['العقد وقت الصيانة'], 'grace': sett.get('أيام السماح بعد الاستحقاق'), 'office': sett.get('اسم المكتب')}, ensure_ascii=False))`, f);
   assert.equal(info.k, 'T0008'); assert.equal(info.cust, 'شركة المستقبل للتدريب'); assert.equal(info.grace, 7); assert.equal(info.office, 'مكتب الاختبار');
 });
 
