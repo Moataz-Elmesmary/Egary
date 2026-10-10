@@ -63,7 +63,7 @@ window.Egary = window.Egary || {};
   async function login(username, password, remember) {
     const u = find(username);
     let ok = false; try { ok = await verifyPassword(password, u && u.enabled !== false ? u.passwordHash : DUMMY); } catch (e) { ok = false; }
-    if (!u || u.enabled === false || !ok) return { ok: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة' };
+    if (!u || u.enabled === false || !ok) { try { if (E.Log) E.Log.append({ action: 'دخول مرفوض', entity: 'مستخدم', code: normUser(username), summary: !u ? 'اسم مستخدم غير موجود' : u.enabled === false ? 'حساب معطَّل' : 'كلمة مرور غير صحيحة' }); } catch (e) { } return { ok: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة' }; }
     setCurrent(u, remember, 'login', 'login');
     try { if (S().log) S().log({ action: 'دخول', entity: 'مستخدم', code: u.code, summary: current.name + (remember ? ' (تذكرني)' : '') }); } catch (e) { }
     return { ok: true, user: current };
@@ -92,7 +92,7 @@ window.Egary = window.Egary || {};
   }
   function hasAdmin() { return users().some(u => u.role === 'admin' && u.enabled !== false && u.passwordHash); }
   function demo(name) { current = { username: 'demo', name: name || 'تجربة', role: 'admin', source: 'demo' }; emit(); return current; }
-  function logout() { current = null; try { sessionStorage.removeItem(SESSION_KEY); } catch (e) { } try { localStorage.removeItem(REMEMBER_KEY); } catch (e) { } emit(); }
+  function logout() { try { if (current && current.source !== 'demo' && E.Log) E.Log.append({ action: 'خروج', entity: 'مستخدم', code: current.username, summary: current.name, user: current.name }); } catch (e) { } current = null; try { sessionStorage.removeItem(SESSION_KEY); } catch (e) { } try { localStorage.removeItem(REMEMBER_KEY); } catch (e) { } emit(); }
   function user() { return current; }
   function role() { return current ? current.role : ''; }
   const CORE = new Set(['projects', 'units', 'clients', 'contracts']);

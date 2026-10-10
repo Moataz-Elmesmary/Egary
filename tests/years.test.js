@@ -189,3 +189,23 @@ test('a prior-year sheet whose full months carry a different rent than the assum
   assert.equal(E2.Engine.cell(c2, '2025-01').status, 'paid', 'the lower amount is a full payment for that contract year');
   assert.ok(r2.flags.some(f => f.code === c.code && /ثُبِّت إيجار/.test(f.text)));
 });
+
+test('«المحاسبة من» slicer: Engine.setOverride moves the accounting start for the view only — months before it become history, arrears shrink, and clearing it restores everything; the Excel write ignores it', async () => {
+  const E = load({ today: TODAY });
+  const { state } = await E.Workbook.read(readFile(SOURCE)); E.Store.load(state);
+  state.settings.ledgerYears = [2025, 2026]; state.settings.trackingFrom = '2025-01';
+  const c = state.contracts.find(x => x.start <= '2025-01-01' && x.end >= '2025-12-31' && !x.inferred);
+  const before = E.Engine.kpis({}).arrears.total;
+  assert.equal(E.Engine.cell(c, '2025-06').status, 'late', 'with accounting from 2025 an unpaid 2025 month is late');
+  E.Engine.setOverride({ trackingFrom: '2026-01' });
+  assert.equal(E.Engine.cell(c, '2025-06').status, 'history');
+  const after = E.Engine.kpis({}).arrears.total;
+  assert.ok(after < before, `arrears ${after} < ${before}`);
+  assert.equal(state.settings.trackingFrom, '2025-01', 'the setting itself is untouched');
+  const buf = await E.Workbook.write(state);
+  const r2 = await E.Workbook.read(buf);
+  assert.equal(r2.state.settings.trackingFrom, '2025-01', 'the override never reaches the workbook');
+  E.Engine.setOverride({});
+  assert.equal(E.Engine.cell(c, '2025-06').status, 'late');
+  assert.equal(E.Engine.kpis({}).arrears.total, before);
+});

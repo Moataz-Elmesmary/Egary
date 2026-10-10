@@ -1081,3 +1081,43 @@ e2e('17. first run: a workbook without users shows the setup screen, creates own
   assert.equal(await page.evaluate(() => Egary.Auth.user().username), 'owner');
   assert.equal(await page.evaluate(() => Egary.Auth.user().source), 'restored');
 });
+
+/* =====================================================================
+   18. حساب جديد من شاشة الدخول، سجل العمليات في الإعدادات، وسلايسر «المحاسبة من»
+   ===================================================================== */
+e2e('18. sign-up from the login screen creates a staff account written to the users sheet and logs in; the settings page shows the operations log card and a CSV download; the accounting-start slicer appears only when more than one year is available', async (page) => {
+  await linkReal(page, null);
+  await page.waitForSelector('#login-form');
+  await page.click('#login-signup'); await page.waitForSelector('#signup-form:not(.hidden)');
+  await page.fill('#signup-user', 'nour'); await page.fill('#signup-name', 'نور'); await page.fill('#signup-pass', 'nour@2026'); await page.fill('#signup-pass2', 'nour@2027');
+  await page.click('#signup-go'); await page.waitForSelector('#signup-err.on');
+  await page.fill('#signup-pass2', 'nour@2026'); await page.click('#signup-go');
+  await page.waitForSelector('#content .kpis .kpi', { timeout: 30000 });
+  assert.deepEqual(await page.evaluate(() => [Egary.Auth.user().username, Egary.Auth.user().role]), ['nour', 'staff']);
+  await page.waitForFunction(() => Egary.Sync.status.state === 'linked' && Egary.Sync.status.pending === 0);
+  const rows = await sheetRows(page, 'المستخدمون');
+  const nour = rows.find(r => r && r[0] === 'nour'); assert.ok(nour && nour[2] === 'موظف' && /^pbkdf2\$/.test(nour[3]), JSON.stringify(nour));
+  // سجل العمليات: الدخول مسجَّل باسم المستخدم في ورقة السجل وفي ذاكرة السجل
+  const audit = await sheetRows(page, 'سجل التعديلات');
+  assert.ok(audit.some(r => r && r[1] === 'دخول' && r[3] === 'nour' && r[5] === 'نور'), 'login row with user in the audit sheet');
+  assert.ok((await page.evaluate(() => Egary.Log.entries().some(e => e.action === 'إضافة' && e.entity === 'مستخدم' && e.code === 'nour'))), 'sign-up logged');
+  await go(page, '#/settings', '#log-card');
+  assert.ok((await page.textContent('#log-card')).includes('تُفعَّل مع مجلد النسخ الاحتياطي'));
+  const dl = page.waitForEvent('download', { timeout: 10000 }).catch(() => null);
+  await page.click('#log-card button:has-text("تنزيل السجل")');
+  const d = await dl; if (d) assert.ok(d.suggestedFilename().startsWith('Egary-log-'));
+  // سلايسر «المحاسبة من»: الملف فيه سنة واحدة ⇒ لا يظهر؛ بعد إضافة سنة أقدم للإعدادات يظهر ويغيّر الأرقام ولا يُكتب في الإكسيل
+  await go(page, '#/dashboard', '#content .kpis .kpi');
+  assert.equal(await page.$('#from-group'), null, 'one year only: no slicer');
+  const arrears0 = await page.evaluate(() => Egary.Engine.kpis({}).arrears.total);
+  await page.evaluate(() => { const st = Egary.Store.state(); st.settings.ledgerYears = [2025, 2026]; st.settings.trackingFrom = '2025-01'; Egary.App.render(); });
+  await page.waitForSelector('#from-pick');
+  const arrears1 = await page.evaluate(() => Egary.Engine.kpis({}).arrears.total);
+  assert.ok(arrears1 > arrears0, 'accounting from 2025 adds arrears');
+  await page.selectOption('#from-pick', '2026-01'); await page.waitForSelector('#from-reset');
+  assert.equal(await page.evaluate(() => Egary.Engine.kpis({}).arrears.total), arrears0, 'slicer restores the 2026-only figure');
+  assert.ok((await page.textContent('#content .page-head .sub')).includes('المحاسبة من 2026'));
+  assert.equal(await page.evaluate(() => Egary.Store.state().settings.trackingFrom), '2025-01', 'the setting is untouched');
+  await page.click('#from-reset'); await page.waitForFunction(() => !document.querySelector('#from-reset'));
+  assert.equal(await page.evaluate(() => Egary.Engine.kpis({}).arrears.total), arrears1);
+});

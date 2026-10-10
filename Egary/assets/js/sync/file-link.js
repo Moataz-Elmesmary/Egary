@@ -56,6 +56,15 @@ window.Egary = window.Egary || {};
     const fh = await d.getFileHandle(name, { create: true });
     const w = await fh.createWritable(); try { await w.write(buf); } finally { await w.close(); }
   }
+  /* إلحاق نص بآخر ملف (سجل العمليات): يُكتب الرأس عند إنشاء الملف فقط */
+  async function appendFileIn(dir, sub, name, text, header) {
+    const d = sub ? await dir.getDirectoryHandle(sub, { create: true }) : dir;
+    const fh = await d.getFileHandle(name, { create: true });
+    const f = await fh.getFile(); const size = f.size;
+    const w = await fh.createWritable({ keepExistingData: true });
+    try { await w.write({ type: 'write', position: size, data: (size === 0 && header ? header : '') + text }); } finally { await w.close(); }
+    return size;
+  }
   async function listFilesIn(dir, sub) {
     const out = [];
     let d; try { d = sub ? await dir.getDirectoryHandle(sub, { create: false }) : dir; } catch (e) { return out; }
@@ -131,5 +140,5 @@ window.Egary = window.Egary || {};
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
-  E.FileLink = { supported, pick, restore, saveHandle, loadHandle, clearHandle, saveBackup, loadBackup, listBrowserBackups, saveOriginal, loadOriginal, dirSupported, pickDirectory, dirPermission, saveDirHandle, loadDirHandle, clearDirHandle, writeFileIn, listFilesIn, removeFileIn, fileHandleAdapter, memoryAdapter, downloadBytes };
+  E.FileLink = { supported, pick, restore, saveHandle, loadHandle, clearHandle, saveBackup, loadBackup, listBrowserBackups, saveOriginal, loadOriginal, dirSupported, pickDirectory, dirPermission, saveDirHandle, loadDirHandle, clearDirHandle, writeFileIn, appendFileIn, listFilesIn, removeFileIn, fileHandleAdapter, memoryAdapter, downloadBytes };
 })(window.Egary);

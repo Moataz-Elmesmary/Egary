@@ -436,3 +436,5 @@ input.chip[type="date"] { padding: 0 8px; direction: ltr; }
 #login .file-tag svg { width: 14px; height: 14px; }
 .field .date-echo { color: var(--text-2); font-weight: 600; }
 .period-nav.fgroup { padding-inline-end: 4px; }
+#login .signup { margin-top: 4px; }
+#login .hidden { display: none !important; }

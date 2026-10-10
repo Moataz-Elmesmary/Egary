@@ -84,7 +84,7 @@ window.Egary = window.Egary || {};
       else if (y0 && y0 < ty && state.settings.trackingMode !== 'manual') { // ورقة سنة أقدم ظهرت: المحاسبة تبدأ منها (ما لم يثبّت المدير البداية يدويًا)
         const n = state.contracts.filter(c => c.start && c.end && c.start.slice(0, 4) <= String(y0) && c.end.slice(0, 4) >= String(y0)).length;
         state.settings.trackingFrom = String(y0) + '-01';
-        flags.push({ sev: 'warn', entity: 'sheet', code: String(y0), text: `ورقة ${y0} جعلت المحاسبة تبدأ ${y0}-01: ${n} عقدًا ساريًا في ${y0} — أي شهر بلا مبلغ فيها سيُحسب متأخرًا. لو السنة للتاريخ فقط: ثبّت «بداية المحاسبة» من الإعدادات` });
+        flags.push({ sev: 'warn', entity: 'sheet', code: String(y0), text: `ورقة ${y0} جعلت المحاسبة تبدأ ${y0}-01: ${n} عقدًا ساريًا في ${y0} — أي شهر بلا مبلغ فيها سيُحسب متأخرًا. لعرض الأرقام من سنة لاحقة استخدم سلايسر «المحاسبة من» في اللوحة، أو ثبّت «بداية المحاسبة» من الإعدادات` });
       }
       else if (y0 && y0 < ty && state.settings.trackingMode === 'manual') flags.push({ sev: 'info', entity: 'sheet', code: String(y0), text: `ورقة ${y0} موجودة لكن المحاسبة مثبّتة من ${state.settings.trackingFrom} — الشهور قبلها تاريخ فقط` });
     }
