@@ -18,7 +18,7 @@ const FAKE_DIR = `
   const K = '__fake_dir_files';
   const load = () => { try { return JSON.parse(sessionStorage.getItem(K) || '{}'); } catch (e) { return {}; } };
   const save = (o) => sessionStorage.setItem(K, JSON.stringify(o));
-  class FakeFile { constructor(n) { this.kind = 'file'; this.name = n; } async getFile() { const f = load()[this.name]; return { size: f ? f.size : 0, lastModified: f ? f.at : 0 }; } async createWritable() { const n = this.name; let size = 0; return { write: async (d) => { size += (d.byteLength || d.length || 0); }, close: async () => { const o = load(); o[n] = { size, at: Date.now() + Object.keys(o).length }; save(o); window.__dirWrites = (window.__dirWrites || 0) + 1; } }; } }
+  class FakeFile { constructor(n) { this.kind = 'file'; this.name = n; } async getFile() { const f = load()[this.name]; return { size: f ? f.size : 0, lastModified: f ? f.at : 0 }; } async createWritable(o) { const n = this.name; let size = (o && o.keepExistingData && load()[n]) ? load()[n].size : 0; return { write: async (d) => { if (d && typeof d === 'object' && d.type === 'write') { size = (d.position == null ? size : d.position) + String(d.data).length; return; } size += (d.byteLength || d.length || 0); }, close: async () => { const o = load(); o[n] = { size, at: Date.now() + Object.keys(o).length }; save(o); window.__dirWrites = (window.__dirWrites || 0) + 1; } }; } }
   class FakeDir {
     constructor() { this.kind = 'directory'; this.name = 'Egary'; }
     async queryPermission() { return sessionStorage.getItem('__dperm') || 'prompt'; }
@@ -54,7 +54,8 @@ test('backup flow: offer after link → pick folder → original written → del
   await page.waitForFunction(() => window.__dirPicked === true);
   await page.waitForFunction(() => (window.__dirFiles() || []).some(n => /original/.test(n)));
   const files1 = await page.evaluate(() => window.__dirFiles());
-  assert.ok(files1.every(n => /^Egary-.*\.xlsx$/.test(n)), 'file names: ' + files1.join(','));
+  assert.ok(files1.filter(n => /\.xlsx$/.test(n)).every(n => /^Egary-.*\.xlsx$/.test(n)) && files1.some(n => /\.xlsx$/.test(n)), 'file names: ' + files1.join(','));
+  assert.ok(files1.some(n => /^Egary-log-\d{4}-\d{2}\.csv$/.test(n)), 'the operations log file is created in the same folder: ' + files1.join(','));
   assert.equal(await page.evaluate(() => Egary.Backup.status().enabled), true);
   // حذف دفعة ⇒ نسخة قبل الحذف فورًا (رغم فاصل 20 دقيقة)
   await page.goto(URL_ + '#/payments'); await page.waitForSelector('table tbody tr');
