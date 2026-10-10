@@ -12,6 +12,9 @@
 - **Contracts**: start – end – deposit – annual increase, with the per-year rent schedule (prorated split months), renewals chain, status computed (never typed).
 - **Unit profile**: project, type (تجارية / سكنية / إدارية / جراج), assets checklist with free-text details (AC, furniture, …), full rental history, maintenance history with *who was the custodian at the time* (for deposit questions).
 - **Client profile**: national ID / passport, tax registration, phones, contracts, payments, arrears, punctuality.
+- **Login with roles**: accounts live in a hidden sheet «المستخدمون» inside the workbook (PBKDF2-SHA256 salted hashes, never plaintext). First run on a workbook without accounts asks to create an owner (مدير) and a staff (موظف) account; roles are admin / staff / view-only, and every row of سجل التعديلات records who did it. The hosted preview ships demo accounts: `admin / admin@2026`, `office / office@2026`, `zaer / view@2026`. It gates the app, not the file: whoever has the folder can open the Excel.
+- **Other years**: «＋ إضافة سنة…» in the ledger creates the year sheet with every contract active in it; a sheet the office copies by hand (with or without the code columns) is matched to the same contracts by codes or by name + unit + start date. Accounting starts at the earliest year sheet.
+- **Always-on backups**: a `backups/` folder next to the workbook (after every write at most every 20 min, before every delete, the original forever; last 60 periodic copies kept) plus the last 12 good copies in the browser.
 - **Delete always asks for confirmation** and shows what else will be deleted.
 - **Filters**: project, unit type (incl. garage), status, floor, year; global search by any code, name, phone, national ID, tax number (Arabic-normalized).
 - **Insights** computed live from the data; **Data quality** flags (text in a number cell, end before start, duplicate labels, mismatched IDs…).
@@ -28,8 +31,8 @@
 ## Development
 No build step. Tests (Node 22 + Playwright + Python openpyxl as an independent oracle):
 ```
-node --test tests/sync.test.js tests/workbook.test.js          # sync engine + Excel round trips (both directions)
-NODE_PATH=/opt/node22/lib/node_modules node --test tests/e2e.test.js   # browser end-to-end
+node --test tests/sync.test.js tests/workbook.test.js tests/workbook2.test.js tests/auth.test.js tests/years.test.js tests/backup.test.js   # sync engine, Excel round trips (both directions), login, other years, backups
+NODE_PATH=/opt/node22/lib/node_modules node --test tests/e2e.test.js tests/bi.test.js tests/link-flow.test.js tests/backup-flow.test.js   # browser end-to-end
 node tests/build_workbook.js                                   # regenerate Egary/Egary.xlsx from a source workbook
 ```
 Architecture (`Egary/assets/js`): `core/` (util, model, codes, store, engine) · `xlsx/workbook.js` (ExcelJS read/write + migration of the original sheet format + conflict rules) · `sync/` (file link + sync engine with a pending-ops journal) · `ui/` (toolkit, forms, views) · `bi/` · `app.js`.
