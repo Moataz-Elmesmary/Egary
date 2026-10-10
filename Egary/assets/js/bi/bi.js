@@ -208,7 +208,7 @@ window.Egary = window.Egary || {};
       tile('danger', 'عملاء متأخرون', fn(a.byClient.length), a.byClient[0] ? `أكبرهم ${a.byClient[0].clientName}` : '', () => V().arrearsEvidence(c, a, null, 'clients')),
     ));
     body.appendChild(h('div', { class: 'grid2' },
-      panel('أعمار المتأخرات', UI().bars({ data: [['b30', 'حتى 30'], ['b60', '31–60'], ['b90', '61–90'], ['b90p', '> 90']].map(([key, l], i) => ({ label: l + ' يومًا', value: a.buckets[key], color: ['#6D9BE0', '#E0A33A', '#EF6B67', '#B13C39'][i] })), fmt: fm, padL: 140 })),
+      panel('المتأخرات حسب مدة التأخير', UI().bars({ data: [['b30', 'حتى 30'], ['b60', '31–60'], ['b90', '61–90'], ['b90p', '> 90']].map(([key, l], i) => ({ label: l + ' يومًا', value: a.buckets[key], color: ['#6D9BE0', '#E0A33A', '#EF6B67', '#B13C39'][i] })), fmt: fm, padL: 140 })),
       panel('حسب المشروع', a.byProject.length ? UI().bars({ data: a.byProject.map((o, i) => ({ label: o.projectName, value: o.amount, color: UI().PALETTE[i % 10], code: o.projectCode })), fmt: fm, onClick: d => c.open('project', d.code) }) : h('p', null, 'لا متأخرات')),
     ));
     body.appendChild(panel('أعلى 15 مدينًا', UI().table({ cols: [{ key: 'clientName', label: 'العميل', render: r => h('a', { onclick: () => c.open('client', r.clientCode) }, r.clientName) }, { key: 'months', label: 'شهور', num: true }, { key: 'maxDays', label: 'أقصى تأخير', num: true }, { key: 'amount', label: 'المتأخرات', num: true, render: r => fm(r.amount) }], rows: a.byClient.slice(0, 15), onRow: r => c.open('client', r.clientCode) })));

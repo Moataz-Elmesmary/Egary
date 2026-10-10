@@ -116,7 +116,7 @@ window.Egary = window.Egary || {};
     if (paid > 0) return { ...base, status: 'partial', late };
     return { ...base, status: late ? 'late' : 'due', late };
   }
-  const STATUS_AR = { paid: 'مسدَّد', partial: 'جزئي', late: 'متأخر', due: 'مستحق', upcoming: 'قادم', advance: 'مقدَّم', pending: 'لم يُسجَّل بعد', none: '—', history: 'قبل التتبع', orphan: 'خارج العقد' };
+  const STATUS_AR = { paid: 'مسدَّد', partial: 'جزئي', late: 'متأخر', due: 'مستحق', upcoming: 'قادم', advance: 'مقدَّم', pending: 'لم يُسجَّل بعد', none: '—', history: 'قبل بداية المحاسبة', orphan: 'خارج العقد' };
 
   /* ---------- حالة عقد / وحدة ---------- */
   function contractStatus(c, asOf) {
@@ -385,7 +385,7 @@ window.Egary = window.Egary || {};
     if (k.occupancy.total) {
       push(k.occupancy.rate >= 0.9 ? 'good' : k.occupancy.rate >= 0.75 ? 'info' : 'warn', `الإشغال ${pct(k.occupancy.rate)} (${k.occupancy.occupiedCount} من ${k.occupancy.total} وحدة)`, `${k.occupancy.vacant.length} وحدة شاغرة الآن${k.occupancy.longVacant.length ? `، منها ${k.occupancy.longVacant.length} شاغرة أكثر من ${settings().vacancyMonths} شهور` : ''}.`, { view: 'units', status: 'vacant' });
       const lost = U().sum(k.occupancy.vacant, v => { const last = v.last; return last ? Math.round((Math.min(365, v.vacantDays || 0) / 30) * currentRent(last)) : 0; });
-      if (lost > 0) push('warn', `فاقد الشواغر التقديري ≈ ${f(lost)}`, `تقدير: مدة الشغور × آخر إيجار لكل وحدة شاغرة سبق تأجيرها (الشغور الأطول من سنة يُحسب بسنة).`, { view: 'units', status: 'vacant' });
+      if (lost > 0) push('warn', `إيجار ضائع تقريبًا بسبب الوحدات الشاغرة ≈ ${f(lost)}`, `تقدير: مدة الشغور × آخر إيجار لكل وحدة شاغرة سبق تأجيرها (الشغور الأطول من سنة يُحسب بسنة).`, { view: 'units', status: 'vacant' });
     }
     if (k.renewals.soon.length) push('warn', `${k.renewals.soon.length} عقد ينتهي خلال 90 يومًا`, `منها ${k.renewals.soon30.length} خلال 30 يومًا. الإيجار الشهري المعرَّض: ${f(U().sum(k.renewals.soon, r => r.rent))}.`, { view: 'contracts', status: 'ending' });
     if (k.renewals.ended.length) push('danger', `${k.renewals.ended.length} عقد انتهى والوحدة ما زالت شاغرة بلا تجديد`, k.renewals.ended.slice(0, 3).map(r => `${r.unitLabel} (${r.projectName}) منذ ${r.daysAgo} يوم`).join(' · '), { view: 'contracts', status: 'ended' });

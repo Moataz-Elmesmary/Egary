@@ -329,7 +329,7 @@ window.Egary = window.Egary || {};
   }
 
   /* ---------- الإعدادات ---------- */
-  const SETTING_AR = { officeName: 'اسم المكتب', graceDays: 'أيام السماح', dueDay: 'يوم الاستحقاق الافتراضي', vacancyMonths: 'عتبة الشغور الطويل', trackingFrom: 'بداية المحاسبة', defaultIncreasePct: 'الزيادة السنوية الافتراضية', invoicePrefix: 'بادئة رقم الفاتورة', currency: 'رمز العملة', enteredThrough: 'آخر شهر مسجَّل في الورقة', tolerancePct: 'فرق مقبول في السداد %', toleranceMin: 'الحد الأدنى للفرق المقبول' };
+  const SETTING_AR = { officeName: 'اسم المكتب', graceDays: 'أيام السماح', dueDay: 'يوم الاستحقاق الافتراضي', vacancyMonths: 'تنبيه الشغور الطويل بعد (شهور)', trackingFrom: 'بداية المحاسبة', defaultIncreasePct: 'الزيادة السنوية الافتراضية', invoicePrefix: 'بادئة رقم الفاتورة', currency: 'رمز العملة', enteredThrough: 'آخر شهر مسجَّل في الورقة', tolerancePct: 'فرق مقبول في السداد %', toleranceMin: 'الحد الأدنى للفرق المقبول' };
   function settings() {
     if (!guard('settings')) return Promise.resolve(null);
     const st = S().state(), sg = st.settings;
@@ -339,7 +339,7 @@ window.Egary = window.Egary || {};
         field('اسم المكتب', input('officeName', st.meta.officeName), { full: true }),
         field('أيام السماح بعد الاستحقاق', number('graceDays', sg.graceDays, { min: 0, max: 60, step: 1 })),
         field('يوم الاستحقاق الافتراضي', number('dueDay', sg.dueDay, { min: 1, max: 28, step: 1 })),
-        field('عتبة الشغور الطويل (شهور)', number('vacancyMonths', sg.vacancyMonths, { min: 1, max: 24, step: 1 })),
+        field('تنبيه الشغور الطويل بعد (شهور)', number('vacancyMonths', sg.vacancyMonths, { min: 1, max: 24, step: 1 })),
         field('بداية المحاسبة (سنة-شهر)', input('trackingFrom', sg.trackingFrom, { dir: 'ltr', placeholder: '2026-01' }), { help: 'الشهور قبلها لا تُحاسَب' }),
         field('الزيادة السنوية الافتراضية %', number('defaultIncreasePct', sg.defaultIncreasePct, { min: 0, max: 100 })),
         field('بادئة رقم الفاتورة', input('invoicePrefix', sg.invoicePrefix, { dir: 'ltr' })),

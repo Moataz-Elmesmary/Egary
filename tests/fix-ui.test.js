@@ -128,7 +128,7 @@ test('41. aging bars open the exact bucket: 31–60 / 61–90 have their own evi
   assert.ok(drawer().querySelector('p.muted').textContent.includes(E.U.fmtMoney(k.arrears.buckets.b60)));
   // صفحة التحليلات: الشريط الثالث (61–90) يفتح دليل 61–90 لا كل المتأخرات
   const el = render(E, 'insights', ctx);
-  const card = el.querySelectorAll('.card').find(c => c.querySelector('h3') && c.querySelector('h3').textContent === 'أعمار المتأخرات');
+  const card = el.querySelectorAll('.card').find(c => c.querySelector('h3') && c.querySelector('h3').textContent === 'المتأخرات حسب مدة التأخير');
   const bars = card.querySelectorAll('g.bar'); assert.equal(bars.length, 4);
   bars[2].click(); assert.equal(drawerTitle(), 'متأخرات 61–90 يومًا');
   bars[1].click(); assert.equal(drawerTitle(), 'متأخرات 31–60 يومًا');
