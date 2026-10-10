@@ -419,8 +419,8 @@ window.Egary = window.Egary || {};
       body: () => [
         field('اسم المستخدم (للدخول)', input('code', rec.code, { placeholder: 'حروف لاتينية وأرقام', disabled: !isNew, dir: 'ltr', autocapitalize: 'off', spellcheck: false }), { req: true, help: isNew ? '3–24 حرفًا لاتينيًا أو أرقامًا بلا مسافات' : 'لا يتغيّر بعد الإنشاء' }),
         field('الاسم (يظهر في سجل التعديلات)', input('name', rec.name), { req: true }),
-        field('الدور', select('role', E.Auth.ROLES, rec.role), { req: true }),
-        field('الحالة', select('enabled', [{ key: 'yes', ar: 'مفعَّل' }, { key: 'no', ar: 'معطَّل' }], rec.enabled === false ? 'no' : 'yes')),
+        field('الدور', select('role', listOpts(E.Auth.ROLES), rec.role), { req: true }),
+        field('الحالة', select('enabled', [{ value: 'yes', label: 'مفعَّل' }, { value: 'no', label: 'معطَّل' }], rec.enabled === false ? 'no' : 'yes')),
         isNew ? field('كلمة المرور', input('password', '', { type: 'password', autocomplete: 'new-password' }), { req: true, help: '6 أحرف على الأقل' }) : null,
         isNew ? field('تأكيد كلمة المرور', input('password2', '', { type: 'password', autocomplete: 'new-password' }), { req: true }) : null,
         h('p', { class: 'small muted', style: { gridColumn: '1 / -1' } }, 'مدير: كل الصلاحيات · موظف: إدخال وتعديل، وحذف الدفعات والصيانة فقط (بلا إعدادات ولا مستخدمين) · مشاهدة فقط: بلا أي تعديل.'),

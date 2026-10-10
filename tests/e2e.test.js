@@ -66,6 +66,7 @@ async function loginAs(page, creds, remember) {
   await page.waitForSelector('#login', { state: 'detached', timeout: 20000 });
 }
 async function linkReal(page, creds, b64) {
+  await page.evaluate(() => { if (location.hash && location.hash !== '#/dashboard') location.hash = '#/dashboard'; }); // بعد إعادة تحميل من صفحة أخرى
   await page.evaluate((b64) => {
     const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
     const adapter = Egary.FileLink.memoryAdapter(bytes, 'Egary.xlsx');
@@ -1004,6 +1005,7 @@ e2e('16. login: wrong password shows an error, eye toggles, admin logs in (chip 
   // إدارة المستخدمين من الإعدادات: إضافة مستخدم ⇒ يظهر في الجدول وفي ورقة «المستخدمون» بكلمة مرور مشفّرة
   await go(page, '#/settings', '#users-card');
   assert.equal(await page.locator('#users-card table.tbl tbody tr').count(), 3);
+  const wBefore = await page.evaluate(() => window.__adapter.writes);
   await page.click('#users-card button:has-text("مستخدم جديد")'); await page.waitForSelector('.modal #f_code');
   await page.fill('.modal #f_code', 'sara'); await page.fill('.modal #f_name', 'سارة'); await page.selectOption('.modal #f_role', 'staff');
   await page.fill('.modal #f_password', 'sara@2026'); await page.fill('.modal #f_password2', 'sara@2027'); await page.click('.modal .m-foot .btn.primary');
@@ -1012,7 +1014,7 @@ e2e('16. login: wrong password shows an error, eye toggles, admin logs in (chip 
   await page.waitForSelector('.modal', { state: 'detached' });
   await page.waitForFunction(() => Egary.Auth.users().length === 4);
   assert.equal(await page.locator('#users-card table.tbl tbody tr').count(), 4);
-  await waitWrite(page);
+  await waitWrite(page, wBefore);
   const rows = await sheetRows(page, 'المستخدمون');
   const sara = rows.find(r => r && r[0] === 'sara');
   assert.ok(sara && /^pbkdf2\$/.test(sara[3]) && sara[2] === 'موظف', JSON.stringify(sara));
@@ -1059,13 +1061,13 @@ e2e('17. first run: a workbook without users shows the setup screen, creates own
   await page.fill('#su-admin-pass2', 'own@2026'); await page.click('#setup-go');
   await page.waitForSelector('#content .kpis .kpi', { timeout: 30000 });
   assert.equal(await page.evaluate(() => Egary.Auth.user().username), 'owner');
-  await waitWrite(page);
+  await waitWrite(page, 0);
   const rows = await sheetRows(page, 'المستخدمون');
   assert.deepEqual(rows.slice(1).map(r => [r[0], r[2]]).sort(), [['office', 'موظف'], ['owner', 'مدير']]);
   // تذكرني ⇒ بعد إعادة التحميل والربط من جديد لا تظهر شاشة الدخول
+  const bytes = await page.evaluate(() => { const u = new Uint8Array(window.__adapter.bytes()); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); });
   await page.click('#user-chip'); await page.waitForSelector('#btn-logout'); await page.click('#btn-logout');
   await page.waitForSelector('#btn-demo', { timeout: 20000 });
-  const bytes = await page.evaluate(() => { const u = new Uint8Array(window.__adapter.bytes()); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); });
   await linkReal(page, null, bytes);
   await loginAs(page, ['owner', 'own@2026'], true);
   await page.waitForSelector('#content .kpis .kpi');
