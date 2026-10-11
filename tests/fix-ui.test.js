@@ -305,7 +305,7 @@ test('37. saving the settings form writes an audit row (user, entity «الإع�
     assert.equal(st.audit.length, before + 1);
     const a = st.audit[0];
     assert.equal(a.action, 'تعديل'); assert.equal(a.entity, 'الإعدادات'); assert.equal(a.code, 'settings'); assert.equal(a.user, 'المدير');
-    assert.ok(a.summary.includes('أيام السماح: 5 ← 7'), a.summary); assert.ok(a.summary.includes('اسم المكتب: إيجاري ← مكتب الاختبار'), a.summary); assert.ok(a.summary.includes('آخر شهر مسجَّل في الورقة: — ← 2026-08'), a.summary);
+    assert.ok(a.summary.includes('أيام السماح: 5 ← 7'), a.summary); assert.ok(a.summary.includes('اسم المكتب: إيجاري ← مكتب الاختبار'), a.summary); assert.ok(a.summary.includes('آخر شهر مسجَّل في كشف التحصيل: — ← 2026-08'), a.summary);
     assert.ok(!/undefined|null/.test(a.summary), a.summary);
     assert.ok(recorded.some(op => op.type === 'audit' && op.record.entity === 'الإعدادات'), 'audit op handed to the sync recorder (reaches the Excel sheet)');
     E.Forms.settings(); modalBtn('حفظ').click(); await tick(20);
