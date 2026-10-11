@@ -105,3 +105,15 @@
 #bi .dock button svg { width: 17px; height: 17px; }
 #bi .fade-up { animation: bi-rise .5s both; }
 @media (prefers-reduced-motion: reduce) { #bi .hero-card, #bi .tile, #bi .panel, #bi .aurora, #bi .stars, #bi .sk-win, #bi .sk-beacon, #bi .sk-far, #bi .sk-mid { animation: none !important; } #bi .sk-win { opacity: .5; } }
+
+/* ----- الأبعاد: البطاقات بلا صف يتيم والأرقام لا تُقص ----- */
+#bi .tiles { grid-template-columns: repeat(auto-fit, minmax(min(220px, calc(50% - 6px)), 1fr)); }
+#bi .tile { container-type: inline-size; }
+#bi .tile .v { font-size: clamp(18px, 12cqi, 27px); white-space: nowrap; }
+#bi .counter b { font-size: clamp(17px, 2vw, 24px); white-space: nowrap; }
+@media (min-width: 1100px) { /* 8 بطاقات = 4 + 4، و9 = 5 + 4 (بلا بطاقة وحيدة في آخر صف) */
+  #bi .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #bi .tiles:has(> :nth-child(9)) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  #bi .tiles:has(> :nth-child(11)) { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+#bi .tbl td { white-space: normal; } /* جداول اللوحة كما كانت: النصوص الطويلة (الوصف، الأسماء) تلتف */

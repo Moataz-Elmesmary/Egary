@@ -17,6 +17,8 @@ window.Egary = window.Egary || {};
   /* ---------- أسماء الأوراق والأعمدة ---------- */
   const SH = { projects: 'المشاريع', units: 'الوحدات', assets: 'أصول الوحدات', clients: 'العملاء', contracts: 'العقود', payments: 'المدفوعات', maintenance: 'الصيانة', settings: 'الإعدادات', audit: 'سجل التعديلات', summary: 'ملخص المشاريع', users: 'المستخدمون' };
   const LEDGER_HEAD = ['م', 'المشروع', 'الاسم', 'الممثل القانوني', 'الوحدة', 'العنوان', 'العقد من', 'العقد الى', 'تسجيل ضريبي', 'الرقم القومي / الباسبور', 'يناير', 'فبراير', 'مارس', 'ابريل', 'مايو', 'يونيو', 'يوليو', 'اغسطس', 'سبتمبر', 'اكتوبر', 'نوفمبر', 'ديسمبر', 'الاجمالي', 'ملاحظات', 'كود العقد', 'كود الوحدة', 'كود العميل', 'كود المشروع'];
+  /* نوع مقاس كل عمود في ورقة السنة (انظر SIZES): م · المشروع · الاسم · الممثل · الوحدة · العنوان · التاريخان · الرقمان · الشهور · الاجمالي · ملاحظات · الأكواد */
+  const LEDGER_SIZE = ['int', 'text', 'name', 'name', 'text', 'text', 'date', 'date', 'id', 'id'].concat(Array(12).fill('money'), ['money', 'note', 'code', 'code', 'code', 'code']);
   /* كل عمود: [الحقل، العنوان الحالي، …عناوين قديمة تُقرأ كمرادفات]
      • الحقل الذي يبدأ بـ«_» عمود تلقائي لا يقرأه البرنامج أبدًا (هذا هو السبب الوحيد لتجاهله، لا نص العنوان ولا كونه معادلة)؛
        الاستثناء: المشروع/الوحدة/العميل تُقرأ كنص بديل عندما يكون الكود فارغًا (صف كتبه المكتب باليد).
@@ -99,18 +101,140 @@ window.Egary = window.Egary || {};
   }
   /* عمود باسمه أو بأي من مرادفاته (الأول في القائمة هو العنوان الحالي، وبعده العناوين القديمة) */
   function findCol(map, names) { for (const n of (Array.isArray(names) ? names : [names])) { const c = map[U().normalize(n)]; if (c) return c; } return 0; }
+  /* كل خط يُكتب باسمه (Calibri مثل الخط الافتراضي للملف): الخط بلا اسم يرسمه كل برنامج بخط بديل مختلف فتختلّ المقاسات */
+  const BASE_FONT = { name: 'Calibri', family: 2, size: 11 };
+  const font = (o) => Object.assign({}, BASE_FONT, o);
+  const HEAD_H = { one: 22, two: 34 }; // ارتفاع صف العناوين: سطر واحد أو سطران (11 بولد + التشكيل)
   function styleHeader(row) {
-    row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.head } }; cell.font = { bold: true, color: { argb: STYLE.headFont }, size: 11 }; cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; cell.border = { bottom: { style: 'thin' } }; });
-    row.height = 28;
+    row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.head } }; cell.font = font({ bold: true, color: { argb: STYLE.headFont } }); cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; cell.border = { bottom: { style: 'thin' } }; });
+    row.height = HEAD_H.two; // fitColumns يخفضه لسطر واحد لو كل العناوين تسعها أعمدتها
   }
   /* لون خلية عنوان بحسب نوع العمود (الأزرق هو ما يضعه styleHeader) */
   function styleHeadKind(cell, kind) { const argb = kind === 'formula' ? STYLE.headFormula : (kind === 'program' || kind === 'helper') ? STYLE.headProgram : STYLE.head; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb } }; }
   /* تنسيق خلية بيانات تلقائية */
   function styleAutoCell(cell, kind) {
-    if (kind === 'formula') { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.formulaCell } }; cell.font = { color: { argb: STYLE.formulaFont } }; }
-    else if (kind === 'program' || kind === 'helper') { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.computed } }; cell.font = { color: { argb: STYLE.programFont }, italic: true }; }
+    if (kind === 'formula') { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.formulaCell } }; cell.font = font({ color: { argb: STYLE.formulaFont } }); }
+    else if (kind === 'program' || kind === 'helper') { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.computed } }; cell.font = font({ color: { argb: STYLE.programFont }, italic: true }); }
   }
   function rtl(ws, xSplit, ySplit) { ws.views = [{ state: 'frozen', xSplit: xSplit || 0, ySplit: ySplit || 1, rightToLeft: true }]; }
+
+  /* ---------- مقاسات الأعمدة ----------
+     وحدة العرض في إكسيل = عرض رقم واحد بخط Calibri 11 (7 بكسل). العرض يُحسب عند كل كتابة من محتوى العمود نفسه
+     (نفس البيانات ⇒ نفس المقاسات بالضبط):
+     • العنوان يُقرأ كاملًا في سطرين على الأكثر، مع ترك مكان زر التصفية.
+     • أطول قيمة كما تظهر (1,234.00 · 31/12/2026 · الاسم كاملًا) لا تُقص، بين حد أدنى وأقصى لنوع العمود:
+       المبالغ تتسع دائمًا لـ 9,999,999.00 (لا ####)، والملاحظات الطويلة لا تمدّ العمود بلا حد.
+     الأرقام والحروف اللاتينية بمقاس Calibri، والحروف العربية بمقاس خط عربي عريض (أسوأ حالة) حتى لا تُقص بأي خط بديل. */
+  const CHAR_W = (() => {
+    const t = {}; const set = (chars, reg, bold) => { for (const ch of chars) t[ch] = [reg, bold]; };
+    set('0123456789', 1.06, 1.06); set('ABCDEFGHIJKLMNOPQRSTUVWXYZ', 1.16, 1.19); set('abcdefghijklmnopqrstuvwxyz', 0.95, 0.98);
+    set('.', 0.53, 0.56); set(',', 0.52, 0.54); set(':;', 0.56, 0.58); set("'", 0.46, 0.49); set('-()[]{}!', 0.65, 0.72); set('/"²|', 0.85, 0.92); set('_+=#*<>~?$', 1.04, 1.04); set('%&', 1.5, 1.53); set('@—', 2.09, 2.09);
+    set('«»', 1.28, 1.35); set('·،؛', 0.68, 0.79); set('٠١٢٣٤٥٦٧٨٩٪؟', 1.12, 1.28);
+    return t;
+  })();
+  // الحروف العربية: عرض كل حرف في المتوسط (عادي، عريض) + «ذيل» لكل كلمة (الحرف الأخير أعرض من شكله الموصول)، × 1.04 و+0.6 لكل نص احتياطًا
+  const AR_LETTERS = 'ءآأؤإئابةتثجحخدذرزسشصضطظعغفقكلمنهوىي';
+  const AR_REG = [0.26, 0.6, 0.55, 1.39, 0.46, 0.6, 0.49, 0.7, 0.57, 0.87, 1.0, 0.95, 1.23, 1.24, 0.81, 1.18, 0.93, 1.33, 1.87, 1.88, 1.87, 1.79, 1.84, 1.46, 0.99, 0.75, 1.35, 0.93, 1.01, 0.83, 1.12, 0.79, 0.84, 1.02, 1.13, 0.78];
+  const AR_BOLD = [0.31, 0.77, 0.7, 1.56, 0.64, 0.75, 0.63, 0.86, 0.73, 1.04, 1.26, 1.1, 1.36, 1.41, 0.91, 1.19, 1.09, 1.45, 2.15, 2.15, 2.11, 2.01, 2.14, 1.71, 1.18, 0.99, 1.72, 1.28, 1.14, 1.01, 1.31, 1.02, 1.14, 1.24, 1.49, 1.01];
+  const AR_OF = new Map([...AR_LETTERS].map((ch, i) => [ch, [AR_REG[i], AR_BOLD[i]]]));
+  const AR_W = { other: [1.0, 1.2], tail: [0.56, 0.61], space: [0.57, 0.62], k: 1.04, extra: 0.6, mixed: 1.25 }; // mixed: الأرقام داخل نص عربي قد تُرسم بالخط العربي (أعرض)
+  const isArLetter = c => c >= 0x0621 && c <= 0x06D3 && !(c >= 0x064B && c <= 0x065F) && c !== 0x0640 && !(c >= 0x0660 && c <= 0x066D);
+  const isMark = c => (c >= 0x064B && c <= 0x065F) || c === 0x0670 || c === 0x0640 || c === 0x200F || c === 0x200E;
+  /* عرض نص بوحدات عرض العمود (سطره الأطول) */
+  function textWidth(s, bold, size) {
+    s = s == null ? '' : String(s); if (!s) return 0;
+    if (s.includes('\n')) return Math.max(...s.split('\n').map(x => textWidth(x, bold, size)));
+    const k = bold ? 1 : 0, ar = /[\u0621-\u064A]/.test(s); let w = 0, inWord = false;
+    for (const ch of s) {
+      const c = ch.charCodeAt(0);
+      if (isMark(c)) continue;
+      if (isArLetter(c)) { w += ((AR_OF.get(ch) || AR_W.other)[k] + (inWord ? 0 : AR_W.tail[k])) * AR_W.k; inWord = true; continue; }
+      inWord = false;
+      w += ch === ' ' ? (ar ? AR_W.space[k] * AR_W.k : 0.47) : (CHAR_W[ch] || [1.1, 1.15])[k] * (ar ? AR_W.mixed : 1);
+    }
+    return (w + (ar ? AR_W.extra : 0)) * (size || 11) / 11;
+  }
+  const PAD = 0.75, FILTER_BTN = 2.45; // هامش الخلية (~5 بكسل) وزر التصفية (~17 بكسل)
+  /* أصغر عرض يُظهر العنوان في سطرين على الأكثر (أفضل نقطة كسر بين كلماته) */
+  function headWidth(text, filter) {
+    const words = String(text || '').split(/\s+/).filter(Boolean); if (!words.length) return 0;
+    let best = textWidth(words.join(' '), true);
+    for (let i = 1; i < words.length; i++) best = Math.min(best, Math.max(textWidth(words.slice(0, i).join(' '), true), textWidth(words.slice(i).join(' '), true)));
+    return best + PAD + (filter ? FILTER_BTN : 0);
+  }
+  /* عدد الأسطر التي يأخذها نص ملفوف في عرض معيّن (لفّ إكسيل: أكبر عدد كلمات في كل سطر) — بهامش أوسع قليلًا:
+     سطر زائد في الارتفاع لا يضر، وسطر ناقص يقص آخر الشرح */
+  function wrapLines(text, width, bold) {
+    const avail = width - PAD - 1.5; let lines = 0;
+    for (const para of String(text == null ? '' : text).split('\n')) {
+      let cur = ''; lines++;
+      for (const w of para.split(/\s+/).filter(Boolean)) { const t = cur ? cur + ' ' + w : w; if (!cur || textWidth(t, bold) <= avail) cur = t; else { lines++; cur = w; } }
+    }
+    return Math.max(1, lines);
+  }
+  /* النص كما يعرضه إكسيل للقيمة بتنسيقها (للمقاس فقط) */
+  const group3 = s => s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  function shownText(v, numFmt) {
+    if (v && typeof v === 'object' && !(v instanceof Date)) { if (isFormula(v)) return shownText(v.result, numFmt); if (v.richText) return v.richText.map(x => x.text || '').join(''); if (v.text != null) return String(v.text); return ''; }
+    if (v == null || v === '') return '';
+    if (v instanceof Date) return '00/00/0000';
+    if (typeof v === 'number') {
+      const f = String(numFmt || ''); const neg = v < 0 ? '-' : ''; const a = Math.abs(v);
+      if (/^#,##0\.00$/.test(f)) { const [i, d] = a.toFixed(2).split('.'); return neg + group3(i) + '.' + d; }
+      if (/^#,##0$/.test(f)) return neg + group3(a.toFixed(0));
+      if (/%$/.test(f)) return neg + (a * 100).toFixed(0) + '%';
+      if (/^dd\/mm\/yyyy$/.test(f)) return '00/00/0000';
+      if (f === '0') return neg + a.toFixed(0);
+      return String(Math.round(v * 1e9) / 1e9);
+    }
+    return String(v);
+  }
+  /* حدود العرض لكل نوع عمود [أدنى، أقصى] */
+  const MONEY_MIN = Math.ceil(textWidth('9,999,999.00', true) + PAD);
+  const SIZES = { code: [8, 20], name: [16, 46], text: [10, 32], note: [24, 46], long: [30, 90], money: [MONEY_MIN, 22], int: [5, 12], date: [11, 14], pct: [7, 10], id: [12, 22], period: [9, 12], list: [8, 24] };
+  const SIZE_OF = {
+    code: 'code', unitCode: 'code', clientCode: 'code', projectCode: 'code', contractCode: 'code', prevCode: 'code', custodianContract: 'code', ref: 'code', _contract: 'code', _custodianContract: 'code', _projectCode: 'code', _activeUnitKey: 'code', _ovKey: 'code',
+    name: 'name', rep: 'name', custodianName: 'name', _client: 'name', _tenant: 'name', _custodian: 'name', _project: 'text', _projectName: 'text',
+    label: 'text', _unit: 'text', address: 'text', email: 'text', rentOverrides: 'text', area: 'text',
+    notes: 'note', description: 'note', details: 'note', _assets: 'note', passwordHash: 'long',
+    nationalId: 'id', taxId: 'id', phone: 'id', phone2: 'id', period: 'period', floor: 'int', dueDay: 'int', ledgerOrder: 'int', increasePct: 'int',
+    rent: 'money', deposit: 'money', amount: 'money', cost: 'money', lastLogin: 'text',
+  };
+  function sizeKind(entity, field) {
+    if (entity === 'units' && field === 'area') return 'int';
+    if (field === 'name' && (entity === 'projects' || entity === 'assets')) return 'text'; // اسم مشروع/أصل قصير، لا اسم شخص
+    const f = FMT[field]; if (f === '#,##0.00') return 'money'; if (f === '0') return 'int'; if (f === '0%') return 'pct';
+    if (f === 'dd/mm/yyyy' || DATE_FIELDS.has(field)) return 'date';
+    return SIZE_OF[field] || 'list';
+  }
+  // أنواع تُوسَّط في خليتها: أكواد وأرقام قومية وتواريخ وأعداد قصيرة (لاتينية في ورقة من اليمين ⇒ بلا توسيط تلتصق بالحافة البعيدة)
+  const CENTER_KINDS = new Set(['code', 'id', 'date', 'int', 'pct', 'period']);
+  /* الأرقام التي يكتبها المكتب (الزيادة %، يوم الاستحقاق، الدور، المساحة…) تبقى بلا تنسيق: خلية بتنسيق مشترك تتغيّر كلها
+     لو غيّرت أداة (ExcelJS) تنسيق واحدة منها — مثل «%» على خلية زيادة واحدة */
+  const centered = (entity, field, kind) => CENTER_KINDS.has(kind) && !((kind === 'int' || kind === 'pct') && kindOf(entity, field) === 'input');
+  const centerCell = (cell) => { cell.alignment = { horizontal: 'center' }; };
+  /* يضبط عرض كل عمود من عنوانه ومحتواه، وارتفاع صف العناوين (سطر أو سطران).
+     o = { headRow, firstRow, kinds[], filter } · الأعمدة بعد kinds (أضافها المكتب) نوعها نص */
+  function fitColumns(ws, o) {
+    const need = []; const ncol = Math.max(o.kinds.length, ws.getRow(o.headRow).cellCount);
+    ws.eachRow((row, rn) => { if (rn < o.firstRow) return; row.eachCell((cell, cn) => { const t = shownText(cell.value, cell.numFmt); if (!t) return; const f = cell.font || {}; const w = textWidth(t, !!f.bold, f.size) + PAD; if (!(need[cn] >= w)) need[cn] = w; }); });
+    let two = false;
+    for (let i = 1; i <= ncol; i++) {
+      const kind = o.kinds[i - 1] || 'text', [lo, hi] = SIZES[kind] || SIZES.text;
+      const head = U().cellText(ws.getCell(o.headRow, i).value);
+      const w = Math.ceil(Math.max(headWidth(head, o.filter), Math.min(hi, Math.max(lo, need[i] || 0))) - 1e-9);
+      ws.getColumn(i).width = w;
+      if (head && !ws.getColumn(i).hidden && textWidth(head, true) + PAD + (o.filter ? FILTER_BTN : 0) > w) two = true;
+    }
+    ws.getRow(o.headRow).height = two ? HEAD_H.two : HEAD_H.one;
+  }
+  /* إعداد الطباعة: أفقي A4، صفوف العناوين تتكرر في كل صفحة، والعرض يُوزَّع على عدد صفحات يبقي الخط مقروءًا */
+  function printSetup(ws, titleRows) {
+    let total = 0; ws.columns.forEach(c => { if (!c.hidden) total += c.width || 9; });
+    Object.assign(ws.pageSetup, { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: Math.max(1, Math.ceil(total / 200)), fitToHeight: 0, horizontalCentered: true, margins: { left: 0.25, right: 0.25, top: 0.4, bottom: 0.45, header: 0.2, footer: 0.2 } });
+    ws.pageSetup.printTitlesRow = titleRows;
+    ws.headerFooter.oddFooter = '&C&P / &N'; // رقم الصفحة / عدد الصفحات (بلا كلمات حتى لا يختلط اتجاه النص)
+  }
   function listValidation(ws, col, fromRow, toRow, values) {
     for (let r = fromRow; r <= Math.max(toRow, fromRow); r++) ws.getCell(r, col).dataValidation = { type: 'list', allowBlank: true, formulae: ['"' + values.join(',') + '"'], showErrorMessage: true, errorTitle: 'قيمة غير مسموحة', error: 'اختر من القائمة: ' + values.join(' / ') };
   }
@@ -245,6 +369,13 @@ window.Egary = window.Egary || {};
 
   const PCT_FIELDS = new Set(['increasePct']); // حقول النسبة المئوية: 0.1 بتنسيق % في الإكسيل = 10
   /* readTable: الصفوف بأسماء الأعمدة. extra (اختياري) يُملأ بالأعمدة التي أضافها المكتب: { headers: [...], fmts: {...} } وكل صف يحمل _extra بقيمها كما قُرئت */
+  /* رقم موبايل مصري كُتب في الإكسيل رقمًا (1001112233) يفقد الصفر الأول — نعيده (01001112233). الأرقام الأخرى كما هي */
+  function phoneFix(v, txt) {
+    const t = String(txt == null ? '' : txt).trim();
+    const digits = U().foldDigits ? U().foldDigits(t) : t;
+    if ((typeof v === 'number' || /^\d+$/.test(digits)) && /^1[0125]\d{8}$/.test(digits)) return '0' + digits;
+    return t;
+  }
   function readTable(ws, entity, headerRow, extra) {
     const map = headerMap(ws, headerRow || 1), cols = COLS[entity], out = [];
     const xh = extraHeaders(ws, headerRow || 1, knownOf(entity));
@@ -271,6 +402,7 @@ window.Egary = window.Egary || {};
         else if (field === 'period') { rec[field] = parsePeriod(v); if (!rec[field]) rec._periodRaw = txt; } // '' = غير مقروء ⇒ يُعلَّم الصف ويُتجاهل في readNormalized
         else if (field === 'present' || field === 'inferred') rec[field] = /^(نعم|✓|yes|true|1|موجود)$/i.test(txt);
         else if (field === 'enabled') rec[field] = !/^(لا|no|false|0|معطل|معطَّل|معطّل|x|✗)$/i.test(txt.trim()); // لا يُعطَّل إلا بنفي صريح
+        else if (field === 'phone' || field === 'phone2') rec[field] = phoneFix(v, txt);
         else rec[field] = txt;
       }
       if (any) { rec._row = r; if (xh.length) { const ex = {}; captureExtra(row, xh, ex, extra && extra.fmts); if (Object.keys(ex).length) rec._extra = ex; } out.push(rec); }
@@ -740,6 +872,7 @@ window.Egary = window.Egary || {};
   const SUMMARY_HEAD = (Y) => ['المشروع', `عدد العقود في ورقة ${Y}`, `المحصَّل في ${Y}`, 'عدد الوحدات', 'مؤجَّرة اليوم', 'شاغرة اليوم', 'نسبة الإشغال', 'المتأخرات (من البرنامج)', 'كود المشروع'];
   const SUMMARY_KIND = ['input', 'formula', 'formula', 'formula', 'formula', 'formula', 'formula', 'program', 'input'];
   const SUMMARY_KEY = 9; // عمود كود المشروع في الملخص (مفتاح كل معادلاته)
+  const SUMMARY_SIZE = ['text', 'int', 'money', 'int', 'int', 'int', 'pct', 'money', 'code'];
   const summaryNote = (i) => SUMMARY_KIND[i] === 'formula' ? NOTE.formula : SUMMARY_KIND[i] === 'program' ? NOTE_OF['projects._arrears'] + '\n' + NOTE.program : i + 1 === SUMMARY_KEY ? 'مفتاح معادلات هذا الملخص — ' + NOTE.key : '';
   /* قوالب المعادلات: F[كيان][حقل](r, ctx, lit) ⇒ نص المعادلة بلا «=»
      ctx = { NC (آخر صف محدود للنطاقات داخل SUMPRODUCT), report: { Y } } · lit = أرقام البرنامج التي تُدمج حرفيًا حيث لا تكفي المعادلة (عقود أطول من 10 سنوات) */
@@ -885,8 +1018,9 @@ window.Egary = window.Egary || {};
   function writeLedger(wb, state, year, asOf) {
     const S = E.Store;
     const ws = wb.addWorksheet(year, { views: [{ state: 'frozen', xSplit: 5, ySplit: 2, rightToLeft: true }] });
-    ws.getCell('K1').value = year; ws.mergeCells('K1:V1'); ws.getCell('K1').font = { bold: true, size: 14 }; ws.getCell('K1').alignment = { horizontal: 'center' };
-    ws.getCell('A1').value = state.meta.officeName || 'إيجاري'; ws.getCell('A1').font = { bold: true, size: 12, color: { argb: STYLE.head } };
+    ws.getCell('K1').value = year; ws.mergeCells('K1:V1'); ws.getCell('K1').font = font({ bold: true, size: 14 }); ws.getCell('K1').alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell('A1').value = state.meta.officeName || 'إيجاري'; ws.getCell('A1').font = font({ bold: true, size: 12, color: { argb: STYLE.head } }); ws.getCell('A1').alignment = { vertical: 'middle' };
+    ws.getRow(1).height = 22; // اسم المكتب (12) وعنوان السنة (14) فوق صف العناوين
     // الأعمدة التي أضافها المكتب في هذه الورقة تُعاد بعد أعمدة الأكواد بقيمها المحفوظة لكل عقد
     const extra = (state._extra && state._extra[year]) || null; const xHead = extra ? extra.headers : [];
     ws.getRow(2).values = LEDGER_HEAD.concat(xHead); styleHeader(ws.getRow(2));
@@ -895,9 +1029,6 @@ window.Egary = window.Egary || {};
     styleHeadKind(ws.getCell(2, cTot), 'formula'); ws.getCell(2, cTot).note = NOTE.rowTotal + '\n' + NOTE.formula;
     for (let m = 0; m < 12; m++) ws.getCell(2, cM1 + m).note = NOTE.month;
     for (let col = cK1; col <= LEDGER_HEAD.length; col++) ws.getCell(2, col).note = NOTE.key;
-    const widths = [5, 12, 34, 30, 12, 26, 12, 12, 13, 18, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 14, 40, 11, 12, 11, 12];
-    widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
-    xHead.forEach((hname, i) => { ws.getColumn(29 + i).width = Math.max(12, Math.min(30, hname.length + 4)); });
     const lastCol = 28 + xHead.length;
     const rows = ledgerRows(state, year);
     const projIdx = new Map(state.projects.map((p, i) => [p.code, i]));
@@ -924,23 +1055,26 @@ window.Egary = window.Egary || {};
       }
       rowSum = r2(rowSum);
       colSums[13] = (colSums[13] || 0) + rowSum;
-      row.getCell(23).value = { formula: `SUM(K${r}:V${r})`, result: rowSum }; row.getCell(23).numFmt = '#,##0.00'; row.getCell(23).font = { bold: true };
+      row.getCell(23).value = { formula: `SUM(K${r}:V${r})`, result: rowSum }; row.getCell(23).numFmt = '#,##0.00'; row.getCell(23).font = font({ bold: true });
       row.getCell(24).value = c.notes || '';
       if (cc[year + '-name']) row.getCell(3).note = cc[year + '-name']; if (cc[year + '-notes']) row.getCell(24).note = cc[year + '-notes'];
       row.getCell(25).value = c.code; row.getCell(26).value = c.unitCode; row.getCell(27).value = c.clientCode; row.getCell(28).value = p.code || '';
       if (extra) { const ex = extra.rows[c.code] || {}; xHead.forEach((hname, i) => { const cell = row.getCell(29 + i); cell.value = ex[hname] == null ? null : ex[hname]; if (extra.fmts && extra.fmts[hname]) cell.numFmt = extra.fmts[hname]; }); }
       const fill = STYLE.rowFills[(projIdx.get(p.code) || 0) % STYLE.rowFills.length];
       row.eachCell({ includeEmpty: true }, (cell, col) => { if (col <= lastCol) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } }; cell.border = { top: { style: 'hair' }, bottom: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' } }; } });
-      for (let col = 25; col <= 28; col++) row.getCell(col).font = { color: { argb: 'FF7F7F7F' }, size: 9 };
+      for (let col = 25; col <= 28; col++) row.getCell(col).font = font({ color: { argb: 'FF7F7F7F' }, size: 9 });
+      LEDGER_SIZE.forEach((k, i) => { if (CENTER_KINDS.has(k)) centerCell(row.getCell(i + 1)); });
       const pc = p.code || ''; byProject[pc] = byProject[pc] || { n: 0, sum: 0 }; byProject[pc].n++; byProject[pc].sum = r2(byProject[pc].sum + rowSum); // ما كُتب فعلًا في عمود الاجمالي (مفتاح الملخص و«المحصَّل في السنة»)
       r++;
     }
     const last = r - 1;
     const tr = ws.getRow(r);
-    tr.getCell(3).value = 'الاجمالي العام'; tr.getCell(3).font = { bold: true };
-    for (let col = 11; col <= 23; col++) { const Lc = ws.getColumn(col).letter; tr.getCell(col).value = last >= 3 ? { formula: `SUM(${Lc}3:${Lc}${last})`, result: Math.round((colSums[col - 10] || 0) * 100) / 100 } : 0; tr.getCell(col).numFmt = '#,##0.00'; tr.getCell(col).font = { bold: true }; }
+    tr.getCell(3).value = 'الاجمالي العام'; tr.getCell(3).font = font({ bold: true });
+    for (let col = 11; col <= 23; col++) { const Lc = ws.getColumn(col).letter; tr.getCell(col).value = last >= 3 ? { formula: `SUM(${Lc}3:${Lc}${last})`, result: Math.round((colSums[col - 10] || 0) * 100) / 100 } : 0; tr.getCell(col).numFmt = '#,##0.00'; tr.getCell(col).font = font({ bold: true }); }
     tr.eachCell({ includeEmpty: true }, (cell, col) => { if (col <= lastCol) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.total } }; });
     ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: Math.max(2, last), column: lastCol } };
+    fitColumns(ws, { headRow: 2, firstRow: 3, kinds: LEDGER_SIZE, filter: true }); // يشمل صف الاجمالي العام (أكبر الأرقام)
+    printSetup(ws, '1:2');
     return { firstRow: 3, lastRow: Math.max(3, last), totalRow: r, count: rows.length, byProject };
   }
   /* ملخص المشاريع: كل المعادلات بمفتاح «كود المشروع» (العمود الأخير) لا بالاسم، وبأعمدة كاملة حتى تُحسب الصفوف التي يضيفها المكتب */
@@ -950,7 +1084,6 @@ window.Egary = window.Egary || {};
     const heads = SUMMARY_HEAD(year);
     ws.getRow(1).values = heads; styleHeader(ws.getRow(1));
     heads.forEach((h, i) => { styleHeadKind(ws.getCell(1, i + 1), SUMMARY_KIND[i]); const note = summaryNote(i); if (note) ws.getCell(1, i + 1).note = note; });
-    [18, 18, 18, 12, 12, 12, 12, 16, 12].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
     let r = 2; const tot = { B: 0, C: 0, D: 0, E: 0, F: 0, H: 0 };
     for (const p of state.projects) {
       const sc = En.scope({ projectCode: p.code }); const occ = En.occupancy(sc, ctx.asOf), ar = En.arrears(sc, ctx.asOf);
@@ -959,12 +1092,15 @@ window.Egary = window.Egary || {};
       ws.getCell(r, 1).value = p.name; ws.getCell(r, SUMMARY_KEY).value = p.code;
       for (const col of Object.keys(vals)) { const cell = ws.getCell(col + r); cell.value = { formula: F.summary[col](r, ctx), result: vals[col] }; styleAutoCell(cell, SUMMARY_KIND[col.charCodeAt(0) - 65]); if (col in tot) tot[col] += U().toNum(vals[col]) || 0; }
       ws.getCell(r, 3).numFmt = '#,##0.00'; ws.getCell(r, 7).numFmt = '0%'; ws.getCell(r, 8).numFmt = '#,##0';
+      SUMMARY_SIZE.forEach((k, i) => { if (CENTER_KINDS.has(k)) centerCell(ws.getCell(r, i + 1)); });
       r++;
     }
-    ws.getCell(r, 1).value = 'الاجمالي'; ws.getCell(r, 1).font = { bold: true };
-    for (const col of ['B', 'C', 'D', 'E', 'F', 'H']) { ws.getCell(col + r).value = r > 2 ? { formula: `SUM(${col}2:${col}${r - 1})`, result: r2(tot[col]) } : 0; ws.getCell(col + r).font = { bold: true }; ws.getCell(col + r).numFmt = col === 'C' ? '#,##0.00' : '#,##0'; }
-    ws.getCell('G' + r).value = r > 2 ? { formula: `IF(OR(D${r}="",D${r}=0),"",E${r}/D${r})`, result: tot.D ? tot.E / tot.D : '' } : ''; ws.getCell('G' + r).numFmt = '0%'; ws.getCell('G' + r).font = { bold: true };
+    ws.getCell(r, 1).value = 'الاجمالي'; ws.getCell(r, 1).font = font({ bold: true });
+    for (const col of ['B', 'C', 'D', 'E', 'F', 'H']) { ws.getCell(col + r).value = r > 2 ? { formula: `SUM(${col}2:${col}${r - 1})`, result: r2(tot[col]) } : 0; ws.getCell(col + r).font = font({ bold: true }); ws.getCell(col + r).numFmt = col === 'C' ? '#,##0.00' : '#,##0'; }
+    ws.getCell('G' + r).value = r > 2 ? { formula: `IF(OR(D${r}="",D${r}=0),"",E${r}/D${r})`, result: tot.D ? tot.E / tot.D : '' } : ''; ws.getCell('G' + r).numFmt = '0%'; ws.getCell('G' + r).font = font({ bold: true });
     ws.getRow(r).eachCell({ includeEmpty: true }, (cell, col) => { if (col <= 9) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.total } }; });
+    fitColumns(ws, { headRow: 1, firstRow: 2, kinds: SUMMARY_SIZE, filter: false });
+    printSetup(ws, '1:1');
   }
   /* جدول كيان: العناوين من COLS (بألوانها وملاحظاتها)، ثم صف لكل سجل؛ extra(rec, r, ctx) يعطي الأعمدة التلقائية (قيمة أو { formula, result }) */
   function table(wb, name, entity, records, extra, opts) {
@@ -979,10 +1115,9 @@ window.Egary = window.Egary || {};
       styleHeadKind(cell, kind); const note = headerNote(entity, c[0], ctx); if (note) cell.note = note;
       if (kind === 'helper') ws.getColumn(i + 1).hidden = true;                   // عمود مساعد للمعادلات
       if (/^_rentY\d+$/.test(c[0])) ws.getColumn(i + 1).outlineLevel = 1;         // كتلة «إيجار السنة …» قابلة للطي
-      ws.getColumn(i + 1).width = opts.widths && opts.widths[i] ? opts.widths[i] : (c[0] === 'notes' || c[0] === 'description' || c[0] === '_assets' ? 36 : c[1].length > 14 ? 20 : 14);
     });
     if (cols.some(c => /^_rentY\d+$/.test(c[0]))) ws.properties.outlineLevelCol = 1;
-    xHead.forEach((hname, i) => { ws.getColumn(cols.length + 1 + i).width = Math.max(12, Math.min(30, hname.length + 4)); });
+    const kinds = cols.map(c => sizeKind(entity, c[0])); // مقاس كل عمود بحقله لا بموضعه (إضافة عمود لا تزيح مقاسات الباقي)
     let r = 2;
     for (const rec of records) {
       const ex = extra ? extra(rec, r, ctx) : {};
@@ -1003,6 +1138,7 @@ window.Egary = window.Egary || {};
         else if (NUM_FIELDS.has(field) || typeof v === 'number' || v === null) { cell.value = v == null || v === '' ? null : v; if (FMT[field]) cell.numFmt = FMT[field]; else if (['rent', 'deposit', 'amount', 'cost'].includes(field)) cell.numFmt = '#,##0.00'; }
         else { cell.value = v == null ? '' : v; if (FMT[field] && v !== '' && v != null) cell.numFmt = FMT[field]; }
         styleAutoCell(cell, kindOf(entity, field));
+        if (centered(entity, field, kinds[i])) centerCell(cell);
       });
       if (opts.afterRow) opts.afterRow(ws, r, rec);
       r++;
@@ -1017,6 +1153,8 @@ window.Egary = window.Egary || {};
       }
     }
     ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: lastRow, column: cols.length + xHead.length } };
+    fitColumns(ws, { headRow: 1, firstRow: 2, kinds, filter: true });
+    printSetup(ws, '1:1');
     return ws;
   }
   /* خيارات الجدول مع الأعمدة الإضافية المحفوظة لهذه الورقة وسياق المعادلات */
@@ -1030,7 +1168,7 @@ window.Egary = window.Egary || {};
       const bp = (ctx.sheetsMeta && ctx.sheetsMeta[Y] && ctx.sheetsMeta[Y].byProject[p.code]) || { n: 0, sum: 0 };
       const f = auto('projects', r, ctx);
       return { _units: f('_units', occ.total), _occupied: f('_occupied', occ.occupiedCount), _vacant: f('_vacant', occ.vacant.length), _arrears: f('_arrears', r2(ar.total)), _ytd: ctx.report.hasSheet ? f('_ytd', r2(bp.sum)) : 0, _rate: f('_rate', occ.rate == null ? '' : occ.rate) };
-    }, withExtra(state, 'projects', { widths: [12, 22, 30, 14, 30, 14, 12, 12, 12, 16, 16, 12] }, ctx));
+    }, withExtra(state, 'projects', {}, ctx));
   }
   function writeUnits(wb, state, ctx) {
     const En = E.Engine, S = E.Store;
@@ -1045,16 +1183,16 @@ window.Egary = window.Egary || {};
         _vacantSince: f('_vacantSince', !s.contract && s.vacantSince ? toDate(s.vacantSince) : ''), _vacantDays: f('_vacantDays', !s.contract && s.vacantDays != null ? s.vacantDays : ''),
         _contractEnd: f('_contractEnd', s.contract ? toDate(s.contract.end) : ''), _daysLeft: f('_daysLeft', s.contract ? s.daysLeft : ''),
       };
-    }, withExtra(state, 'units', { widths: [12, 12, 16, 16, 10, 8, 10, 30, 14, 36, 18, 26, 12, 14, 14, 12, 14, 14], xSplit: 1 }, ctx));
+    }, withExtra(state, 'units', { xSplit: 1 }, ctx));
   }
-  function writeAssets(wb, state) { const rows = []; for (const u of state.units) for (const a of (u.assets || [])) rows.push({ unitCode: u.code, name: a.name, present: !!a.present, details: a.details || '' }); table(wb, SH.assets, 'assets', rows, null, { widths: [12, 20, 10, 40] }); }
+  function writeAssets(wb, state) { const rows = []; for (const u of state.units) for (const a of (u.assets || [])) rows.push({ unitCode: u.code, name: a.name, present: !!a.present, details: a.details || '' }); table(wb, SH.assets, 'assets', rows, null, {}); }
   function writeClients(wb, state, ctx) {
     const En = E.Engine, S = E.Store;
     table(wb, SH.clients, 'clients', state.clients, (c, r) => {
       const cs = S.contractsOfClient(c.code); const sc = { contracts: cs, contractSet: new Set(cs.map(x => x.code)) }; const ar = En.arrears(sc, ctx.asOf);
       const f = auto('clients', r, ctx);
       return { _contracts: f('_contracts', cs.length), _active: f('_active', cs.filter(x => En.contractStatus(x, ctx.asOf) === 'active').length), _arrears: f('_arrears', r2(ar.total)), _paid: f('_paid', r2(U().sum(cs, x => ctx.paidOf(x.code)))) };
-    }, withExtra(state, 'clients', { widths: [10, 34, 8, 28, 18, 14, 14, 14, 20, 26, 30, 12, 10, 12, 16, 16] }, ctx));
+    }, withExtra(state, 'clients', {}, ctx));
   }
   function writeContracts(wb, state, ctx) {
     const En = E.Engine, S = E.Store; const asOf = ctx.asOf;
@@ -1075,7 +1213,7 @@ window.Egary = window.Egary || {};
       };
       for (let kk = 1; kk <= 10; kk++) out['_rentY' + kk] = f('_rentY' + kk, sch[kk - 1] ? sch[kk - 1].rent : '');
       return out;
-    }, withExtra(state, 'contracts', { widths: [10, 12, 10, 14, 12, 30, 12, 12, 16, 10, 22, 12, 14, 10, 12, 36, 12, 14, 16, 18, 16, 14, 16, 10, 12, 14, 10, 14, 16, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 14, 14] }, ctx));
+    }, withExtra(state, 'contracts', {}, ctx));
   }
   function writePayments(wb, state, ctx) {
     const S = E.Store;
@@ -1085,7 +1223,7 @@ window.Egary = window.Egary || {};
       const c = S.contract(p.contractCode); const cl = c ? S.client(c.clientCode) : null, u = c ? S.unit(c.unitCode) : null, pr = u ? S.project(u.projectCode) : null;
       const f = auto('payments', r, ctx); const has = !!String(p.contractCode || '').trim();
       return { _client: f('_client', cl ? cl.name : '', has), _unit: f('_unit', u ? u.label : '', has), _projectName: f('_projectName', pr ? pr.name : '', has) };
-    }, withExtra(state, 'payments', { widths: [16, 10, 30, 12, 10, 14, 12, 14, 16, 30, 10, 12, 16], afterRow: (ws, r, rec) => { if (unread.has(rec)) { const cell = ws.getCell(r, colIndex('payments', 'period')); cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.unread } }; cell.note = NOTE.unread; } } }, ctx));
+    }, withExtra(state, 'payments', { afterRow: (ws, r, rec) => { if (unread.has(rec)) { const cell = ws.getCell(r, colIndex('payments', 'period')); cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STYLE.unread } }; cell.note = NOTE.unread; } } }, ctx));
   }
   function writeMaintenance(wb, state, ctx) {
     const En = E.Engine, S = E.Store;
@@ -1095,7 +1233,7 @@ window.Egary = window.Egary || {};
       const c = code ? S.contract(code) : null; const cl = c ? S.client(c.clientCode) : null;
       const f = auto('maintenance', r, ctx);
       return { _project: f('_project', u ? (S.project(u.projectCode) || {}).name || '' : '', !!m.unitCode), _unit: f('_unit', u ? u.label : '', !!m.unitCode), _custodian: f('_custodian', m.custodianName || (cl ? cl.name : '')), _custodianContract: f('_custodianContract', code) };
-    }, withExtra(state, 'maintenance', { widths: [10, 12, 14, 12, 12, 12, 40, 12, 12, 10, 12, 30, 12, 12, 26, 26, 14] }, ctx));
+    }, withExtra(state, 'maintenance', {}, ctx));
   }
   /* القيمة المكتوبة لإعداد (الكلمات العربية بدل auto/manual/actual) */
   function settingOut(key, v) {
@@ -1106,7 +1244,7 @@ window.Egary = window.Egary || {};
   function writeSettings(wb, state, asOf) {
     const En = E.Engine;
     const ws = wb.addWorksheet(SH.settings, { views: [{ state: 'frozen', ySplit: 1, rightToLeft: true }] });
-    ws.getRow(1).values = ['الإعداد', 'القيمة', 'الشرح']; styleHeader(ws.getRow(1)); ws.getColumn(1).width = 36; ws.getColumn(2).width = 22; ws.getColumn(3).width = 70;
+    ws.getRow(1).values = ['الإعداد', 'القيمة', 'الشرح']; styleHeader(ws.getRow(1));
     const help = { enteredThrough: 'الشهور بعده تُعرض «لم يُسجَّل بعد» لا «متأخرة»', tolerancePct: 'يُقبل المبلغ كسداد كامل لو الفرق أقل من هذه النسبة', toleranceMin: 'حد أدنى للفرق المقبول بالجنيه', prorationBasis: '30 = الشهر 30 يومًا (النصف 15/30) كما يحسب المكتب · فعلي = بعدد أيام الشهر', officeName: 'يظهر أعلى الورقة والموقع', graceDays: 'بعدها يُعتبر الشهر متأخرًا', dueDay: 'يوم الشهر الذي يستحق فيه الإيجار ما لم يحدد العقد غيره', vacancyMonths: 'الوحدة الشاغرة أطول من ذلك تظهر كتنبيه', trackingFrom: 'الشهور قبله لا تُحاسَب (بداية الورقة)', defaultIncreasePct: 'تُقترح عند إنشاء عقد جديد فقط ولا تغيّر العقود القائمة', ledgerYears: 'أوراق السنوات الموجودة (تُضاف تلقائيًا)', codeSeq: 'لا تُعدَّل: تضمن ألا يُعاد استخدام كود محذوف', trackingMode: 'تلقائي = تبدأ من أقدم ورقة سنة · يدوي = كما ضبطها المدير', invoicePrefix: 'الحروف التي يبدأ بها رقم الفاتورة (ثم السنة والرقم المتسلسل)', currency: 'رمز العملة في العرض' };
     let r = 2;
     for (const s of SETTINGS_KEYS) {
@@ -1123,12 +1261,32 @@ window.Egary = window.Egary || {};
     ws.getCell(r, 1).value = INFO_ROWS[2].ar; ws.getCell(r, 2).value = FORMAT_VERSION; ws.getCell(r, 3).value = 'رقم يكتبه البرنامج ليعرف شكل الملف — لا يُعدَّل'; r++;
     // دليل ألوان العناوين
     r++;
-    ws.getCell(r, 1).value = 'دليل ألوان العناوين'; ws.getCell(r, 1).font = { bold: true, size: 12 }; r++;
+    ws.getCell(r, 1).value = 'دليل ألوان العناوين'; ws.getCell(r, 1).font = font({ bold: true, size: 12 }); r++;
+    const legendFrom = r;
     for (const g of LEGEND) {
-      const a = ws.getCell(r, 1); a.value = g.title; a.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: g.argb } }; a.font = { bold: true, color: { argb: STYLE.headFont } }; a.alignment = { horizontal: 'center', vertical: 'middle' };
-      ws.getCell(r, 2).value = g.kind; ws.getCell(r, 3).value = g.text; ws.getCell(r, 3).alignment = { wrapText: true, vertical: 'top' }; ws.getRow(r).height = 48; r++;
+      const a = ws.getCell(r, 1); a.value = g.title; a.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: g.argb } }; a.font = font({ bold: true, color: { argb: STYLE.headFont } });
+      ws.getCell(r, 2).value = g.kind; ws.getCell(r, 3).value = g.text; r++;
     }
-    ws.getCell(r, 3).value = LEGEND_FOOT; ws.getCell(r, 3).alignment = { wrapText: true, vertical: 'top' }; ws.getRow(r).height = 32;
+    ws.getCell(r, 3).value = LEGEND_FOOT;
+    fitSettings(ws, r, legendFrom);
+    printSetup(ws, '1:1');
+  }
+  /* ورقة الإعدادات: كل عمود بعرض محتواه في حدود الشاشة، واسم الإعداد والشرح يلتفّان بدل أن يُقصّا، وارتفاع الصف بعدد أسطره */
+  function fitSettings(ws, lastRow, legendFrom) {
+    const LINE = 16;
+    const widthOf = (c, lo, hi) => { let m = textWidth(ws.getCell(1, c).value, true) + PAD; for (let r = 2; r <= lastRow; r++) { const cell = ws.getCell(r, c), t = shownText(cell.value, cell.numFmt), f = cell.font || {}; if (t) m = Math.max(m, Math.min(hi, textWidth(t, !!f.bold, f.size) + PAD)); } return Math.ceil(Math.max(lo, m) - 1e-9); };
+    const wA = widthOf(1, 30, 48), wB = widthOf(2, 14, 34), wC = widthOf(3, 40, 86);
+    ws.getColumn(1).width = wA; ws.getColumn(2).width = wB; ws.getColumn(3).width = wC;
+    for (let r = 2; r <= lastRow; r++) {
+      const a = ws.getCell(r, 1), b = ws.getCell(r, 2), c = ws.getCell(r, 3); const legend = r >= legendFrom && r < lastRow;
+      if (a.value != null && a.value !== '') a.alignment = { wrapText: true, vertical: 'middle', horizontal: legend ? 'center' : undefined };
+      if (legend && b.value != null && b.value !== '') b.alignment = { vertical: 'middle' }; // خانات القيم نفسها تبقى بلا تنسيق مشترك
+      if (c.value != null && c.value !== '') c.alignment = { wrapText: true, vertical: 'middle' };
+      const fa = a.font || {}; const lines = Math.max(wrapLines(U().cellText(a.value), wA, !!fa.bold), wrapLines(U().cellText(c.value), wC, false));
+      if (legend) ws.getRow(r).height = Math.max(36, lines * LINE + 6); // مربع اللون أكبر من سطر
+      else if (lines > 1) ws.getRow(r).height = lines * LINE + 4;
+    }
+    ws.getRow(1).height = HEAD_H.one;
   }
   /* وصف التخطيط كما يكتبه هذا الملف (للوثائق والاختبارات): الأعمدة ونوعها وقالب معادلتها وملاحظتها */
   function layout() {
@@ -1141,14 +1299,16 @@ window.Egary = window.Egary || {};
   }
   /* ورقة المستخدمين: مخفية في الإكسيل (المدير يستطيع إظهارها)، كلمة المرور مشفّرة لا تُقرأ */
   function writeUsers(wb, state) {
-    const ws = table(wb, SH.users, 'users', (state.users || []).slice().sort((a, b) => U().cmp(a.code, b.code)), null, { widths: [18, 24, 14, 90, 10, 14, 20] });
+    const ws = table(wb, SH.users, 'users', (state.users || []).slice().sort((a, b) => U().cmp(a.code, b.code)), null, {});
     ws.state = 'hidden';
     return ws;
   }
   function writeAudit(wb, state) {
     const ws = wb.addWorksheet(SH.audit, { views: [{ state: 'frozen', ySplit: 1, rightToLeft: true }] });
-    ws.getRow(1).values = ['الوقت', 'العملية', 'الكيان', 'الكود', 'التفاصيل', 'المستخدم']; styleHeader(ws.getRow(1)); [20, 10, 10, 14, 60, 18].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
-    let r = 2; for (const a of (state.audit || []).slice(0, 500)) { ws.getRow(r).values = [a.at, a.action, a.entity, a.code, a.summary, a.user || '']; r++; }
+    ws.getRow(1).values = ['الوقت', 'العملية', 'الكيان', 'الكود', 'التفاصيل', 'المستخدم']; styleHeader(ws.getRow(1));
+    let r = 2; for (const a of (state.audit || []).slice(0, 500)) { ws.getRow(r).values = [a.at, a.action, a.entity, a.code, a.summary, a.user || '']; centerCell(ws.getCell(r, 4)); r++; }
+    fitColumns(ws, { headRow: 1, firstRow: 2, kinds: ['text', 'list', 'list', 'code', 'long', 'name'], filter: false });
+    printSetup(ws, '1:1');
   }
 
   /* لقطة لما كتبه/قرأه الموقع آخر مرة (لمعرفة أي جهة تغيّرت عند التعارض) */
@@ -1160,5 +1320,6 @@ window.Egary = window.Egary || {};
     return { cells, rows, at: new Date().toISOString() };
   }
 
-  E.Workbook = { read, write, snapshotOf, layout, newWorkbook, SH, COLS, RETIRED, LEDGER_HEAD, SETTINGS_KEYS, INFO_ROWS, FORMAT_VERSION, LEGEND, STYLE, FMT, kindOf, headerNote, formulas: F, colLetter, L, LL, fmtOverrides, parseOverrides };
+  E.Workbook = { read, write, snapshotOf, layout, newWorkbook, SH, COLS, RETIRED, LEDGER_HEAD, SETTINGS_KEYS, INFO_ROWS, FORMAT_VERSION, LEGEND, STYLE, FMT, kindOf, headerNote, formulas: F, colLetter, L, LL, fmtOverrides, parseOverrides,
+    sizing: { textWidth, headWidth, shownText, sizeKind, SIZES, PAD, FILTER_BTN, MONEY_MIN, LEDGER_SIZE, SUMMARY_SIZE } };
 })(window.Egary);

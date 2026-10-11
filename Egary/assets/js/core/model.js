@@ -122,6 +122,11 @@ window.Egary = window.Egary || {};
         need(U.d(r.start), 'تاريخ بداية العقد مطلوب');
         need(U.d(r.end), 'تاريخ نهاية العقد مطلوب');
         need(!(U.d(r.start) && U.d(r.end)) || U.d(r.end) >= U.d(r.start), 'تاريخ النهاية قبل تاريخ البداية');
+        { // سنة غير منطقية من خطأ كتابة (2207 / 0202): تُرفض بدل أن تُكتب في الإكسيل
+          const sY = U.d(r.start) ? U.d(r.start).getUTCFullYear() : null, eY = U.d(r.end) ? U.d(r.end).getUTCFullYear() : null, cy = U.today().getUTCFullYear();
+          if (sY != null) need(sY >= 1950 && sY <= cy + 2, 'راجِع سنة بداية العقد');
+          if (sY != null && eY != null && eY >= sY) need(eY - sY <= 60, 'راجِع سنة نهاية العقد');
+        }
         need(U.toNum(r.rent) != null && U.toNum(r.rent) > 0, 'الإيجار الشهري مطلوب (أكبر من صفر)');
         need(U.toNum(r.increasePct) == null || (U.toNum(r.increasePct) >= 0 && U.toNum(r.increasePct) <= 100), 'نسبة الزيادة بين 0 و100');
         need(U.toNum(r.deposit) == null || U.toNum(r.deposit) >= 0, 'التأمين لا يكون سالبًا');
@@ -142,6 +147,12 @@ window.Egary = window.Egary || {};
         }
         need(U.toNum(r.amount) != null && U.toNum(r.amount) > 0, 'المبلغ مطلوب (أكبر من صفر)');
         need(!r.paidOn || U.d(r.paidOn), 'تاريخ السداد غير صحيح');
+        if (r.paidOn && U.d(r.paidOn)) { // من سنة قبل أقدم سنة معروفة (أو سنة الشهر) حتى شهر بعد اليوم
+          const sg = (state && state.settings) || {}, cur = U.today().getUTCFullYear();
+          const known = [cur, ...((Array.isArray(sg.ledgerYears) ? sg.ledgerYears : []).map(Number).filter(n => n > 0)), +String(sg.trackingFrom || '').slice(0, 4) || cur, okPeriod ? +r.period.slice(0, 4) : cur];
+          const pd = U.d(r.paidOn);
+          need(pd.getUTCFullYear() >= Math.min(...known) - 1 && pd <= U.addDays(U.today(), 31), 'تاريخ السداد بعيد عن اليوم — راجِع السنة');
+        }
         break;
       }
       case 'maintenance':
@@ -149,6 +160,10 @@ window.Egary = window.Egary || {};
         need(U.d(r.date), 'التاريخ مطلوب');
         need(r.description && r.description.trim(), 'وصف الصيانة مطلوب');
         need(U.toNum(r.cost) == null || U.toNum(r.cost) >= 0, 'التكلفة لا تكون سالبة');
+        if (U.d(r.date)) { const y = U.d(r.date).getUTCFullYear(); need(y >= 2000 && U.d(r.date) <= U.addDays(U.today(), 365), 'تاريخ الصيانة غير منطقي — راجِع السنة'); }
+        need(!r.closedOn || U.d(r.closedOn), 'تاريخ الإغلاق غير صحيح');
+        if (U.d(r.closedOn) && U.d(r.date)) need(U.d(r.closedOn) >= U.d(r.date), 'تاريخ الإغلاق قبل تاريخ الطلب');
+        if (U.d(r.closedOn)) need(U.d(r.closedOn) <= U.addDays(U.today(), 31), 'تاريخ الإغلاق بعيد عن اليوم — راجِع السنة');
         break;
     }
     return errs.filter(Boolean);

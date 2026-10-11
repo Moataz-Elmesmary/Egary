@@ -298,19 +298,19 @@ e2e('E4. renew from the renewals drawer: the form is prefilled (unit, client, st
   assert.equal(await rowsOf(page, '.drawer table.tbl').count(), soon0);
   const row = page.locator('.drawer table.tbl tbody tr', { has: page.locator('.code', { hasText: /^T0069$/ }) });
   await row.locator('button[title="تجديد / عقد جديد"]').click();
-  await waitModal(page, 'عقد جديد');
+  await waitModal(page, 'تجديد العقد T0069'); // عنوان التجديد (كان «عقد جديد»)
   assert.equal(await page.inputValue('#f_unitCode'), 'P03-704');
   assert.equal(await page.inputValue('#f_clientCode'), old.clientCode);
   assert.equal(await page.inputValue('#f_start'), '2026-10-16', 'start = old end + 1');
   assert.equal(await page.inputValue('#f_rent'), '11000', 'rent carried over (0% increase)');
   assert.equal(await page.inputValue('#f_prevCode'), 'T0069');
-  assert.equal(await page.inputValue('#f_end'), '', 'end is left for the user');
+  assert.equal(await page.inputValue('#f_end'), '2027-10-15', 'end proposed with the old contract length (was left empty: the first save failed)');
   await page.fill('#f_end', '2027-10-15');
   await page.fill('#f_rent', '12000');
   await page.click('.modal .m-foot button:has-text("حفظ")');
   await page.waitForSelector('.modal', { state: 'detached' });
   await page.waitForSelector(`.toast:has-text("أُضيف العقد ${NEXT}")`);
-  await page.waitForSelector('.drawer', { state: 'detached' });
+  await page.waitForFunction((code) => ((document.querySelector('.drawer .d-head h2') || {}).textContent || '') === 'عقد ' + code, NEXT); // بعد الحفظ يُفتح العقد الجديد (كان الدرج يُغلق)
   assert.equal(await navCount(page, 'contracts'), '87');
   assert.equal(num(await page.textContent('#content .kpi[data-kpi="عقود تنتهي خلال 90 يومًا"] .v')), soon0 - 1, 'T0069 now has a successor');
 
@@ -448,7 +448,7 @@ e2e('E8. settings form: validation, grace days / office name / last entered mont
   const card = page.locator('#content .card', { hasText: 'قواعد الاستحقاق' });
   assert.equal((await kvVal(card, 'أيام السماح')).trim(), '7');
   assert.equal((await kvVal(card, 'اسم المكتب')).trim(), 'مكتب الاختبار');
-  assert.ok((await kvVal(card, 'آخر شهر مسجَّل في الورقة')).includes('2026-08 (يدوي)'));
+  assert.ok((await kvVal(card, 'آخر شهر مسجَّل في كشف التحصيل')).includes('2026-08 (يدوي)'));
   assert.deepEqual(await page.evaluate(() => { const s = Egary.Store.state(); return [s.settings.graceDays, s.settings.enteredThrough, s.meta.officeName, s.settings.trackingFrom]; }), [7, '2026-08', 'مكتب الاختبار', '2026-01']);
   // الفاتورة تحمل اسم المكتب الجديد
   await go(page, '#/payments', '#content table.tbl');
@@ -477,7 +477,7 @@ e2e('E9. add-year modal from the ledger year select: validation, the 2025 sheet 
   await go(page, '#/ledger?year=2026', 'table.ledger');
   assert.deepEqual(await page.$$eval('#year-select option', o => o.map(x => x.value)), ['2026', '__add']);
   await page.selectOption('#year-select', '__add');
-  await waitModal(page, 'إضافة سنة إلى الورقة');
+  await waitModal(page, 'إضافة سنة إلى كشف التحصيل');
   assert.equal(await page.inputValue('#year-select'), '2026', 'the select snaps back');
   assert.equal(await page.inputValue('#f_year'), '2025', 'suggests the year before the oldest sheet');
   await page.fill('#f_year', '2026'); await page.click('#btn-add-year');
@@ -617,8 +617,11 @@ e2e('E11. search box keyboard: ArrowDown/ArrowUp move a single highlight, Enter 
   await page.waitForFunction(() => document.getElementById('suggest').classList.contains('hidden'));
   await page.click('#global-search');
   await page.waitForSelector('#suggest:not(.hidden) .item');
+  // أعلى القائمة الآن صف «اعرض كل النتائج» (اختيار Enter الافتراضي): ArrowUp عند القمة يبقى عليه، وArrowDown يعود لأول اقتراح
   await page.press('#global-search', 'ArrowDown'); await page.press('#global-search', 'ArrowUp'); await page.press('#global-search', 'ArrowUp');
-  assert.equal((await page.locator('#suggest .item.on .code').textContent()).trim(), codes[0], 'ArrowUp at the top stays on the first item');
+  assert.equal(await page.locator('#suggest .all.on').count(), 1, 'ArrowUp at the top stays on the top row («اعرض كل النتائج»)');
+  await page.press('#global-search', 'ArrowDown');
+  assert.equal((await page.locator('#suggest .item.on .code').textContent()).trim(), codes[0]);
   await page.press('#global-search', 'Enter'); await page.waitForSelector('.drawer');
   assert.equal((await page.locator('.drawer .profile-head .code').first().textContent()).trim(), codes[0]);
 });
@@ -630,8 +633,10 @@ e2e('E12. slicers: a web payment (today, bank transfer) is the only row under «
   await linkReal(page);
   await go(page, '#/payments', '#period-bar');
   await afterRender(page, () => page.click('[data-quick="month"]')); await page.waitForSelector('#pay-clear');
-  assert.equal(await page.locator('#content table.tbl tbody .empty').count(), 1, 'imported payments have no paid date');
-  assert.ok((await page.textContent('#content')).includes('تُستبعد الدفعات التي ليس لها تاريخ مسجَّل'));
+  // الدفعات المنقولة بلا تاريخ سداد تُحسب بتاريخ استحقاق شهرها (آخرها أغسطس) ⇒ لا شيء في أكتوبر، مع شرح السبب
+  assert.equal(await page.locator('#content table.tbl tbody .empty').count(), 1, 'imported payments end in August');
+  assert.ok((await page.textContent('#content')).includes('تُحسب بتاريخ استحقاق شهرها'));
+  assert.ok((await page.textContent('#content table.tbl tbody')).includes('آخر شهر مسجَّل في كشف التحصيل'));
   await afterRender(page, () => page.click('#pay-clear')); assert.equal(await page.locator('#pay-clear').count(), 0);
   // تسجيل دفعة من زر الصفحة (العقد غير مثبَّت)
   await page.click('#content .page-head button:has-text("تسجيل دفعة")');
@@ -656,12 +661,14 @@ e2e('E12. slicers: a web payment (today, bank transfer) is the only row under «
   assert.equal(await page.locator('[data-quick="month"].on').count(), 1);
   assert.ok((await page.evaluate(() => location.hash)).includes('from=2026-10-01'));
   await afterRender(page, () => page.click('[data-quick="30"]'));
-  assert.equal(await page.inputValue('#pay-from'), '2026-09-09');
+  assert.equal(await page.inputValue('#pay-from'), '2026-09-10', '30 days including today');
   assert.equal(await rowsOf(page).count(), 1);
   await afterRender(page, () => page.click('[data-quick="30"]'));
   assert.equal(await page.inputValue('#pay-from'), '');
   assert.equal(await rowsOf(page).count(), 510, 'toggling the active chip clears the range');
-  await afterRender(page, async () => { await page.fill('#pay-from', '2026-10-10'); await page.dispatchEvent('#pay-from', 'change'); });
+  // حقل التاريخ يفلتر مكانه (بلا إعادة رسم الصفحة حتى لا يضيع التركيز أثناء الكتابة)
+  await page.fill('#pay-from', '2026-10-10'); await page.dispatchEvent('#pay-from', 'change');
+  await page.waitForFunction(() => document.querySelectorAll('#content table.tbl tbody .empty').length === 1);
   assert.equal(await page.locator('#content table.tbl tbody .empty').count(), 1, 'from tomorrow → nothing');
   await afterRender(page, () => page.click('#pay-clear'));
   // الطريقة وعن شهر
@@ -833,7 +840,7 @@ e2e('E14. role gates: staff cannot delete units/clients/contracts (table + drawe
   // الموظف يضيف سنة: الأوراق تزيد لكن بداية المحاسبة لا تتحرك
   await go(page, '#/ledger?year=2026', '#year-select');
   assert.deepEqual(await page.$$eval('#year-select option', o => o.map(x => x.value)), ['2026', '__add']);
-  await page.selectOption('#year-select', '__add'); await waitModal(page, 'إضافة سنة إلى الورقة');
+  await page.selectOption('#year-select', '__add'); await waitModal(page, 'إضافة سنة إلى كشف التحصيل');
   await page.fill('#f_year', '2025'); await page.click('#btn-add-year');
   await page.waitForSelector('.toast:has-text("بداية المحاسبة لا تتغيّر إلا من المدير")');
   assert.deepEqual(await page.evaluate(() => [Egary.Store.state().settings.ledgerYears, Egary.Store.state().settings.trackingFrom]), [[2025, 2026], '2026-01']);
@@ -1050,7 +1057,7 @@ e2e('E19. dashboard drill-downs: the highlighted month bar, the project donut le
   await page.waitForSelector('.drawer'); assert.equal(await drawerTitle(page), 'مشروع: ' + k.proj.name); await closeDrawer(page);
   await afterRender(page, () => page.click('#content button:has-text("كل التحليلات")'));
   await page.waitForSelector('#content .insight');
-  assert.equal(await page.textContent('#page-title'), 'التحليلات والإنسايتس');
+  assert.equal(await page.textContent('#page-title'), 'التحليلات والملاحظات');
   assert.equal(await page.evaluate(() => location.hash), '#/insights');
   await go(page, '#/dashboard', '#content .kpis .kpi');
   await page.click('#content .page-head button:has-text("وحدة جديدة")'); await waitModal(page, 'وحدة جديدة'); await closeModal(page);

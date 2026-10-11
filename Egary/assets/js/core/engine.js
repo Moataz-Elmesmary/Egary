@@ -153,27 +153,78 @@ window.Egary = window.Egary || {};
   }
   const USTATUS_AR = { occupied: 'مؤجَّرة', ending: 'تنتهي خلال 90 يومًا', vacant: 'شاغرة' }; // نفس العبارة في الفلتر والبطاقات والجداول
 
+  /* ---------- البحث: مطابقة واحدة لكل الشاشات (الاقتراحات والقوائم) ----------
+     • الكلمات بأي ترتيب، والملتصقة أو المفصولة (عبدالرحمن = عبد الرحمن)، والهمزات والتاء المربوطة والأرقام العربية
+     • رقم قصير (حتى 4 أرقام) يطابق بداية كلمة فقط: 202 = الوحدة 202 لا منتصف رقم قومي
+     • التليفون بأي صيغة: 0100 111 2233 = 01001112233 = +201001112233 = 1001112233 (صفر ضاع في الإكسيل)
+     • الأكواد بلا أصفار: T16 = T0016، c5 = C005، inv 1 = INV-2026-0001، «عقد 16» = T0016 */
+  const CODE_WORDS = { 'عقد': 't', 'عميل': 'c', 'فاتوره': 'inv', 'مشروع': 'p', 'صيانه': 'm' };
+  function phoneCanon(d) { d = String(d || '').replace(/^00/, ''); if (/^201\d{9}$/.test(d)) d = d.slice(2); return d.replace(/^0+/, ''); }
+  function prepQ(q) {
+    if (q && q.__pq) return q;
+    const n = U().normalize(q); if (!n) return null;
+    const tokens = n.split(' ').filter(Boolean), joined = tokens.join('');
+    const digits = /^\d+$/.test(joined);
+    let code = null;
+    const m1 = /^([a-z]+)0*(\d+)$/.exec(joined), m2 = /^([^\d\s]+) ?0*(\d+)$/.exec(n);
+    if (m1 && !digits) code = { prefix: m1[1], num: String(+m1[2]) };
+    else if (m2 && CODE_WORDS[m2[1]]) code = { prefix: CODE_WORDS[m2[1]], num: String(+m2[2]) };
+    return { __pq: true, n, tokens, joined, digits, short: digits && joined.length <= 4, phone: digits && joined.length >= 7 ? phoneCanon(joined) : '', code };
+  }
+  // رقم قصير يطابق بداية كلمة — لكن 1–3 أرقام لا تطابق سنة (2026 في رقم الفاتورة أو الشهر أو التاريخ): «202» = الوحدة 202 لا كل دفعات 2026
+  const YEAR_WORD = /^(19|20)\d\d$/;
+  const startsWord = (words, t) => words.some(w => w.startsWith(t) && !(t.length < 4 && YEAR_WORD.test(w)));
+  function matchQ(hay, q) {
+    const pq = prepQ(q); if (!pq) return true;
+    const H = U().normalize(hay); if (!H) return false;
+    const Hs = H.replace(/ /g, ''), words = H.split(' ');
+    if (pq.short) return startsWord(words, pq.joined);
+    if (Hs.includes(pq.joined)) return true; // العبارة كلها بلا مسافات
+    if (pq.digits) return pq.phone.length >= 7 && Hs.includes(pq.phone);
+    if (!pq.code && pq.tokens.every(t => /^\d{1,4}$/.test(t) ? startsWord(words, t) : (H.includes(t) || (t.length >= 4 && Hs.includes(t))))) return true;
+    if (pq.code && new RegExp('(^| )' + pq.code.prefix + '(?: ?\\d{4} ?)?0*' + pq.code.num + '( |$)').test(H)) return true;
+    return false;
+  }
+  /* نصوص البحث لكل نوع سجل */
+  const clientText = cl => cl ? [cl.code, cl.name, cl.rep, cl.phone, cl.phone2, cl.nationalId, cl.taxId, cl.email].join(' ') : '';
+  const unitText = u => u ? [u.code, u.label, (S().project(u.projectCode) || {}).name].join(' ') : '';
+  function contractText(c) { return c ? [c.code, c.unitCode, clientText(S().client(c.clientCode)), unitText(S().unit(c.unitCode))].join(' ') : ''; }
+  function paymentText(p) { const c = S().contract(p.contractCode); return [p.code, p.ref, p.notes, p.amount, U().periodLabel(p.period, true), p.paidOn ? U().fmtDate(p.paidOn) : '', c ? contractText(c) : p.contractCode].join(' '); }
+  function maintenanceText(m) { return [m.code, m.description, m.notes, m.unitCode, unitText(S().unit(m.unitCode)), m.custodianName, M().label(M().MAINT_KINDS, m.kind)].join(' '); }
+  /* تاريخ الدفعة الفعلي للفلترة والعرض: تاريخ السداد المسجَّل، وإلا تاريخ استحقاق شهرها (تقريبي — المنقولة من كشف التحصيل بلا تاريخ) */
+  function payDate(p) {
+    if (p && p.paidOn && U().d(p.paidOn)) return { d: p.paidOn, approx: false };
+    if (!p || !/^\d{4}-(0[1-9]|1[0-2])$/.test(p.period || '')) return { d: '', approx: true };
+    const c = S().contract(p.contractCode);
+    return { d: c ? U().iso(dueDateOf(c, p.period)) : p.period + '-01', approx: true };
+  }
+
   /* ---------- نطاق الفلاتر ---------- */
-  /* filter: { projectCode, unitType, floor, status, q } → مجموعة وحدات + عقود */
+  /* filter: { projectCode, unitType, floor, status, q } → مجموعة وحدات + عقود (البحث هنا على مستوى الوحدة: كودها/اسمها/مشروعها أو أي مستأجر لها) */
   function scope(filter) {
     filter = filter || {};
     const asOf = U().today();
-    const q = U().normalize(filter.q || '');
+    const pq = prepQ(filter.q || '');
     let units = st().units.slice();
     if (filter.projectCode) units = units.filter(u => u.projectCode === filter.projectCode);
     if (filter.unitType) units = units.filter(u => u.type === filter.unitType);
     if (filter.floor) units = units.filter(u => String(u.floor) === String(filter.floor));
     if (filter.status) units = units.filter(u => unitStatus(u, asOf).status === filter.status || (filter.status === 'occupied' && unitStatus(u, asOf).status === 'ending'));
-    if (q) {
-      units = units.filter(u => {
-        if (U().matches(u.code + ' ' + u.label + ' ' + (S().project(u.projectCode) || {}).name, q)) return true;
-        return S().contractsOfUnit(u.code).some(c => { const cl = S().client(c.clientCode); return U().matches(c.code + ' ' + (cl ? cl.code + ' ' + cl.name + ' ' + cl.rep + ' ' + cl.phone + ' ' + cl.nationalId + ' ' + cl.taxId : ''), q); });
-      });
-    }
+    if (pq) units = units.filter(u => matchQ(unitText(u), pq) || (!pq.short && S().contractsOfUnit(u.code).some(c => matchQ(c.code + ' ' + clientText(S().client(c.clientCode)), pq)))); // رقم قصير (202) = رقم الوحدة، لا جزء من رقم ضريبي لمستأجرها
     const unitSet = new Set(units.map(u => u.code));
     const contracts = st().contracts.filter(c => unitSet.has(c.unitCode));
     const clientSet = new Set(contracts.map(c => c.clientCode));
     return { units, unitSet, contracts, contractSet: new Set(contracts.map(c => c.code)), clients: st().clients.filter(c => clientSet.has(c.code)), clientSet };
+  }
+  /* نطاق على مستوى العقد: كل عقد يُطابَق بنصه هو (كوده، عميله، وحدته) — للعقود وكشف التحصيل، حتى لا يظهر عقد مستأجر آخر على نفس الوحدة */
+  function contractScope(filter) {
+    filter = filter || {};
+    const pq = prepQ(filter.q || '');
+    const sc = scope(Object.assign({}, filter, { q: '' }));
+    if (!pq) return sc;
+    const contracts = sc.contracts.filter(c => matchQ(contractText(c), pq));
+    const unitSet = new Set(contracts.map(c => c.unitCode)), clientSet = new Set(contracts.map(c => c.clientCode));
+    return { units: sc.units.filter(u => unitSet.has(u.code)), unitSet, contracts, contractSet: new Set(contracts.map(c => c.code)), clients: st().clients.filter(c => clientSet.has(c.code)), clientSet };
   }
 
   /* ---------- تجميعات ---------- */
@@ -334,6 +385,7 @@ window.Egary = window.Egary || {};
   /* ---------- الحزمة الكاملة للوحة ---------- */
   function kpis(filter, asOf) {
     asOf = asOf || U().today();
+    if (filter && filter.q) filter = Object.assign({}, filter, { q: '' }); // نص البحث يفلتر القوائم فقط — أرقام اللوحة والتحليلات وBI لا تتغيّر به
     const sc = scope(filter);
     const cur = U().periodOf(asOf), yr = cur.slice(0, 4);
     const et = enteredThrough(asOf);
@@ -365,7 +417,7 @@ window.Egary = window.Egary || {};
   function insights(k) {
     const out = [], f = U().fmtMoney, pct = U().fmtPct;
     const push = (sev, title, text, evidence) => out.push({ sev, title, text, evidence });
-    if (k.pending && k.pending.periods.length) push('warn', `مدفوعات ${k.pending.periods.map(p => U().periodLabel(p)).join(' و')} لم تُسجَّل في الورقة بعد`, `${k.pending.contracts} عقدًا بإيجار ${f(k.pending.due)} — آخر شهر مسجَّل: ${U().periodLabel(k.enteredThrough, true)}. تُعدّ هذه الشهور «لم تُسجَّل بعد» لا «متأخرة» حتى تُدخل مدفوعاتها (كشف التحصيل أو زر التسجيل هنا).`, { view: 'pending' });
+    if (k.pending && k.pending.periods.length) push('warn', `مدفوعات ${k.pending.periods.map(p => U().periodLabel(p)).join(' و')} لم تُسجَّل في كشف التحصيل بعد`, `${k.pending.contracts} عقدًا بإيجار ${f(k.pending.due)} — آخر شهر مسجَّل: ${U().periodLabel(k.enteredThrough, true)}. تُعدّ هذه الشهور «لم تُسجَّل بعد» لا «متأخرة» حتى تُدخل مدفوعاتها (كشف التحصيل أو زر التسجيل هنا).`, { view: 'pending' });
     if (k.month.due > 0) {
       const r = k.month.rate || 0;
       push(r >= 0.9 ? 'good' : r >= 0.6 ? 'warn' : 'danger', `تحصيل ${U().periodLabel(k.period, true)}: ${pct(r)}`, `محصَّل ${f(k.month.collected)} من مستحق ${f(k.month.due)} — ${k.month.lateCount} عقد لم يُسجَّل له سداد الشهر.`, { view: 'ledger', period: k.period, status: 'late' });
@@ -402,7 +454,7 @@ window.Egary = window.Egary || {};
   /* ---------- الجدول الشبيه بالإكسيل ---------- */
   function ledger(year, filter, asOf) {
     asOf = asOf || U().today();
-    const sc = scope(filter);
+    const sc = contractScope(filter);
     const y = String(year);
     const rows = [];
     for (const c of sc.contracts) {
@@ -442,7 +494,7 @@ window.Egary = window.Egary || {};
     }
     const byNid = U().groupBy(st().clients.filter(c => c.nationalId), c => U().foldCode(c.nationalId));
     for (const [nid, cs] of byNid) if (cs.length > 1) add('info', 'clients', cs[0].code, `نفس الرقم القومي/الباسبور (${nid}) مسجَّل لأكثر من عميل: ${cs.map(c => c.name + ' (' + c.code + ')').join('، ')}`);
-    for (const c of st().contracts) if (c.inferred) add('info', 'contracts', c.code, `${(S().client(c.clientCode) || {}).name || ''} / ${(S().unit(c.unitCode) || {}).label || ''}: فترة سابقة مستنتجة من مبالغ الورقة قبل بداية العقد الحالي — راجع تواريخها وإيجارها`);
+    for (const c of st().contracts) if (c.inferred) add('info', 'contracts', c.code, `${(S().client(c.clientCode) || {}).name || ''} / ${(S().unit(c.unitCode) || {}).label || ''}: فترة سابقة استنتجها البرنامج من مبالغ كشف التحصيل قبل بداية العقد الحالي — راجع تواريخها وإيجارها`);
     for (const cl of st().clients) { if (!cl.phone) add('info', 'clients', cl.code, 'لا يوجد رقم تليفون'); if (!cl.nationalId) add('info', 'clients', cl.code, 'لا يوجد رقم قومي/باسبور'); }
     const byLabel = U().groupBy(st().units, u => u.projectCode + '|' + U().normalize(u.label));
     for (const [, us] of byLabel) if (us.length > 1) add('warn', 'units', us[0].code, `${us.length} وحدات بنفس الاسم «${us[0].label}» في نفس المشروع (${us.map(u => u.code).join('، ')})`);
@@ -450,5 +502,5 @@ window.Egary = window.Egary || {};
     return flags.sort((a, b) => sev[a.sev] - sev[b.sev]);
   }
 
-  E.Engine = { setOverride, overrideOf, trackingFrom, schedule, rentOn, currentRent, dueForMonth, dueDateOf, cell, enteredThrough, tolerance, pendingEntry, STATUS_AR, contractStatus, CSTATUS_AR, activeContractOf, unitStatus, USTATUS_AR, scope, row, arrears, monthTotals, collectedBetween, series, occupancy, renewals, deposits, contractedRevenue, reletGaps, punctuality, maintenanceStats, byDimension, kpis, insights, ledger, dataQuality };
+  E.Engine = { setOverride, overrideOf, trackingFrom, prepQ, matchQ, phoneCanon, clientText, unitText, contractText, paymentText, maintenanceText, payDate, contractScope, schedule, rentOn, currentRent, dueForMonth, dueDateOf, cell, enteredThrough, tolerance, pendingEntry, STATUS_AR, contractStatus, CSTATUS_AR, activeContractOf, unitStatus, USTATUS_AR, scope, row, arrears, monthTotals, collectedBetween, series, occupancy, renewals, deposits, contractedRevenue, reletGaps, punctuality, maintenanceStats, byDimension, kpis, insights, ledger, dataQuality };
 })(window.Egary);

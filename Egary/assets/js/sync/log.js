@@ -65,5 +65,20 @@ window.Egary = window.Egary || {};
     FL().downloadBytes(new TextEncoder().encode(text).buffer, 'Egary-log-' + stampNow().slice(0, 10) + '.csv');
     return all.length;
   }
-  E.Log = { append, flush, setDir, status, subscribe, entries, downloadCsv, line, HEADER, _state: state };
+  /* نفس التنزيل لكن ملف Excel حقيقي (.xlsx): يفتح صحيحًا مهما كانت إعدادات ويندوز الإقليمية */
+  async function downloadXlsx(auditRows) {
+    if (typeof ExcelJS === 'undefined') return downloadCsv(auditRows);
+    const seen = new Set(), all = [];
+    for (const e of buf.concat(auditRows || [])) { const k = [e.at, e.action, e.code, e.summary].join('|'); if (seen.has(k)) continue; seen.add(k); all.push(e); }
+    all.sort((a, b) => (b.at > a.at ? 1 : b.at < a.at ? -1 : 0));
+    const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('سجل العمليات', { views: [{ rightToLeft: true, state: 'frozen', ySplit: 1 }] });
+    ws.getRow(1).values = ['الوقت', 'المستخدم', 'العملية', 'الكيان', 'الكود', 'التفاصيل', 'الجهاز'];
+    ws.getRow(1).eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } }; c.alignment = { horizontal: 'center' }; });
+    all.forEach((e, i) => { ws.getRow(2 + i).values = [e.at || '', e.user || '', e.action || '', e.entity || '', e.code || '', e.summary || '', e.device || '']; });
+    [20, 16, 12, 14, 16, 70, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(1, all.length + 1), column: 7 } };
+    FL().downloadBytes(await wb.xlsx.writeBuffer(), 'Egary-log-' + stampNow().slice(0, 10) + '.xlsx');
+    return all.length;
+  }
+  E.Log = { append, flush, setDir, status, subscribe, entries, downloadCsv, downloadXlsx, line, HEADER, _state: state };
 })(window.Egary);

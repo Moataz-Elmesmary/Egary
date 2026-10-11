@@ -532,3 +532,151 @@ test('[A15] performance smoke: 100 contracts × 3 year sheets × 1,500 payments 
   const r = await E.Workbook.read(buf); assert.equal(r.state.contracts.length, 100); assert.equal(r.state.payments.length, 1500);
   const demo = await E.Workbook.write(await demoState(E)); assert.ok(demo.byteLength < 400 * 1024, 'demo size ' + demo.byteLength);
 });
+
+/* ---------- مقاسات الأوراق: عناوين في سطرين على الأكثر، لا #### ولا قص للأسماء والأكواد والتواريخ والمبالغ ----------
+   القياس هنا مستقل عن مقدِّر البرنامج: خطوط حقيقية (DejaVu Sans للنص العربي كما يرسمه ليبر أوفيس — أعرض من خط إكسيل،
+   وCarlito المطابق لمقاسات Calibri للأرقام واللاتيني)، ولفّ إكسيل الجشع للعناوين مع زر التصفية (17 بكسل). العمود = 7 بكسل لكل وحدة. */
+const DIM_FONTS = ['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', '/usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf', '/usr/share/fonts/truetype/crosextra/Carlito-Bold.ttf'];
+const dimSkip = (() => { try { execFileSync('python3', ['-I', '-c', 'from PIL import ImageFont']); } catch (e) { return 'PIL غير متاح'; } return DIM_FONTS.every(f => fs.existsSync(f)) ? false : 'خطوط القياس غير موجودة'; })();
+const PY_DIMS = `
+import sys, json, re, datetime, zipfile, openpyxl
+from openpyxl.utils import get_column_letter
+from PIL import ImageFont, features
+RA = ImageFont.Layout.RAQM if features.check('raqm') else ImageFont.Layout.BASIC
+FONTS = json.loads(sys.argv[2]); FC = {}
+def font(ar, bold, size):
+    k = (ar, bold, size)
+    if k not in FC: FC[k] = ImageFont.truetype(FONTS[(0 if ar else 2) + (1 if bold else 0)], size * 96 / 72, layout_engine=RA)
+    return FC[k]
+AR = re.compile('[\\u0600-\\u06FF]')
+def px(s, bold=False, size=11):
+    if not s: return 0.0
+    if AR.search(s): return font(True, bold, size).getlength(s, direction='rtl')
+    return font(False, bold, size).getlength(s)
+def shown(v, nf):
+    if v is None or v == '': return ''
+    if isinstance(v, (datetime.datetime, datetime.date)): return v.strftime('%d/%m/%Y')
+    if isinstance(v, bool): return 'TRUE' if v else 'FALSE'
+    if isinstance(v, (int, float)):
+        nf = nf or ''
+        if '#,##0.00' in nf: return f'{v:,.2f}'
+        if '#,##0' in nf: return f'{v:,.0f}'
+        if '%' in nf: return f'{v*100:.0f}%'
+        return str(int(v)) if float(v).is_integer() else str(v)
+    return str(v)
+def greedy(text, avail, bold=True):
+    lines = []; cur = ''
+    for w in str(text).split():
+        t = (cur + ' ' + w) if cur else w
+        if not cur or px(t, bold) <= avail: cur = t
+        else: lines.append(cur); cur = w
+    if cur: lines.append(cur)
+    return lines
+src = sys.argv[1]
+wf = openpyxl.load_workbook(src); wv = openpyxl.load_workbook(src, data_only=True)
+out = {'heads': [], 'clips': [], 'height': [], 'widths': {}, 'money': [], 'wrap': [], 'print': {}, 'unnamedFonts': 0, 'totalRow': {}}
+styles = zipfile.ZipFile(src).read('xl/styles.xml').decode('utf-8')
+out['printTitles'] = zipfile.ZipFile(src).read('xl/workbook.xml').decode('utf-8').count('_xlnm.Print_Titles')
+fonts = re.search(r'<fonts[^>]*>(.*?)</fonts>', styles, re.S).group(1)
+out['unnamedFonts'] = sum(1 for f in re.findall(r'<font>(.*?)</font>|<font/>', fonts, re.S) if '<name ' not in f)
+for ws in wf.worksheets:
+    v = wv[ws.title]; hr = 2 if ws.title.isdigit() else 1; filt = bool(ws.auto_filter.ref)
+    if ws.title.isdigit(): out['totalRow'][ws.title] = next((r for r in range(3, ws.max_row + 1) if ws.cell(r, 3).value == 'الاجمالي العام'), 0)
+    W = {}
+    for k, cd in ws.column_dimensions.items():
+        for c in range(cd.min or 0, (cd.max or 0) + 1): W[c] = (cd.width or 9, bool(cd.hidden))
+    out['widths'][ws.title] = {}
+    two = False
+    for c in range(1, ws.max_column + 1):
+        w, hid = W.get(c, (9, False)); L = get_column_letter(c)
+        h = ws.cell(hr, c).value; h = '' if h is None else str(h)
+        out['widths'][ws.title][h or L] = w
+        if hid or not h: continue
+        avail = 7 * w - (17 if filt else 0) - 3
+        lines = greedy(h, avail)
+        if len(lines) > 2 or any(px(l, True) > avail for l in lines): out['heads'].append([ws.title, L, h, w, lines])
+        if len(lines) > 1: two = True
+        nf_money = False
+        for r in range(hr + 1, ws.max_row + 1):
+            cell = ws.cell(r, c); s = shown(v.cell(r, c).value, cell.number_format)
+            if '#,##0.00' in (cell.number_format or ''): nf_money = True
+            if not s: continue
+            b = bool(cell.font and cell.font.b); sz = (cell.font.sz if cell.font and cell.font.sz else 11)
+            need = px(s, b, sz) + 3
+            if ws.title == 'الإعدادات':
+                if need > 7 * w:
+                    al = cell.alignment; n = len(greedy(s, 7 * w - 3, b))
+                    out['wrap'].append([ws.title, L + str(r), bool(al.wrap_text), ws.row_dimensions[r].height or 15, n])
+                continue
+            if need > 7 * w: out['clips'].append([ws.title, L, h, s[:60], round(need / 7, 1), w])
+        if nf_money and 7 * w < px('9,999,999.00', True) + 3: out['money'].append([ws.title, L, h, w])
+    out['height'].append([ws.title, ws.row_dimensions[hr].height, two])
+    ps = ws.page_setup
+    out['print'][ws.title] = {'landscape': ps.orientation == 'landscape', 'fit': bool(ws.sheet_properties.pageSetUpPr and ws.sheet_properties.pageSetUpPr.fitToPage), 'fitToHeight': ps.fitToHeight, 'titles': ws.print_title_rows, 'freeze': ws.freeze_panes, 'filter': ws.auto_filter.ref, 'hidden': ws.sheet_state != 'visible'}
+print(json.dumps(out, ensure_ascii=False, default=str))
+`;
+const dims = (file) => py(PY_DIMS, file, JSON.stringify(DIM_FONTS));
+/* القص المقبول بالتصميم: الملاحظات الطويلة (عمود بحد أقصى)، وكلمة المرور المشفّرة في ورقة المستخدمين المخفية */
+const clipAllowed = (c) => c[2] === 'ملاحظات' || c[0] === 'المستخدمون';
+
+test('[A16] sheet dimensions: every visible header reads in at most two lines (with the filter button), names/codes/dates/IDs/money are never cut, money columns hold 9,999,999.00, header rows are two lines high, every font is named, print setup repeats the titles, and freeze/filters are unchanged', { skip: dimSkip }, async () => {
+  const E = load({ today: TODAY });
+  const st = await demoState(E); const f = save('dims_demo.xlsx', await E.Workbook.write(st));
+  const D = dims(f);
+  assert.deepEqual(D.heads, [], 'headers that need more than two lines or break inside a word');
+  assert.deepEqual(D.clips.filter(c => !clipAllowed(c)), [], 'cut values (need > width)');
+  assert.deepEqual(D.money, [], 'money columns narrower than 9,999,999.00');
+  for (const [sheet, h, two] of D.height) if (two) assert.ok(h >= 30, `${sheet}: two-line headers need a taller header row (got ${h})`);
+  assert.equal(D.unnamedFonts, 0, 'every font record names its font (a nameless font is drawn with a different fallback in each program)');
+  // الإعدادات: ما لا يسعه العمود يلتفّ في صفه بارتفاع يكفي أسطره
+  for (const [sheet, cell, wrap, height, lines] of D.wrap) { assert.ok(wrap, `${sheet}!${cell} is wider than its column and must wrap`); assert.ok(height >= 15 * Math.min(lines, 3) - 1, `${sheet}!${cell}: ${lines} lines need a taller row (got ${height})`); }
+  // الطباعة: أفقي، يتسع للعرض، والعناوين تتكرر — وصفوف التجميد والتصفية كما هي
+  for (const [name, p] of Object.entries(D.print)) { if (p.hidden) continue; assert.ok(p.landscape && p.fit && p.titles, name + ': print setup ' + JSON.stringify(p)); assert.equal(String(p.fitToHeight), '0', name + ': as many pages tall as needed'); }
+  assert.equal(D.print['2026'].titles, '$1:$2'); assert.equal(D.print['2026'].freeze, 'F3');
+  assert.ok(D.totalRow['2026'] > 3); assert.equal(D.print['2026'].filter, 'A2:AB' + (D.totalRow['2026'] - 1), 'the year-sheet filter stops above «الاجمالي العام»');
+  assert.equal(D.printTitles, Object.keys(D.print).length, 'one print-titles name per sheet');
+  for (const name of ['المشاريع', 'الوحدات', 'العملاء', 'العقود', 'المدفوعات', 'الصيانة']) { assert.equal(D.print[name].freeze, 'B2', name + ' freeze'); assert.match(D.print[name].filter, /^A1:[A-Z]+\d+$/, name + ' filter'); assert.equal(D.print[name].titles, '$1:$1'); }
+  // أمثلة يراها المكتب مباشرة: عناوين العقود التي كانت تُقص، والشهور، والأسماء
+  const w = D.widths;
+  for (const h of ['الإيجار الشهري (السنة الأولى)', 'يوم الاستحقاق', 'ترتيب الصف في ورقة السنة', 'مستنتج تلقائيًا من الورقة', 'الأيام المتبقية على نهاية العقد', 'عدد سنوات العقد']) assert.ok(w['العقود'][h] >= 13, `العقود/${h}: ${w['العقود'][h]}`);
+  for (const m of ['يناير', 'يونيو', 'ديسمبر']) assert.ok(w['2026'][m] >= 12, `2026/${m}: ${w['2026'][m]}`);
+  assert.ok(w['2026']['الاسم'] >= 30 && w['العقود']['العميل'] >= 30 && w['العملاء']['الاسم'] >= 30 && w['المدفوعات']['العميل'] >= 30, 'name columns hold the longest client name');
+});
+
+test('[A17] sizes follow the content and are stable: the same data gives the same widths across read → write → read → write (with the previous file as base, like the app), a 10-million month total and a long client name widen their columns, and office-added columns get a readable width', { skip: dimSkip }, async () => {
+  const E = load({ today: TODAY });
+  const st = await demoState(E);
+  const o1 = await E.Workbook.write(st); const r1 = await E.Workbook.read(o1); E.Store.load(r1.state);
+  const o2 = await E.Workbook.write(r1.state, { base: o1 }); const r2 = await E.Workbook.read(o2); E.Store.load(r2.state);
+  const f2 = save('dims_idem_2.xlsx', o2), f3 = save('dims_idem_3.xlsx', await E.Workbook.write(r2.state, { base: o2 }));
+  const a = dims(f2), b = dims(f3);
+  assert.deepEqual(b.widths, a.widths, 'widths are identical on the next save'); assert.deepEqual(b.height, a.height); assert.deepEqual(b.print, a.print);
+  assert.equal(b.printTitles, Object.keys(b.print).length, 'one print-titles name per sheet after repeated saves (no duplicates)');
+  // محتوى أكبر: اسم عميل طويل ومجموع شهر فوق 10 ملايين
+  const big = edgeState(E); big.clients[0].name = 'مؤسسة النيل الكبرى للمقاولات والتوريدات العامة';
+  big.payments.push(Object.assign(E.M.blank.payments(), { code: 'INV-2026-0101', contractCode: 'T0005', period: '2026-03', amount: 9999999, source: 'web' }));
+  big.payments.push(Object.assign(E.M.blank.payments(), { code: 'INV-2026-0102', contractCode: 'T0001', period: '2026-03', amount: 600000, source: 'web' }));
+  E.Store.load(big); big._extra = { contracts: { headers: ['ملاحظة داخلية طويلة للمكتب'], rows: { T0001: { 'ملاحظة داخلية طويلة للمكتب': 'سري' } }, fmts: {} } };
+  const D = dims(save('dims_big.xlsx', await E.Workbook.write(big)));
+  assert.deepEqual(D.heads, []); assert.deepEqual(D.money, []);
+  assert.deepEqual(D.clips.filter(c => !clipAllowed(c)), [], 'nothing cut with the bigger content');
+  assert.ok(D.widths['2026']['مارس'] >= 13 && D.widths['2026']['مارس'] > D.widths['2026']['يناير'], 'March total 10,599,999.00 widens March only: ' + D.widths['2026']['مارس'] + ' vs ' + D.widths['2026']['يناير']);
+  assert.ok(D.widths['العقود']['العميل'] > a.widths['العقود']['العميل'] || D.widths['العقود']['العميل'] >= 40, 'the long client name widens العقود/العميل');
+  assert.ok(D.widths['العقود']['ملاحظة داخلية طويلة للمكتب'] >= 12, 'office-added column has a readable width');
+  // المقاس مربوط بالحقل لا بالموضع: كل حقل له نوع مقاس معروف، وقوائم أوراق السنة والملخص بطول عناوينها
+  const Z = E.Workbook.sizing;
+  assert.equal(Z.LEDGER_SIZE.length, E.Workbook.LEDGER_HEAD.length); assert.equal(Z.SUMMARY_SIZE.length, 9);
+  for (const ent of Object.keys(E.Workbook.COLS)) for (const c of E.Workbook.COLS[ent]) assert.ok(Z.SIZES[Z.sizeKind(ent, c[0])], `${ent}.${c[0]} has a size kind`);
+  assert.equal(Z.sizeKind('contracts', 'rent'), 'money'); assert.equal(Z.sizeKind('contracts', '_client'), 'name'); assert.equal(Z.sizeKind('payments', 'paidOn'), 'date'); assert.equal(Z.sizeKind('clients', 'nationalId'), 'id');
+});
+
+test('[A18] the layout styling never ties input cells together: after loading the written file with ExcelJS, a «%» format put on one «الزيادة السنوية %» cell or on one settings value does not spread to the other rows (cells that share a style index share one style object in ExcelJS)', async () => {
+  const E = load({ today: TODAY });
+  const st = await demoState(E); const wb = await book(await E.Workbook.write(st));
+  const ws = wb.getWorksheet('العقود'), h = hdr(ws);
+  for (const head of ['الزيادة السنوية %', 'يوم الاستحقاق']) { const col = h[head]; ws.getCell(2, col).numFmt = '0%'; for (let r = 3; r <= 6; r++) assert.notEqual(ws.getCell(r, col).numFmt, '0%', `العقود/${head} row ${r} keeps its own format`); }
+  const u = wb.getWorksheet('الوحدات'), hu = hdr(u); for (const head of ['الدور', 'المساحة م²']) { u.getCell(2, hu[head]).numFmt = '0.0%'; assert.notEqual(u.getCell(3, hu[head]).numFmt, '0.0%', 'الوحدات/' + head); }
+  const s = wb.getWorksheet('الإعدادات'); const rows = []; for (let r = 2; r <= s.rowCount; r++) if (typeof s.getCell(r, 2).value === 'number') rows.push(r);
+  assert.ok(rows.length >= 4, 'numeric settings rows'); s.getCell(rows[0], 2).numFmt = '0.0%';
+  for (const r of rows.slice(1)) assert.notEqual(s.getCell(r, 2).numFmt, '0.0%', `الإعدادات!B${r} keeps its own format`);
+});

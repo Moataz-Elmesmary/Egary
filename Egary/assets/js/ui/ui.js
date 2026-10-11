@@ -109,7 +109,9 @@ window.Egary = window.Egary || {};
     if (dep.maintenance && dep.maintenance.length) lines.push(`${dep.maintenance.length} سجل صيانة`);
     const body = h('div', null,
       h('p', null, 'هل أنت متأكد من حذف ', h('b', null, `${opts.entityAr} «${opts.name}»`), '؟'),
+      opts.detail ? h('p', { class: 'del-detail' }, opts.detail) : null, // ما الذي يُحذف بالضبط (العميل — الشهر — المبلغ)
       lines.length ? h('div', { class: 'banner danger mt-s' }, icon('warning'), h('span', null, 'سيُحذف معه أيضًا: ' + lines.join(' · '))) : null,
+      opts.note ? h('div', { class: 'banner info mt-s del-note' }, icon('info'), h('span', null, opts.note)) : null,
       h('p', { class: 'muted small mt-s' }, 'الحذف يُكتب فورًا في ملف الإكسيل ولا يمكن التراجع عنه من البرنامج.'),
     );
     return confirm({ title: 'تأكيد الحذف', text: body, danger: true, okText: 'نعم، احذف' });
@@ -120,13 +122,14 @@ window.Egary = window.Egary || {};
   function drawer(opts) {
     if (drawerApi) drawerApi.close();
     const body = h('div', { class: 'd-body' });
-    const title = h('h2', { class: 'grow' }, opts.title || '');
+    const title = h('h2', { class: 'grow', title: opts.title || '' }, opts.title || '');
     const head = h('div', { class: 'd-head' }, h('button', { class: 'btn ghost icon', 'aria-label': 'إغلاق', onclick: () => api.close() }, icon('back')), title, ...(opts.actions || []));
     const el = h('aside', { class: 'drawer', role: 'dialog', 'aria-label': opts.title || '' }, head, body);
     const ov = h('div', { class: 'drawer-overlay', onclick: () => api.close() });
-    const api = { el, body, head, setTitle: t => { title.textContent = t; }, close() { if (!el.isConnected) return; el.remove(); ov.remove(); drawerApi = null; if (opts.onClose) opts.onClose(); } };
+    const api = { el, body, head, setTitle: t => { title.textContent = t; title.title = t; }, close() { if (!el.isConnected) return; el.remove(); ov.remove(); drawerApi = null; document.body.classList.remove('drawer-open'); if (opts.onClose) opts.onClose(); } };
     append(body, [opts.body]);
     document.body.appendChild(ov); document.body.appendChild(el);
+    document.body.classList.add('drawer-open'); // شريط البحث العلوي يبقى فوق البروفايل وقابلًا للاستخدام (app.css)
     drawerApi = api;
     return api;
   }
@@ -142,7 +145,7 @@ window.Egary = window.Egary || {};
       clear(wrap);
       const data = rows.slice();
       if (sortKey) { const c = cols.find(c => c.key === sortKey); data.sort((a, b) => { const va = c.sortVal ? c.sortVal(a) : a[sortKey], vb = c.sortVal ? c.sortVal(b) : b[sortKey]; if (va == null) return 1; if (vb == null) return -1; return (typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb), 'ar')) * sortDir; }); }
-      const thead = h('thead', null, h('tr', null, cols.map(c => h('th', { class: (c.num ? 'num ' : '') + (c.sortable !== false ? 'sortable' : ''), onclick: c.sortable === false ? null : () => { if (sortKey === c.key) sortDir = -sortDir; else { sortKey = c.key; sortDir = 1; } render(); } }, c.label, sortKey === c.key ? h('span', { class: 'arr' }, sortDir > 0 ? '▲' : '▼') : null))));
+      const thead = h('thead', null, h('tr', null, cols.map(c => h('th', { class: (c.num ? 'num ' : '') + (c.sortable !== false ? 'sortable ' : '') + (c.cls && c.cls !== 'actions' ? c.cls : ''), onclick: c.sortable === false ? null : () => { if (sortKey === c.key) sortDir = -sortDir; else { sortKey = c.key; sortDir = 1; } render(); } }, c.label, sortKey === c.key ? h('span', { class: 'arr' }, sortDir > 0 ? '▲' : '▼') : null))));
       const tbody = h('tbody');
       if (!data.length) tbody.appendChild(h('tr', null, h('td', { colspan: cols.length }, h('div', { class: 'empty' }, h('b', null, opts.emptyTitle || 'لا توجد بيانات'), opts.empty || ''))));
       for (const r of data) {
@@ -171,52 +174,82 @@ window.Egary = window.Egary || {};
   /* قيمة رسم آمنة: أي شيء غير رقمي (NaN/undefined/null/نص) = 0 حتى لا تخرج سمات SVG غير صالحة */
   const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
   const maxOf = (vals) => Math.max(1, ...vals.map(num));
+  /* عرض الرسم = عرضه الفعلي على الشاشة (بحدود): النص يظهر بحجمه الحقيقي بدل أن يُصغَّر مع الرسم إلى 6–7px على اللابتوب */
+  function fitChart(svg, draw, cur, widthFor, after) {
+    const fit = () => { if (!svg.isConnected) return; const w = svg.getBoundingClientRect().width; if (!w) return; const W = Math.round(widthFor(w)); if (Math.abs(W - cur) >= 8) { cur = W; draw(W); } if (after) after(); };
+    Promise.resolve().then(fit); // بعد أن تُضاف الصفحة كلها (وقبل الرسم على الشاشة)
+    if (window.ResizeObserver) { let seen = false; const ro = new ResizeObserver(() => { if (!svg.isConnected) { if (seen) ro.disconnect(); return; } seen = true; requestAnimationFrame(fit); }); ro.observe(svg); }
+  }
   function bars(opts) { // data: [{label, value, color?, sub?}] ; horizontal
-    const data = (opts.data || []).map(d => ({ ...d, label: String(d.label ?? ''), value: num(d.value) })), W = opts.width || 520, rowH = opts.rowH || 30, padL = opts.padL || 150, H = data.length * rowH + 10;
+    const data = (opts.data || []).map(d => ({ ...d, label: String(d.label ?? ''), value: num(d.value) })), rowH = opts.rowH || 30, padL = opts.padL || 150, H = data.length * rowH + 10;
     const max = maxOf(data.map(d => d.value));
-    const svg = s('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', style: 'direction:ltr' });
-    data.forEach((d, i) => {
-      const y = i * rowH + 5, w = Math.max(2, (W - padL - 70) * (d.value / max));
-      const g = s('g', { class: 'bar', onclick: opts.onClick ? () => opts.onClick(d) : null });
-      g.appendChild(s('text', { x: W - 6, y: y + rowH / 2 + 4, 'text-anchor': 'end', 'font-weight': '600' }, d.label.length > 24 ? d.label.slice(0, 23) + '…' : d.label));
-      g.appendChild(s('rect', { x: W - padL - w, y: y + 6, width: w, height: rowH - 12, rx: 5, fill: d.color || PALETTE[i % PALETTE.length] }));
-      g.appendChild(s('text', { x: W - padL - w - 6, y: y + rowH / 2 + 4, 'text-anchor': 'end', 'font-weight': '700' }, opts.fmt ? opts.fmt(d.value) : U().fmtNum(d.value)));
-      if (opts.onClick) g.style.cursor = 'pointer';
-      tipped(g, () => (d.tip || d.label + ': ' + (opts.fmt ? opts.fmt(d.value) : U().fmtNum(d.value))));
-      svg.appendChild(g);
-    });
+    const svg = s('svg', { class: 'chart', preserveAspectRatio: 'none', style: 'direction:ltr' });
+    function draw(W) {
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      data.forEach((d, i) => {
+        const y = i * rowH + 5, w = Math.max(2, (W - padL - 84) * (d.value / max));
+        const g = s('g', { class: 'bar', onclick: opts.onClick ? () => opts.onClick(d) : null });
+        g.appendChild(s('text', { x: W - 6, y: y + rowH / 2 + 4, 'text-anchor': 'end', 'font-weight': '600' }, d.label.length > 24 ? d.label.slice(0, 23) + '…' : d.label));
+        g.appendChild(s('rect', { x: W - padL - w, y: y + 6, width: w, height: rowH - 12, rx: 5, fill: d.color || PALETTE[i % PALETTE.length] }));
+        g.appendChild(s('text', { x: W - padL - w - 6, y: y + rowH / 2 + 4, 'text-anchor': 'end', 'font-weight': '700' }, opts.fmt ? opts.fmt(d.value) : U().fmtNum(d.value)));
+        if (opts.onClick) g.style.cursor = 'pointer';
+        tipped(g, () => (d.tip || d.label + ': ' + (opts.fmt ? opts.fmt(d.value) : U().fmtNum(d.value))));
+        svg.appendChild(g);
+      });
+    }
+    const W0 = opts.width || 520;
+    draw(W0);
+    if (!opts.width) fitChart(svg, draw, W0, w => Math.max(380, Math.min(720, w)));
     return svg;
   }
   function columns(opts) { // series: [{name, color, values:[]}], labels:[] ; line اختياري ; highlight فهرس الشهر المميَّز ; fmt للتلميحات ; unit لاحقة المحور
-    const W = opts.width || 720, H = opts.height || 240, padL = 56, padB = 28, padT = opts.valueLabels === false ? 14 : 24, padR = 10;
+    const H = opts.height || 240, padL = 56, padB = 28, padT = opts.valueLabels === false ? 14 : 24, padR = 10;
     const labels = (opts.labels || []).map(l => String(l ?? '')), series = (opts.series || []).map(sr => ({ ...sr, values: (sr.values || []).map(num) })), fmtV = opts.fmt || (v => U().fmtMoney(v)), unit = opts.unit || '';
     if (opts.line) opts = { ...opts, line: { ...opts.line, values: (opts.line.values || []).map(num) } };
     const max = maxOf([...series.flatMap(sr => sr.values), ...(opts.line ? opts.line.values : [])]);
-    const svg = s('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, style: 'direction:ltr' });
-    const iw = (W - padL - padR) / Math.max(1, labels.length), ih = H - padT - padB;
-    for (let t = 0; t <= 4; t++) { const y = padT + ih - ih * t / 4; svg.appendChild(s('line', { class: 'grid-line', x1: padL, x2: W - padR, y1: y, y2: y })); svg.appendChild(s('text', { x: padL - 6, y: y + 4, 'text-anchor': 'end' }, short(max * t / 4) + unit)); }
-    const showVals = opts.valueLabels !== false && labels.length <= 13 && series.length === 1;
-    labels.forEach((lb, i) => {
-      const x0 = padL + i * iw, hl = opts.highlight === i;
-      if (hl) svg.appendChild(s('rect', { class: 'hl-band', x: x0 + 2, y: padT - 8, width: iw - 4, height: ih + 8 + 4, rx: 7 }));
-      svg.appendChild(s('text', { x: x0 + iw / 2, y: H - 8, 'text-anchor': 'middle', class: hl ? 'hl' : '' }, lb));
-      const n = series.length, bw = Math.min(30, (iw - 10) / n);
-      series.forEach((sr, k) => {
-        const v = sr.values[i] || 0, bh = Math.max(0, ih * v / max), x = x0 + iw / 2 - (n * bw) / 2 + k * bw, w = bw - 3, y = padT + ih - bh, r = Math.min(5, w / 2, bh);
-        // عمود بزوايا علوية مستديرة فقط
-        const d = bh > 0 ? `M${x} ${y + r} a${r} ${r} 0 0 1 ${r} ${-r} h${w - 2 * r} a${r} ${r} 0 0 1 ${r} ${r} v${bh - r} h${-w} z` : `M${x} ${y} h${w} v0 h${-w} z`;
-        const bar = s('path', { class: 'bar' + (hl ? ' hl' : ''), d, fill: sr.color || PALETTE[k], onclick: opts.onClick ? () => opts.onClick(i, k) : null });
-        tipped(bar, () => `${lb} — ${sr.name}: ${fmtV(v)}`);
-        svg.appendChild(bar);
-        if (showVals && v > 0) svg.appendChild(s('text', { class: 'val', x: x + w / 2, y: y - 5, 'text-anchor': 'middle' }, short(v) + unit));
+    const svg = s('svg', { class: 'chart', style: 'direction:ltr' });
+    function draw(W) {
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      const iw = (W - padL - padR) / Math.max(1, labels.length), ih = H - padT - padB;
+      curIw = iw;
+      for (let t = 0; t <= 4; t++) { const y = padT + ih - ih * t / 4; svg.appendChild(s('line', { class: 'grid-line', x1: padL, x2: W - padR, y1: y, y2: y })); svg.appendChild(s('text', { x: padL - 6, y: y + 4, 'text-anchor': 'end' }, short(max * t / 4) + unit)); }
+      const showVals = opts.valueLabels !== false && labels.length <= 13 && series.length === 1;
+      labels.forEach((lb, i) => {
+        const x0 = padL + i * iw, hl = opts.highlight === i;
+        if (hl) svg.appendChild(s('rect', { class: 'hl-band', x: x0 + 2, y: padT - 8, width: iw - 4, height: ih + 8 + 4, rx: 7 }));
+        svg.appendChild(s('text', { x: x0 + iw / 2, y: H - 8, 'text-anchor': 'middle', class: 'mlab' + (hl ? ' hl' : '') }, lb));
+        const n = series.length, bw = Math.min(30, (iw - 10) / n);
+        series.forEach((sr, k) => {
+          const v = sr.values[i] || 0, bh = Math.max(0, ih * v / max), x = x0 + iw / 2 - (n * bw) / 2 + k * bw, w = bw - 3, y = padT + ih - bh, r = Math.min(5, w / 2, bh);
+          // عمود بزوايا علوية مستديرة فقط
+          const d = bh > 0 ? `M${x} ${y + r} a${r} ${r} 0 0 1 ${r} ${-r} h${w - 2 * r} a${r} ${r} 0 0 1 ${r} ${r} v${bh - r} h${-w} z` : `M${x} ${y} h${w} v0 h${-w} z`;
+          const bar = s('path', { class: 'bar' + (hl ? ' hl' : ''), d, fill: sr.color || PALETTE[k], onclick: opts.onClick ? () => opts.onClick(i, k) : null });
+          tipped(bar, () => `${lb} — ${sr.name}: ${fmtV(v)}`);
+          svg.appendChild(bar);
+          if (showVals && v > 0) svg.appendChild(s('text', { class: 'val', x: x + w / 2, y: y - 5, 'text-anchor': 'middle' }, short(v) + unit));
+        });
       });
-    });
-    if (opts.line) { // خط فوق الأعمدة (مثل المستحق) — متقطع وبنقاط واضحة
-      const col = opts.line.color || cssVar('--warn');
-      const pts = opts.line.values.map((v, i) => [padL + i * iw + iw / 2, padT + ih - ih * (v || 0) / max]);
-      svg.appendChild(s('path', { class: 'line' + (opts.line.dashed === false ? '' : ' dashed'), d: pts.map((p, i) => (i ? 'L' : 'M') + p[0] + ' ' + p[1]).join(' '), stroke: col }));
-      pts.forEach((p, i) => { const c = s('circle', { class: 'dot', cx: p[0], cy: p[1], r: 4, fill: col, stroke: cssVar('--surface'), 'stroke-width': 1.5, onclick: opts.onClick ? () => opts.onClick(i, -1) : null }); tipped(c, () => `${labels[i]} — ${opts.line.name}: ${fmtV(opts.line.values[i])}`); svg.appendChild(c); });
+      if (opts.line) { // خط فوق الأعمدة (مثل المستحق) — متقطع وبنقاط واضحة
+        const col = opts.line.color || cssVar('--warn');
+        const pts = opts.line.values.map((v, i) => [padL + i * iw + iw / 2, padT + ih - ih * (v || 0) / max]);
+        svg.appendChild(s('path', { class: 'line' + (opts.line.dashed === false ? '' : ' dashed'), d: pts.map((p, i) => (i ? 'L' : 'M') + p[0] + ' ' + p[1]).join(' '), stroke: col }));
+        pts.forEach((p, i) => { const c = s('circle', { class: 'dot', cx: p[0], cy: p[1], r: 4, fill: col, stroke: cssVar('--surface'), 'stroke-width': 1.5, onclick: opts.onClick ? () => opts.onClick(i, -1) : null }); tipped(c, () => `${labels[i]} — ${opts.line.name}: ${fmtV(opts.line.values[i])}`); svg.appendChild(c); });
+      }
     }
+    let curIw = 0;
+    /* أسماء الشهور بحجمها الحقيقي: لو لا تتسع كلها جنبًا إلى جنب يظهر اسم كل شهرين (والشهر المميَّز والأخير دائمًا)، والأرقام فوق الأعمدة تُخفى لو تتلاصق */
+    const thin = () => {
+      const fits = (els) => { let m = 0; for (const t of els) { t.style.display = ''; m = Math.max(m, t.getBBox().width); } return m + 6 <= curIw; };
+      const labs = [...svg.querySelectorAll('text.mlab')];
+      if (labs.length > 1 && !fits(labs)) labs.forEach((t, i) => { if (!t.classList.contains('hl') && (labs.length - 1 - i) % 2) t.style.display = 'none'; });
+      const vals = [...svg.querySelectorAll('text.val')];
+      if (vals.length && !fits(vals)) vals.forEach(t => { t.style.display = 'none'; });
+    };
+    const W0 = opts.width || 640;
+    draw(W0);
+    if (!opts.width) fitChart(svg, draw, W0, w => Math.max(400, Math.min(720, w)), thin);
     if (opts.legend === false || (series.length < 2 && !opts.line)) return svg;
     const legend = h('div', { class: 'chart-legend' }, series.map(sr => h('span', null, h('i', { style: { background: sr.color || PALETTE[0] } }), sr.name)), opts.line ? h('span', null, h('i', { class: 'ln', style: { borderColor: opts.line.color || cssVar('--warn') } }), opts.line.name) : null, opts.highlight != null && opts.highlight >= 0 ? h('span', null, h('i', { class: 'band' }), opts.highlightLabel || 'الشهر المعروض') : null);
     return h('div', { class: 'chart-wrap' }, svg, legend);

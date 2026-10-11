@@ -10,8 +10,8 @@ window.Egary = window.Egary || {};
 
   const VIEWS = [
     { key: 'dashboard', title: 'لوحة المؤشرات', icon: 'home' },
-    { key: 'ledger', title: 'كشف التحصيل (الورقة)', icon: 'table' },
-    { key: 'insights', title: 'التحليلات والإنسايتس', icon: 'sparkles' },
+    { key: 'ledger', title: 'كشف التحصيل', icon: 'table' },
+    { key: 'insights', title: 'التحليلات والملاحظات', icon: 'sparkles' },
     { sep: true, label: 'السجلات' },
     { key: 'projects', title: 'المشاريع', icon: 'building', count: s => s.projects.length },
     { key: 'units', title: 'الوحدات', icon: 'door', count: s => s.units.length },
@@ -23,11 +23,11 @@ window.Egary = window.Egary || {};
     { key: 'quality', title: 'جودة البيانات', icon: 'shield' },
     { key: 'audit', title: 'سجل التعديلات', icon: 'calendar' },
     { key: 'settings', title: 'الإعدادات والملف', icon: 'settings' },
-    { key: 'bi', title: 'لوحة BI التفاعلية', icon: 'bi' },
+    { key: 'bi', title: 'لوحة العرض التفاعلية', icon: 'bi' },
   ];
 
   const App = {
-    filter: { projectCode: '', unitType: '', status: '', floor: '', q: '', period: '', from: '' }, // period: شهر التقرير المختار (لا يُحفظ بين الجلسات) · from: سلايسر «المحاسبة من» (سنة-01)
+    filter: { projectCode: '', unitType: '', status: '', floor: '', q: '', period: '', from: '' }, // period: شهر التقرير المختار · from: سلايسر «المحاسبة من» (سنة-01) · q: نص البحث — الثلاثة لا تُحفظ بين الجلسات
     year: String(new Date().getFullYear()),
     route: { view: 'dashboard', id: '', params: {} },
     mode: 'none', // 'linked' | 'preview' | 'file' | 'demo'
@@ -88,6 +88,8 @@ window.Egary = window.Egary || {};
     if (!E.FileLink.dirSupported || App.mode !== 'linked' || E.Backup.status().enabled) return;
     let shown = false; try { shown = localStorage.getItem('egary-backup-offered') === '1'; } catch (e) { }
     if (shown) return;
+    // الموظف بدأ العمل (نموذج أو نافذة مفتوحة): لا نفتح العرض فوقه — ننتظر حتى تُغلق النوافذ
+    if (document.querySelector('.overlay')) { setTimeout(offerBackupFolder, 2500); return; }
     try { localStorage.setItem('egary-backup-offered', '1'); } catch (e) { }
     const m = UI().modal({ title: 'تفعيل النسخ الاحتياطي التلقائي', size: 'sm', body: h('div', null, h('p', null, 'ليبقى عندك دائمًا نسخة من الإكسيل على القرص: اختر مجلد البرنامج نفسه (المجلد الذي فيه Egary.xlsx) مرة واحدة، وسيحفظ البرنامج نسخًا تلقائية في مجلد فرعي باسم ', h('span', { class: 'code' }, 'backups'), ' بعد كل تعديل وقبل أي حذف.'), h('p', { class: 'muted small mt-s' }, 'يمكنك تفعيله لاحقًا من الإعدادات.')), footer: [h('button', { class: 'btn', onclick: () => m.close() }, 'لاحقًا'), h('button', { class: 'btn primary', id: 'btn-enable-backups', onclick: async () => { m.close(); await enableBackups(); } }, UI().icon('shield'), 'اختيار مجلد البرنامج')] });
   }
@@ -107,6 +109,8 @@ window.Egary = window.Egary || {};
     const [t, sub] = map[st.state] || ['', ''];
     el.className = 'sync ' + st.state; UI().clear(el); el.append(h('span', { class: 'dot' }), h('span', null, t)); el.title = sub;
     const banner = App.els.banner; if (!banner) return; UI().clear(banner);
+    try { document.body.dataset.role = (E.Auth.user() && E.Auth.role()) || ''; } catch (e) { }
+    if (E.Auth.user() && !E.Auth.can('edit')) banner.appendChild(h('div', { class: 'banner info', id: 'viewer-banner' }, UI().icon('eye'), h('span', null, 'حساب مشاهدة فقط — يمكنك البحث والعرض والطباعة، ولا يمكنك الإضافة أو التعديل أو الحذف.')));
     if (st.state === 'locked') banner.appendChild(h('div', { class: 'banner warn' }, UI().icon('warning'), h('span', null, `ملف الإكسيل مفتوح في برنامج Excel، لذلك لا يمكن الحفظ الآن. تعديلاتك (${st.pending}) محفوظة مؤقتًا وستُكتب تلقائيًا بمجرد إغلاق الملف.`), h('button', { class: 'btn sm', onclick: () => E.Sync.flush() }, 'حاول الآن')));
     else if (st.state === 'error') banner.appendChild(h('div', { class: 'banner danger' }, UI().icon('warning'), h('span', null, 'خطأ في المزامنة: ' + (st.error || '')), h('button', { class: 'btn sm', onclick: () => E.Sync.flush() }, 'إعادة المحاولة'),
       /تعذّرت قراءته/.test(st.error || '') && (!E.Auth.user() || E.Auth.can('unlink')) ? h('button', { class: 'btn sm danger', title: 'يكتب بيانات الموقع فوق الملف الذي تعذّرت قراءته (تُحفظ نسخة احتياطية أولًا)', onclick: async () => { if (await UI().confirm({ title: 'استبدال الملف بنسخة الموقع', text: 'تعذّرت قراءة آخر تغيير في ملف الإكسيل. سيُكتب ما على الموقع فوق الملف، وتُحفظ نسخة احتياطية من الملف الحالي أولًا. هل تريد المتابعة؟', danger: true, okText: 'استبدال' })) E.Sync.forceWrite(); } }, 'استبدال الملف بنسخة الموقع') : null,
@@ -329,25 +333,30 @@ window.Egary = window.Egary || {};
   function showApp() {
     const root = App.els.root; UI().clear(root); document.body.classList.remove('no-app');
     const nav = h('nav', { class: 'nav' });
-    const sidebar = h('aside', { class: 'sidebar', id: 'sidebar' }, h('div', { class: 'brand' }, h('div', { class: 'logo' }, UI().icon('building', 22)), h('div', null, h('b', null, S().state().meta.officeName || 'إيجاري'), h('span', null, 'إدارة الإيجارات'))), nav, h('div', { class: 'foot' }, 'Egary v2 — الإكسيل هو مصدر البيانات'));
+    const sidebar = h('aside', { class: 'sidebar', id: 'sidebar' }, h('div', { class: 'brand' }, h('div', { class: 'logo' }, UI().icon('building', 22)), h('div', null, h('b', null, S().state().meta.officeName || 'إيجاري'), h('span', null, 'إدارة الإيجارات'))), nav, h('div', { class: 'foot' }, 'إيجاري — كل البيانات في ملف الإكسيل'));
+    const scrim = h('div', { class: 'side-scrim', onclick: () => sidebar.classList.remove('open') }); // الموبايل: لمس خارج القائمة يغلقها
     App.els.nav = nav;
-    const search = h('input', { type: 'search', placeholder: 'ابحث بالكود أو الاسم أو التليفون أو الرقم القومي…', id: 'global-search', 'aria-label': 'بحث' });
-    const sugg = h('div', { class: 'suggest hidden', id: 'suggest' });
+    const search = h('input', { type: 'search', placeholder: 'ابحث بالكود أو الاسم أو التليفون أو الرقم القومي…', id: 'global-search', 'aria-label': 'بحث', role: 'combobox', 'aria-autocomplete': 'list', 'aria-expanded': 'false', 'aria-controls': 'suggest', autocomplete: 'off', title: 'بحث سريع (Ctrl+K أو /)' });
+    const sugg = h('div', { class: 'suggest hidden', id: 'suggest', role: 'listbox', 'aria-label': 'نتائج البحث' });
     App.els.search = search; App.els.suggest = sugg;
     search.addEventListener('input', () => suggest(search.value));
-    search.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const on = sugg.querySelector('.item.on:not(.muted)') || sugg.querySelector('.item:not(.muted)'); if (on && !sugg.classList.contains('hidden')) { on.click(); } else { App.filter.q = search.value.trim(); saveFilter(); go(App.route.view === 'dashboard' || App.route.view === 'bi' ? 'units' : App.route.view); } sugg.classList.add('hidden'); } if (e.key === 'Escape') sugg.classList.add('hidden'); if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { const items = [...sugg.querySelectorAll('.item')]; if (!items.length) return; e.preventDefault(); let i = items.findIndex(x => x.classList.contains('on')); items.forEach(x => x.classList.remove('on')); i = e.key === 'ArrowDown' ? Math.min(items.length - 1, i + 1) : Math.max(0, i - 1); items[i].classList.add('on'); } });
+    search.addEventListener('keydown', onSearchKey);
     search.addEventListener('focus', () => { if (search.value) suggest(search.value); });
-    document.addEventListener('click', (e) => { if (!e.target.closest('.search')) sugg.classList.add('hidden'); });
+    sugg.addEventListener('mousedown', (e) => e.preventDefault()); // النقر على اقتراح لا يُفقد الصندوق التركيز (وإلا اختفت القائمة قبل النقرة)
+    document.addEventListener('click', (e) => { if (!e.target.closest('.search')) hideSuggest(); });
+    if (!App._keys) { App._keys = true; document.addEventListener('keydown', globalKeys); }
     const syncEl = h('button', { class: 'sync unlinked', id: 'sync-status', onclick: () => go('settings') }, h('span', { class: 'dot' }), h('span', null, '…'));
     App.els.sync = syncEl;
     const themeBtn = h('button', { class: 'btn icon', title: 'الوضع الداكن/الفاتح', id: 'theme-btn', onclick: toggleTheme }, UI().icon(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon'));
     const title = h('div', { class: 'title', id: 'page-title' });
     const chipHost = h('span', { id: 'user-chip-host' }, userChip());
-    const topbar = h('header', { class: 'topbar' }, h('button', { class: 'btn icon ghost menu-btn', onclick: () => sidebar.classList.toggle('open') }, UI().icon('menu')), title, h('div', { class: 'search' }, UI().icon('search'), search, sugg), syncEl, themeBtn, chipHost);
+    const searchWrap = h('div', { class: 'search' }, UI().icon('search'), search, sugg);
+    searchWrap.addEventListener('focusout', (e) => { if (!e.relatedTarget || !searchWrap.contains(e.relatedTarget)) hideSuggest(); }); // Tab يغلق القائمة
+    const topbar = h('header', { class: 'topbar' }, h('button', { class: 'btn icon ghost menu-btn', 'aria-label': 'القائمة', onclick: () => sidebar.classList.toggle('open') }, UI().icon('menu')), title, searchWrap, syncEl, themeBtn, chipHost);
     if (!App._authSub) { App._authSub = E.Auth.subscribe(() => { const host = document.getElementById('user-chip-host'); if (host) { UI().clear(host); host.appendChild(userChip()); } }); }
     const banner = h('div', { id: 'banner' }); App.els.banner = banner;
     const content = h('div', { class: 'content', id: 'content' }); App.els.content = content;
-    root.appendChild(h('div', { id: 'app' }, sidebar, h('main', { class: 'main' }, topbar, h('div', { style: { padding: '0 22px' } }, banner), content)));
+    root.appendChild(h('div', { id: 'app' }, sidebar, scrim, h('main', { class: 'main' }, topbar, h('div', { style: { padding: '0 22px' } }, banner), content)));
     App.els.title = title;
     renderNav();
     renderSync(E.Sync.status);
@@ -359,7 +368,7 @@ window.Egary = window.Egary || {};
     const st = S().state();
     for (const v of VIEWS) {
       if (v.sep) { nav.appendChild(h('div', { class: 'sep' })); nav.appendChild(h('div', { class: 'label' }, v.label)); continue; }
-      nav.appendChild(h('a', { href: '#/' + v.key, class: App.route.view === v.key ? 'active' : '', dataset: { view: v.key }, onclick: () => { document.getElementById('sidebar').classList.remove('open'); } }, UI().icon(v.icon), h('span', null, v.title), v.count ? h('span', { class: 'cnt' }, v.count(st)) : null));
+      nav.appendChild(h('a', { href: '#/' + v.key, class: App.route.view === v.key ? 'active' : '', dataset: { view: v.key }, onclick: () => { document.getElementById('sidebar').classList.remove('open'); if (v.key === 'dashboard' && App.filter.q) { clearQ(); if (App.route.view === 'dashboard') render(); } } }, UI().icon(v.icon), h('span', null, v.title), v.count ? h('span', { class: 'cnt' }, v.count(st)) : null));
     }
   }
 
@@ -400,7 +409,7 @@ window.Egary = window.Egary || {};
     App.els.title.textContent = v.title; document.title = v.title + ' — إيجاري';
     renderNav();
     const c = App.els.content; UI().clear(c);
-    if (App.els.search && App.els.search.value !== App.filter.q) App.els.search.value = App.filter.q;
+    if (App.els.search && App.els.search.value !== App.filter.q && document.activeElement !== App.els.search) App.els.search.value = App.filter.q; // لا نمسح ما يكتبه المستخدم الآن (إعادة رسم من المزامنة مثلًا)
     try { E.Views.render(v.key, c, ctx()); } catch (e) { console.error(e); c.appendChild(h('div', { class: 'banner danger' }, 'خطأ في عرض الشاشة: ' + e.message)); }
   }
   function ctx() { return { auth: E.Auth, filter: App.filter, year: App.year, params: App.route.params, open, evidence, go, rerender: render, filterBar, setYear: (y) => { App.year = String(y); render(); }, mode: App.mode, flags: App.flags, readOnly: App.mode !== 'linked' && App.mode !== 'file' && App.mode !== 'demo' }; }
@@ -410,7 +419,7 @@ window.Egary = window.Egary || {};
     const st = S().state(); const years = st.settings.ledgerYears || [];
     const inp = h('input', { type: 'number', id: 'f_year', min: 2000, max: 2100, value: (years.length ? years[0] - 1 : new Date().getFullYear()), style: { width: '100%', height: '40px', border: '1px solid var(--line)', borderRadius: '10px', padding: '0 12px', background: 'var(--surface)' } });
     const err = h('div', { class: 'form-errors', style: { display: 'none' } });
-    const m = UI().modal({ title: 'إضافة سنة إلى الورقة', size: 'sm', body: h('div', null, h('p', { class: 'muted' }, 'تُنشأ ورقة جديدة في الإكسيل بنفس شكل ورقة السنة (كل عقد ساري في تلك السنة في صف)، وتبدأ المحاسبة من أول سنة موجودة. سجّلوا فيها كل المدفوعات وإلا ظهرت شهورها متأخرات.'), h('label', { class: 'small', for: 'f_year', style: { display: 'block', margin: '12px 0 6px' } }, 'السنة'), inp, err), footer: [h('button', { class: 'btn', onclick: () => m.close() }, 'إلغاء'), h('button', { class: 'btn primary', id: 'btn-add-year', onclick: () => {
+    const m = UI().modal({ title: 'إضافة سنة إلى كشف التحصيل', size: 'sm', body: h('div', null, h('p', { class: 'muted' }, 'تُنشأ ورقة جديدة في الإكسيل بنفس شكل ورقة السنة (كل عقد ساري في تلك السنة في صف)، وتبدأ المحاسبة من أول سنة موجودة. سجّلوا فيها كل المدفوعات وإلا ظهرت شهورها متأخرات.'), h('label', { class: 'small', for: 'f_year', style: { display: 'block', margin: '12px 0 6px' } }, 'السنة'), inp, err), footer: [h('button', { class: 'btn', onclick: () => m.close() }, 'إلغاء'), h('button', { class: 'btn primary', id: 'btn-add-year', onclick: () => {
       const y = parseInt(inp.value, 10);
       if (!(y >= 2000 && y <= 2100)) { err.textContent = 'أدخل سنة بين 2000 و2100'; err.style.display = 'block'; return; }
       if (years.includes(y)) { err.textContent = 'هذه السنة موجودة بالفعل'; err.style.display = 'block'; return; }
@@ -427,14 +436,26 @@ window.Egary = window.Egary || {};
   }
 
   /* ---------- الفلاتر ---------- */
-  function saveFilter() { try { const { period, ...rest } = App.filter; localStorage.setItem(FILTER_KEY, JSON.stringify(rest)); } catch (e) { } }
-  function setFilter(patch) { Object.assign(App.filter, patch); saveFilter(); render(); }
+  /* لا يُحفظ بين الجلسات: شهر التقرير، وسلايسر «المحاسبة من»، ونص البحث — حتى لا تفتح الجلسة التالية (أو مستخدم آخر على نفس الجهاز) على قوائم مفلترة أو أرقام مختلفة بلا سبب ظاهر */
+  function saveFilter() { try { const { period, from, q, ...rest } = App.filter; localStorage.setItem(FILTER_KEY, JSON.stringify(rest)); } catch (e) { } }
+  /* مسح البحث: من الفلتر ومن رابط الصفحة (?q=) حتى لا يعود مع أول تنقّل داخل الصفحة */
+  function clearQ() {
+    App.filter.q = ''; saveFilter();
+    if (App.els.search) App.els.search.value = ''; // البحث مُسح ⇒ الصندوق يفرغ فورًا (لا ينتظر إعادة الرسم)
+    if (App.route.params && App.route.params.q != null) { delete App.route.params.q; const qs = Object.entries(App.route.params).map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&'); try { history.replaceState(history.state, '', '#/' + App.route.view + (App.route.id ? '/' + encodeURIComponent(App.route.id) : '') + (qs ? '?' + qs : '')); } catch (e) { } }
+  }
+  function setFilter(patch) { if (patch && 'q' in patch && !patch.q) clearQ(); Object.assign(App.filter, patch); saveFilter(); render(); }
   function filterBar(opts) {
     opts = opts || {};
     const st = S().state(), f = App.filter;
     const chip = (label, on, onClick, cls) => h('button', { class: 'chip ' + (on ? 'on' : '') + ' ' + (cls || ''), onclick: onClick }, label, on ? h('span', { class: 'x' }, '×') : null);
     const bar = h('div', { class: 'flex wrap row-gap', id: 'filter-bar' });
     bar.appendChild(h('span', { class: 'muted small flex' }, UI().icon('filter'), 'الفلاتر:'));
+    if (opts.qOnly) { // صفحات بلا فلاتر (المشاريع، سجل التعديلات): شارة البحث (وسلايسر «المحاسبة من» لو مفعَّل) فقط
+      if (f.from && opts.from !== false) bar.appendChild(chip('المحاسبة من ' + U().periodLabel(f.from, true), true, () => setFilter({ from: '' }), 'f-from'));
+      if (f.q) bar.appendChild(chip('بحث: ' + f.q, true, () => setFilter({ q: '' }), 'f-q'));
+      return bar;
+    }
     if (opts.period) { // متصفح الشهر: ◀ الشهر ▶ — يغيّر شهر التقرير في اللوحة والتحليلات ولوحة BI
       const cur = U().periodOf(U().today()), tf = En().trackingFrom(); // الحد الأدنى = بداية المحاسبة الفعلية (الإعداد أو سلايسر «المحاسبة من»)
       const from = tf && U().cmp(tf, cur) <= 0 ? tf : cur.slice(0, 4) + '-01';
@@ -447,7 +468,7 @@ window.Egary = window.Egary || {};
         f.period ? h('button', { class: 'chip', id: 'period-reset', title: 'العودة إلى الشهر الافتراضي', onclick: () => setFilter({ period: '' }) }, '↩ ' + (opts.defaultPeriod && opts.defaultPeriod !== cur ? 'آخر شهر مسجَّل' : 'الشهر الحالي')) : null));
     }
     const gP = h('span', { class: 'fgroup' }, h('span', { class: 'lbl' }, 'المشروع')); for (const p of st.projects) gP.appendChild(chip(p.name, f.projectCode === p.code, () => setFilter({ projectCode: f.projectCode === p.code ? '' : p.code }), 'f-project')); bar.appendChild(gP);
-    const gT = h('span', { class: 'fgroup' }, h('span', { class: 'lbl' }, 'النوع')); for (const t of M().UNIT_TYPES) gT.appendChild(chip(t.ar, f.unitType === t.key, () => setFilter({ unitType: f.unitType === t.key ? '' : t.key }), 'f-type')); bar.appendChild(gT);
+    const gT = h('span', { class: 'fgroup' }, h('span', { class: 'lbl' }, 'نوع الوحدة')); for (const t of M().UNIT_TYPES) gT.appendChild(chip(t.ar, f.unitType === t.key, () => setFilter({ unitType: f.unitType === t.key ? '' : t.key }), 'f-type')); bar.appendChild(gT);
     if (opts.status !== false) { const gS = h('span', { class: 'fgroup' }, h('span', { class: 'lbl' }, 'الحالة')); for (const k of ['occupied', 'vacant', 'ending']) gS.appendChild(chip(En().USTATUS_AR[k], f.status === k, () => setFilter({ status: f.status === k ? '' : k }), 'f-status')); bar.appendChild(gS); }
     if (opts.year) { const years = st.settings.ledgerYears.length ? st.settings.ledgerYears : [new Date().getFullYear()]; const sel = h('select', { class: 'chip', id: 'year-select', onchange: (e) => { if (e.target.value === '__add') { e.target.value = String(App.year); addYear(); return; } App.year = e.target.value; render(); } }, years.map(y => h('option', { value: y, selected: String(y) === String(App.year) ? true : null }, 'سنة ' + y)), (!E.Auth || E.Auth.can('edit')) && App.mode === 'linked' ? h('option', { value: '__add' }, '＋ إضافة سنة…') : null); bar.appendChild(sel); }
     if (opts.period || opts.year) { // سلايسر «المحاسبة من»: يحدد من أي سنة تُحتسب الاستحقاقات والمتأخرات في هذه الشاشة (بلا تغيير الإعداد)
@@ -455,33 +476,120 @@ window.Egary = window.Egary || {};
       const y0 = Math.min(st.settings.ledgerYears && st.settings.ledgerYears.length ? st.settings.ledgerYears[0] : tfy, tfy);
       const ys = []; for (let y = y0; y <= curY; y++) ys.push(y);
       if (ys.length > 1) {
-        const sel = h('select', { class: 'chip' + (f.from ? ' on' : ''), id: 'from-pick', title: 'من أي سنة تُحتسب المتأخرات', onchange: (e) => setFilter({ from: e.target.value }) }, h('option', { value: '' }, `حسب الإعداد (${tfy})`), ys.map(y => h('option', { value: y + '-01', selected: f.from === y + '-01' ? true : null }, 'من ' + y)));
+        const tfLabel = st.settings.trackingFrom && /^\d{4}-\d{2}$/.test(st.settings.trackingFrom) ? U().periodLabel(st.settings.trackingFrom, true) : String(tfy);
+        const sel = h('select', { class: 'chip' + (f.from ? ' on' : ''), id: 'from-pick', title: 'من أي سنة تُحتسب المتأخرات', onchange: (e) => setFilter({ from: e.target.value }) }, h('option', { value: '' }, `حسب الإعداد (من ${tfLabel})`), ys.map(y => h('option', { value: y + '-01', selected: f.from === y + '-01' ? true : null }, 'من يناير ' + y)));
         bar.appendChild(h('span', { class: 'fgroup', id: 'from-group' }, h('span', { class: 'lbl' }, 'المحاسبة من'), sel, f.from ? h('button', { class: 'chip', id: 'from-reset', title: 'العودة إلى الإعداد', onclick: () => setFilter({ from: '' }) }, '×') : null));
       }
     }
-    if (f.q) bar.appendChild(chip('بحث: ' + f.q, true, () => setFilter({ q: '' }), 'f-q'));
-    if (f.projectCode || f.unitType || f.status || f.q || f.floor || f.from) bar.appendChild(h('button', { class: 'btn sm ghost', id: 'clear-filters', onclick: () => setFilter({ projectCode: '', unitType: '', status: '', floor: '', q: '', period: '', from: '' }) }, 'مسح الكل'));
+    else if (f.from) bar.appendChild(chip('المحاسبة من ' + U().periodLabel(f.from, true), true, () => setFilter({ from: '' }), 'f-from')); // السلايسر مفعَّل من شاشة أخرى: يظهر هنا أيضًا لأنه يغيّر المتأخرات في هذه الصفحة
+    if (f.q && opts.q !== false) bar.appendChild(chip('بحث: ' + f.q, true, () => setFilter({ q: '' }), 'f-q'));
+    if (f.projectCode || f.unitType || f.status || (f.q && opts.q !== false) || f.floor || f.from) bar.appendChild(h('button', { class: 'btn sm ghost', id: 'clear-filters', onclick: () => setFilter({ projectCode: '', unitType: '', status: '', floor: '', q: '', period: '', from: '' }) }, 'مسح الكل'));
     return bar;
   }
 
-  /* ---------- البحث مع الاقتراحات ---------- */
+  /* ---------- البحث مع الاقتراحات ----------
+     أول صف دائمًا «اعرض كل النتائج لـ … في <الصفحة>» وهو ما ينفّذه Enter، إلا لو اختار المستخدم اقتراحًا بالأسهم
+     أو كتب كودًا كاملًا (C001 / T16 / P03-304) فيفتح سجله مباشرة. الاقتراحات مرتبة بالأقرب: الكود ثم الاسم ثم بقية الحقول. */
+  const LIST_AR = { projects: 'المشاريع', units: 'الوحدات', clients: 'العملاء', contracts: 'العقود', payments: 'المدفوعات', maintenance: 'الصيانة', ledger: 'كشف التحصيل', audit: 'سجل التعديلات' };
+  const KIND_LIST = { 'مشروع': 'units', 'وحدة': 'units', 'عميل': 'clients', 'عقد': 'contracts', 'فاتورة': 'payments', 'صيانة': 'maintenance' };
+  const KIND_ORDER = ['مشروع', 'وحدة', 'عميل', 'عقد', 'فاتورة', 'صيانة'];
+  const KIND_CAP = { 'مشروع': 3, 'وحدة': 5, 'عميل': 6, 'عقد': 4, 'فاتورة': 4, 'صيانة': 3 };
+  const SUGGEST_MAX = 16;
+  function searchTarget(hits) { return LIST_AR[App.route.view] ? App.route.view : (hits.length ? KIND_LIST[hits[0].k] : 'units'); }
+  function hideSuggest() { const box = App.els.suggest; if (!box) return; box.classList.add('hidden'); if (App.els.search) { App.els.search.setAttribute('aria-expanded', 'false'); App.els.search.removeAttribute('aria-activedescendant'); } }
+  function suggestNav() { const box = App.els.suggest; return box ? [...box.querySelectorAll('[role="option"]')] : []; }
+  function setActive(i) {
+    const nav = suggestNav(); if (!nav.length) return;
+    i = Math.max(0, Math.min(nav.length - 1, i));
+    nav.forEach((x, j) => { x.classList.toggle('on', j === i); x.setAttribute('aria-selected', j === i ? 'true' : 'false'); });
+    if (App.els.search) App.els.search.setAttribute('aria-activedescendant', nav[i].id);
+    try { nav[i].scrollIntoView({ block: 'nearest' }); } catch (e) { }
+  }
+  function runAll(q, target) {
+    hideSuggest();
+    App.filter.q = q; saveFilter();
+    const params = target === App.route.view ? Object.assign({}, App.route.params) : {};
+    if (params.q != null) params.q = q;
+    go(target, params);
+  }
   function suggest(q) {
     const box = App.els.suggest; if (!box) return;
-    const n = U().normalize(q); UI().clear(box);
-    if (!n) { box.classList.add('hidden'); return; }
-    const st = S().state(), out = [];
-    const tokens = n.split(' ').filter(Boolean);
-    const m = (hay) => { const H = U().normalize(hay); const Hs = H.replace(/\s+/g, ''); return tokens.every(t => H.includes(t) || Hs.includes(t.replace(/\s+/g, ''))) || Hs.includes(n.replace(/\s+/g, '')); };
-    for (const p of st.projects) if (m(p.code + ' ' + p.name + ' ' + p.address)) out.push({ k: 'مشروع', code: p.code, label: p.name, sub: p.address, open: () => open('project', p.code) });
-    for (const u of st.units) if (m(u.code + ' ' + u.label + ' ' + ((S().project(u.projectCode) || {}).name || ''))) out.push({ k: 'وحدة', code: u.code, label: u.label, sub: (S().project(u.projectCode) || {}).name, open: () => open('unit', u.code) });
-    for (const c of st.clients) if (m([c.code, c.name, c.rep, c.phone, c.phone2, c.nationalId, c.taxId].join(' '))) out.push({ k: 'عميل', code: c.code, label: c.name, sub: c.phone || c.nationalId, open: () => open('client', c.code) });
-    for (const c of st.contracts) if (m(c.code)) { const cl = S().client(c.clientCode) || {}, u = S().unit(c.unitCode) || {}; out.push({ k: 'عقد', code: c.code, label: `${cl.name || ''} — ${u.label || ''}`, sub: U().fmtDate(c.start) + ' → ' + U().fmtDate(c.end), open: () => open('contract', c.code) }); }
-    for (const p of st.payments) if (m(p.code + ' ' + p.ref)) { const c = S().contract(p.contractCode) || {}; const cl = S().client(c.clientCode) || {}; out.push({ k: 'فاتورة', code: p.code, label: `${cl.name || ''} — ${U().periodLabel(p.period, true)}`, sub: U().fmtMoney(p.amount), open: () => F().invoice(p) }); }
-    for (const mt of st.maintenance) if (m(mt.code + ' ' + mt.description)) { const u = S().unit(mt.unitCode) || {}; out.push({ k: 'صيانة', code: mt.code, label: mt.description.slice(0, 40), sub: u.label, open: () => open('unit', mt.unitCode) }); }
-    const top = out.slice(0, 14);
-    if (!top.length) { box.appendChild(h('div', { class: 'item muted' }, 'لا توجد نتائج — اضغط Enter للبحث داخل القوائم')); }
-    for (const r of top) box.appendChild(h('div', { class: 'item', onclick: () => { box.classList.add('hidden'); r.open(); } }, h('span', { class: 'k' }, r.k), h('span', { class: 'code' }, r.code), h('span', null, r.label), h('span', { class: 'sub' }, r.sub || '')));
+    const pq = En().prepQ(q); UI().clear(box);
+    if (!pq) { hideSuggest(); return; }
+    const st = S().state(), hits = [];
+    const fc = (s) => U().foldCode(s).replace(/[-_/.]/g, '');
+    const qc = fc(q);
+    const codeNum = (code) => { const m = /^([A-Z]+)(?:-\d{4})?-?0*(\d+)$/i.exec(String(code || '')); return m ? m[1].toLowerCase() + '|' + (+m[2]) : ''; };
+    const codeScore = (code) => { if (!code) return 0; const c = fc(code); if (c === qc || (pq.code && codeNum(code) === pq.code.prefix + '|' + pq.code.num)) return 100; if (qc.length >= 2 && c.startsWith(qc)) return 90; return 0; };
+    const nameScore = (name) => { const N = U().normalize(name); if (!N) return 0; if (N === pq.n || N.replace(/ /g, '') === pq.joined) return 80; if (N.startsWith(pq.n)) return 70; const words = N.split(' '); if (pq.tokens.every(t => words.some(w => w.startsWith(t)))) return 60; return En().matchQ(name, pq) ? 50 : 0; };
+    const add = (k, code, label, sub, score, open) => { if (score > 0) hits.push({ k, code, label, sub, score, open }); };
+    for (const p of st.projects) add('مشروع', p.code, p.name, p.address, Math.max(codeScore(p.code), nameScore(p.name), En().matchQ([p.area, p.address].join(' '), pq) ? 40 : 0), () => open('project', p.code));
+    for (const u of st.units) { const pn = (S().project(u.projectCode) || {}).name || ''; const us = En().unitStatus(u).status; add('وحدة', u.code, u.label, pn + ' — ' + En().USTATUS_AR[us], Math.max(codeScore(u.code), nameScore(u.label), En().matchQ(u.code + ' ' + u.label + ' ' + pn, pq) ? (En().matchQ(u.code + ' ' + u.label, pq) ? 45 : 20) : 0), () => open('unit', u.code)); }
+    for (const c of st.clients) {
+      let s = Math.max(codeScore(c.code), nameScore(c.name)), sub = c.phone || c.nationalId;
+      if (!s) { // لماذا ظهر؟ نُظهر الحقل الذي طابق (الممثل، التليفون، الرقم القومي…)
+        const why = [['rep', 'الممثل: '], ['phone', 'ت: '], ['phone2', 'ت: '], ['nationalId', 'الرقم القومي: '], ['taxId', 'التسجيل الضريبي: '], ['email', '']].find(([f]) => c[f] && En().matchQ(c[f], pq));
+        if (why) { s = 40; sub = why[1] + c[why[0]]; }
+      }
+      add('عميل', c.code, c.name, sub, s, () => open('client', c.code));
+    }
+    for (const c of st.contracts) { const s = codeScore(c.code); if (!s) continue; const cl = S().client(c.clientCode) || {}, u = S().unit(c.unitCode) || {}; add('عقد', c.code, `${cl.name || ''} — ${u.label || ''}`, U().fmtDate(c.start) + ' → ' + U().fmtDate(c.end), s, () => open('contract', c.code)); }
+    for (const p of st.payments) { // رقم الفاتورة: الرقم بعد السنة (202 أو 2026 لا تُغرق القائمة بكل فواتير السنة) إلا لو كُتب الكود بحروفه
+      const hay = (pq.digits ? String(p.code || '').replace(/-\d{4}-/, '-') : p.code) + ' ' + (p.ref || '');
+      const s = Math.max(codeScore(p.code), En().matchQ(hay, pq) ? 45 : 0); if (!s) continue;
+      const c = S().contract(p.contractCode) || {}; const cl = S().client(c.clientCode) || {};
+      add('فاتورة', p.code, `${cl.name || ''} — ${U().periodLabel(p.period, true)}`, U().fmtMoney(p.amount), s, () => F().invoice(p));
+    }
+    for (const mt of st.maintenance) { const u = S().unit(mt.unitCode) || {}; add('صيانة', mt.code, String(mt.description || '').slice(0, 40), u.label, Math.max(codeScore(mt.code), nameScore(mt.description) ? 50 : 0), () => open('unit', mt.unitCode)); }
+    hits.sort((a, b) => b.score - a.score || KIND_ORDER.indexOf(a.k) - KIND_ORDER.indexOf(b.k) || U().cmp(a.code, b.code));
+    const per = {}, top = [];
+    for (const r of hits) { per[r.k] = (per[r.k] || 0) + 1; if (per[r.k] <= KIND_CAP[r.k] && top.length < SUGGEST_MAX) top.push(r); }
+    const text = String(q).trim(), target = searchTarget(hits);
+    const opt = (id, cls, children, onclick) => h('div', { class: cls, id, role: 'option', 'aria-selected': 'false', onclick }, children);
+    box.appendChild(opt('sg-all', 'all', [UI().icon('search'), h('span', null, 'اعرض كل النتائج لـ «', h('b', null, text), '» في ', h('b', null, LIST_AR[target]))], () => runAll(text, target)));
+    if (!top.length) box.appendChild(h('div', { class: 'item muted' }, 'لا توجد نتائج — اضغط Enter للبحث داخل القوائم'));
+    top.forEach((r, i) => box.appendChild(opt('sg-' + (i + 1), 'item', [h('span', { class: 'k' }, r.k), h('span', { class: 'code' }, r.code), h('span', { class: 'lbl' }, r.label), h('span', { class: 'sub' }, r.sub || '')], () => { hideSuggest(); r.open(); })));
+    if (hits.length > top.length) box.appendChild(h('div', { class: 'more muted' }, `و${hits.length - top.length} نتيجة أخرى — اضغط Enter لعرضها كلها في ${LIST_AR[target]}`));
+    // عميل جاء للمكتب وليس مسجَّلًا: تسجيله من هنا بالاسم أو التليفون المكتوب ثم يُفتح بروفايله (فيه «ربطه بوحدة الآن»)
+    if (!E.Auth || E.Auth.can('edit')) box.appendChild(opt('sg-new', 'new', [UI().icon('plus'), h('span', null, 'تسجيل عميل جديد: «', h('b', null, text), '»')], () => { hideSuggest(); newClientFrom(text); }));
     box.classList.remove('hidden');
+    if (App.els.search) App.els.search.setAttribute('aria-expanded', 'true');
+    const exact = top.filter(r => r.score === 100);
+    setActive(exact.length === 1 ? top.indexOf(exact[0]) + 1 : 0); // كود كامل ⇒ Enter يفتحه مباشرة؛ غير ذلك ⇒ Enter يعرض كل النتائج في القائمة
+  }
+  function newClientFrom(text) {
+    const t = String(text || '').trim(), phone = /^[\d\s+\-٠-٩]+$/.test(t);
+    F().client(null, phone ? { phone: t } : { name: t }).then(r => { if (!r) return; if (App.els.search) App.els.search.value = ''; if (App.filter.q) { clearQ(); } render(); open('client', r.code); });
+  }
+  function onSearchKey(e) {
+    const search = App.els.search, box = App.els.suggest;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (box.classList.contains('hidden')) { if (search.value.trim()) suggest(search.value); return; } // القائمة مخفية: السهم يُظهرها أولًا بدل اختيار عنصر لا يُرى
+      const nav = suggestNav(); if (!nav.length) return;
+      const i = nav.findIndex(x => x.classList.contains('on'));
+      setActive(e.key === 'ArrowDown' ? i + 1 : i - 1);
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const q = search.value.trim();
+      if (!q) { hideSuggest(); if (App.filter.q) setFilter({ q: '' }); return; }
+      if (box.classList.contains('hidden') || !box.querySelector('.on')) suggest(q);
+      const on = box.querySelector('[role="option"].on'); if (on) on.click();
+      return;
+    }
+    if (e.key === 'Escape') hideSuggest();
+  }
+  /* اختصار البحث من أي شاشة: Ctrl+K أو «/» (يغلق البروفايل المفتوح ويضع المؤشر في صندوق البحث) */
+  function globalKeys(e) {
+    const s = App.els.search; if (!s || !s.isConnected) return;
+    const t = e.target, typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+    const ctrlK = (e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK');
+    if (!ctrlK && !(e.key === '/' && !typing)) return;
+    if (document.querySelector('.overlay')) return; // نافذة مفتوحة (نموذج إدخال): لا نسرق التركيز
+    e.preventDefault();
+    UI().closeDrawer(); s.focus(); s.select();
   }
 
   /* ---------- فتح بروفايل / دليل ---------- */
@@ -495,7 +603,7 @@ window.Egary = window.Egary || {};
   /* ---------- الإقلاع ---------- */
   async function boot() {
     applyTheme((() => { try { return localStorage.getItem(THEME_KEY) || (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch (e) { return 'light'; } })());
-    try { const f = JSON.parse(localStorage.getItem(FILTER_KEY) || 'null'); if (f) { delete f.period; Object.assign(App.filter, f); } } catch (e) { }
+    try { const f = JSON.parse(localStorage.getItem(FILTER_KEY) || 'null'); if (f) { delete f.period; delete f.from; delete f.q; Object.assign(App.filter, f); } } catch (e) { }
     App.els.root = document.getElementById('root');
     initSync();
     const yrs = []; App.year = String(new Date().getFullYear());

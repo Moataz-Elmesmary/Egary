@@ -810,7 +810,7 @@ e2e('11. insights page lists ≥ 8 insights (first one opens evidence); quality 
   const firstTitle = (await page.locator('#content .insight b').first().textContent()).trim();
   assert.ok(firstTitle.length > 0, firstTitle);
   // أكتوبر وسبتمبر لم يُسجَّلا بعد في الورقة ⇒ ملاحظة «بانتظار التسجيل» موجودة
-  assert.ok((await page.textContent('#content')).includes('لم تُسجَّل في الورقة بعد'));
+  assert.ok((await page.textContent('#content')).includes('لم تُسجَّل في كشف التحصيل بعد'));
   const hashBefore = await page.evaluate(() => location.hash);
   await page.locator('#content .insight').first().click();
   await page.waitForFunction(h => document.querySelector('.drawer') || location.hash !== h, hashBefore);
@@ -905,12 +905,13 @@ e2e('14. slicers: payments by paid-date range and method, clients by arrears/kin
   await page.evaluate(() => Egary.U.setToday('2026-10-09'));
   await page.goto(APP + '#/payments'); await page.waitForSelector('#period-bar');
   const total = await rowsOf(page).count();
-  // مدة: هذه السنة ⇒ فقط الدفعات التي لها تاريخ سداد داخل 2026
+  // مدة: هذه السنة ⇒ الدفعات التي تاريخ سدادها داخل 2026، والدفعات بلا تاريخ سداد (المنقولة من كشف التحصيل) بتاريخ استحقاق شهرها
+  // (كان الاختبار يتوقع استبعاد الدفعات بلا تاريخ ⇒ جدول فارغ؛ القرار الآن: تُحسب بتاريخ استحقاق شهرها — يوم الاستحقاق داخل نفس الشهر دائمًا)
   await page.click('[data-quick="year"]'); await page.waitForSelector('#pay-clear');
   const yearRows = await page.locator('#content table.tbl tbody tr:not(:has(.empty))').count();
-  const expectYear = await page.evaluate(() => Egary.Store.state().payments.filter(p => p.paidOn && p.paidOn >= '2026-01-01' && p.paidOn <= '2026-10-09').length);
-  assert.equal(yearRows, expectYear, 'rows by paid date range');
-  if (!expectYear) assert.ok(await page.$('#content table.tbl .empty'), 'empty state shown when no payment has a date in range');
+  const expectYear = await page.evaluate(() => Egary.Store.state().payments.filter(p => { const d = p.paidOn || (p.period + '-01'); return d >= '2026-01-01' && d <= '2026-10-09'; }).length);
+  assert.equal(yearRows, expectYear, 'rows by paid date range (due date for undated payments)');
+  assert.equal(expectYear, REAL.payments, 'every imported payment falls in 2026 by its due date');
   assert.equal(await page.inputValue('#pay-from'), '2026-01-01');
   // الطريقة
   const m = await page.evaluate(() => { const c = {}; for (const p of Egary.Store.state().payments) c[p.method || ''] = (c[p.method || ''] || 0) + 1; return Object.entries(c).filter(([k]) => k).sort((a, b) => b[1] - a[1])[0]; });
